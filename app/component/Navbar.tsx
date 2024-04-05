@@ -30,9 +30,9 @@ const Navbar = () => {
         !pathname.includes("sign") &&
         <nav className="bg-white p-container shadow-md">
             <div className="flex items-center justify-between px-5 py-5">
-                <div>
-                    <Link href={'/'}>
-                        <LogoIcon className="w-14 h-14" />
+                <div className="flex items-center">
+                    <Link href={'/'} className="absolute">
+                        <LogoIcon className="w-11 h-11" />
                     </Link>
                 </div>
                 <div className="flex items-center md:gap-7">

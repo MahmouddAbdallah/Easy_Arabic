@@ -7,7 +7,7 @@ const SignUp = async () => {
     if (user) {
         if (user.role == 'admin') {
             return (
-                <div className='flex justify-center items-center h-screen'>
+                <div className='flex justify-center items-center h-svh px-5'>
                     <div className="bg-white px-5 pb-10 w-full sm:w-[400px] rounded-md">
                         <div className="pt-5">
                             <span className="text-sm font-medium">

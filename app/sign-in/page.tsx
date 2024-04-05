@@ -8,7 +8,7 @@ const SignIn = () => {
         redirect('/')
     }
     return (
-        <div className='flex justify-center items-center h-screen'>
+        <div className='flex justify-center items-center h-svh px-5'>
             <div className="bg-white px-5 py-10 w-full sm:w-[400px] rounded-md">
                 <div className="">
                     <span className="text-sm">

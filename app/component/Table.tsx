@@ -59,10 +59,10 @@ const Table = () => {
 
     return (
         <div className='p-container py-10'>
-            <div className='bg-white py-3 lg:py-10 lg:px-10 rounded-xl space-y-10 shadow'>
+            <div className='bg-white py-5 lg:py-10 lg:px-10 rounded-xl space-y-10 shadow'>
                 {data?.map((item: any) => (
                     <div key={item.monthYear} >
-                        <div className='py-3 pl-2 text-xs font-semibold uppercase'>
+                        <div className='pb-5 pl-2 text-xs font-semibold uppercase'>
                             <span>DateTime : </span>
                             <span>{item.monthYear}</span>
                         </div>
@@ -138,14 +138,22 @@ const Table = () => {
                                             <td className="px-6 py-4 text-xs whitespace-nowrap">
                                                 {item.user.name}
                                             </td>
-                                            {(context?.user?.role == 'teacher' ||
-                                                context?.user?.role == 'admin') && <td className="px-6 py-4 text-xs">
-                                                    <button onClick={() => {
-                                                        setEdit(item)
-                                                        setOpen(true)
-                                                        document.body.style.overflowY = 'hidden'
-                                                    }} className='text-blue-600 font-semibold text-xs'>Edit</button>
-                                                </td>}
+                                            {
+                                                (context?.user?.role == 'teacher' ||
+                                                    context?.user?.role == 'admin') &&
+                                                <td className="px-6 py-4 text-xs">
+                                                    <button
+                                                        className='text-blue-600 font-semibold text-xs'
+                                                        onClick={() => {
+                                                            setEdit(item)
+                                                            setOpen(true)
+                                                            document.body.style.overflowY = 'hidden'
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                </td>
+                                            }
                                         </tr>
                                     ))}
                                 </tbody>

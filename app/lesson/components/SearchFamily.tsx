@@ -20,7 +20,6 @@ const SearchFamily: React.FC<props> = ({ className, placeholder, setValue, keywo
                 if (keyword) {
                     const { data } = await axios.get(`/api/family/keyword/${keyword}`)
                     setFamily(data?.data);
-                    setOpen(true)
                 } else {
                     setFamily([])
                     setOpen(false)
@@ -45,11 +44,12 @@ const SearchFamily: React.FC<props> = ({ className, placeholder, setValue, keywo
                 className={`${className}`}
                 onChange={(e) => {
                     setKeyword(e.target.value)
+                    setOpen(true)
                 }}
             />
             {
                 open &&
-                <ul className='absolute bg-white py-5 px-3 w-full rounded-b-md border-b border-l border-r'>
+                <ul className='absolute bg-white space-y-1 w-full rounded-md border-b border-black/50'>
                     {family?.map((item: any, i) => (
                         <li key={item.id}>
                             <button
@@ -58,7 +58,7 @@ const SearchFamily: React.FC<props> = ({ className, placeholder, setValue, keywo
                                     setOpen(false)
                                     setValue('familyId', item.id)
                                 }}
-                                className='flex gap-2 py-1 w-full'>
+                                className='flex gap-2 py-2 px-2 w-full bg-blue-50'>
                                 <div className='text-xs font-semibold bg-teal-500 text-white w-6 h-6 flex justify-center items-center rounded-full'>
                                     {item?.name?.split("")[0]}
                                 </div>

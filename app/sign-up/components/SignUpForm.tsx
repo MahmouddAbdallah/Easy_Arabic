@@ -27,6 +27,7 @@ const SignUpForm = ({ role }: { role: string }) => {
             router.push("/dashboard")
             setLoading(false)
         } catch (error: any) {
+            setLoading(false)
             toast.error(error?.response?.data?.message || 'There is an error');
             console.error(error);
         }
@@ -35,6 +36,7 @@ const SignUpForm = ({ role }: { role: string }) => {
         <div className=''>
             <form onSubmit={onSubmit} className='space-y-5'>
                 <input
+                    disabled={loading}
                     type="name"
                     placeholder='Full Name'
                     className={clsx(
@@ -45,6 +47,7 @@ const SignUpForm = ({ role }: { role: string }) => {
                 />
                 <ErrorMsg message={errors.name?.message as string} />
                 <input
+                    disabled={loading}
                     type="text"
                     placeholder='Email Address'
                     className={clsx(
@@ -55,6 +58,7 @@ const SignUpForm = ({ role }: { role: string }) => {
                 />
                 <ErrorMsg message={errors.email?.message as string} />
                 <input
+                    disabled={loading}
                     type="text"
                     placeholder='Phone number'
                     className={clsx(
@@ -65,6 +69,7 @@ const SignUpForm = ({ role }: { role: string }) => {
                 />
                 <ErrorMsg message={errors.phone?.message as string} />
                 <input
+                    disabled={loading}
                     type="password"
                     placeholder='Password'
                     className={clsx(
@@ -75,6 +80,7 @@ const SignUpForm = ({ role }: { role: string }) => {
                 />
                 <ErrorMsg message={errors.password?.message as string} />
                 <input
+                    disabled={loading}
                     type="password"
                     placeholder='Confirm password'
                     className={clsx(

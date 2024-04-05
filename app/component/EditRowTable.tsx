@@ -4,6 +4,7 @@ import SearchFamily from '../lesson/components/SearchFamily';
 import { CloseIcon, LoadingIcon } from './icons';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
+import ErrorMsg from './ErrorMsg';
 type editTypes = {
     family: { name: string },
     student: string,
@@ -64,7 +65,7 @@ const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
                 </div>
             </div>
             <div
-                className='w-full md:w-[500px] h-[90%] overflow-y-auto hide-scrollbar py-10 bg-white rounded-md z-50'
+                className='w-full md:w-[500px] overflow-y-auto hide-scrollbar py-5 lg:py-10 bg-white rounded-md z-50'
             >
                 <form onSubmit={onSubmit} className='px-5'>
                     <div className='flex flex-col gap-5'>
@@ -81,26 +82,29 @@ const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
                         <label className='space-y-2'>
                             <span className='text-sm text-black/80 font-semibold'>Student Name :</span>
                             <input
+                                {...register('student', { required: 'Please enter student name...' })}
                                 type="text"
-                                {...register('student')}
                                 value={edit.student}
                                 onChange={(e) => setEdit({ ...edit, student: e.target.value })}
                                 className='border w-full rounded-md py-2 px-3 outline-none placeholder:text-sm'
                             />
+                            <ErrorMsg message={edit.student ? "" : "Please enter student name" as string} />
                         </label>
                         <div className='space-y-2 w-full'>
                             <span className='block text-sm text-black/80 font-semibold'>Student Status:</span>
                             <div className='flex gap-5'>
-                                <label className='w-full bg-gray-100 p-3 flex items-center gap-3 rounded-md'>
-                                    <input type="radio"
-                                        value="Attended"
-                                        id="Attended"
-                                        {...register("status")}
-                                        checked={status === "Attended"}
-                                        onChange={(e) => setStatus(e.target.value as string)}
-                                        className='w-5 h-5'
-                                    />
-                                    <span className='text-xs text-black/80 font-semibold'>Attended</span>
+                                <label className='w-full bg-gray-100 p-3 rounded-md'>
+                                    <div className='flex items-center gap-3'>
+                                        <input type="radio"
+                                            value="Attended"
+                                            id="Attended"
+                                            {...register("status")}
+                                            checked={status === "Attended"}
+                                            onChange={(e) => setStatus(e.target.value as string)}
+                                            className='w-5 h-5'
+                                        />
+                                        <span className='text-xs text-black/80 font-semibold'>Attended</span>
+                                    </div>
                                 </label>
                                 <label className='w-full bg-gray-100 p-3 flex items-center gap-3 rounded-md'>
                                     <input
@@ -133,6 +137,7 @@ const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
                                 <option value="90" >90</option>
                                 <option value="120" >120</option>
                             </select>
+                            <ErrorMsg message={edit.duration ? "" : "Please enter Duration" as string} />
                         </label>
                         <label className='space-y-2'>
                             <span className='text-sm text-black/80 font-semibold'>Teacher reward:</span>
