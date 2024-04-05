@@ -24,12 +24,10 @@ const SignInForm = ({ role }: { role: string }) => {
                     "Accept": 'application/json'
                 }
             })
-            console.log(data);
-
-            // localStorage.setItem('user', JSON.stringify(data.user))
+            localStorage.setItem('user', JSON.stringify(data.user))
             toast.success(data.message);
             router.push("/")
-            // window.location.reload();
+            window.location.reload();
             setLoading(false)
         } catch (error: any) {
             setLoading(false)

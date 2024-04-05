@@ -17,33 +17,33 @@ const userVaild = z.object({
 })
 export async function POST(req: NextRequest, { params }: { params: Params }) {
     try {
-        //     const { role } = params
-        //     const body: bodyInterface = await req.json();
-        //     const vaildation = userVaild.safeParse(body);
-        //     if (!vaildation.success) return NextResponse.json(vaildation.error.errors[0], { status: 400 });
-        //     let user;
-        //     if (role == 'teacher') {
-        //     } else if (role == 'family') {
-        //         user = await prisma.family.findUnique({ where: { email: vaildation.data.email } })
-        //     }
-        //     if (!user) return NextResponse.json({ message: "Invaild user, please sign Up" }, { status: 400 })
-        //     else {
-        //         const isMatch = await bcrypt.compare(vaildation.data.password, user.password)
-        //         if (!isMatch) return NextResponse.json({ message: "Incorrect Password" }, { status: 400 })
-        //         const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET as string)
-        //         cookies()
-        //             .set({
-        //                 name: 'token',
-        //                 value: token,
-        //                 httpOnly: true,
-        //                 maxAge: 5454512,
-        //             })
-        //         if (user) {
-        //             delete (user as { password: unknown }).password;
-        //         }
-        const user = await prisma.user.findUnique({ where: { email: "mmaahm2002@gmail.com" } })
-        return NextResponse.json({ message: 'Sign In successfully!!', db: process.env.DATABASE_URL, prisma: user, user: { name: 'Mahmoud' }, status: 201 })
-        // }
+        const { role } = params
+        const body: bodyInterface = await req.json();
+        const vaildation = userVaild.safeParse(body);
+        if (!vaildation.success) return NextResponse.json(vaildation.error.errors[0], { status: 400 });
+        let user;
+        if (role == 'teacher') {
+            user = await prisma.user.findUnique({ where: { email: vaildation.data.email } })
+        } else if (role == 'family') {
+            user = await prisma.family.findUnique({ where: { email: vaildation.data.email } })
+        }
+        if (!user) return NextResponse.json({ message: "Invaild user, please sign Up" }, { status: 400 })
+        else {
+            const isMatch = await bcrypt.compare(vaildation.data.password, user.password)
+            if (!isMatch) return NextResponse.json({ message: "Incorrect Password" }, { status: 400 })
+            const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET as string)
+            cookies()
+                .set({
+                    name: 'token',
+                    value: token,
+                    httpOnly: true,
+                    maxAge: 5454512,
+                })
+            if (user) {
+                delete (user as { password: unknown }).password;
+            }
+            return NextResponse.json({ message: 'Sign In successfully!!', user, status: 201 })
+        }
     } catch (error: any) {
         return NextResponse.json({ error: error.message, message: 'Error in server' })
     }
