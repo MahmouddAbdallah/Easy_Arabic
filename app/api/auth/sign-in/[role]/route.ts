@@ -23,7 +23,6 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
         //     if (!vaildation.success) return NextResponse.json(vaildation.error.errors[0], { status: 400 });
         //     let user;
         //     if (role == 'teacher') {
-        //         user = await prisma.user.findUnique({ where: { email: vaildation.data.email } })
         //     } else if (role == 'family') {
         //         user = await prisma.family.findUnique({ where: { email: vaildation.data.email } })
         //     }
@@ -42,7 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
         //         if (user) {
         //             delete (user as { password: unknown }).password;
         //         }
-        return NextResponse.json({ message: 'Sign In successfully!!', db: process.env.DATABASE_URL, user: { name: 'Mahmoud' }, status: 201 })
+        const user = await prisma.user.findUnique({ where: { email: "mmaahm2002@gmail.com" } })
+        return NextResponse.json({ message: 'Sign In successfully!!', db: process.env.DATABASE_URL, prisma: user, user: { name: 'Mahmoud' }, status: 201 })
         // }
     } catch (error: any) {
         return NextResponse.json({ error: error.message, message: 'Error in server' })
