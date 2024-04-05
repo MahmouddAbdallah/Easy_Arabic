@@ -30,6 +30,7 @@ const SignInForm = ({ role }: { role: string }) => {
             window.location.reload();
             setLoading(false)
         } catch (error: any) {
+            setLoading(false)
             toast.error(error?.response?.data?.message || 'There is an error');
             console.error(error);
         }
@@ -39,6 +40,7 @@ const SignInForm = ({ role }: { role: string }) => {
     return (
         <form onSubmit={onSubmit} className='w-full space-y-5'>
             <input
+                disabled={loading}
                 type="text"
                 placeholder='Email Address'
                 className={clsx(
@@ -49,6 +51,7 @@ const SignInForm = ({ role }: { role: string }) => {
             />
             <ErrorMsg message={errors.email?.message as string} />
             <input
+                disabled={loading}
                 type="password"
                 placeholder='Password'
                 className={clsx(
