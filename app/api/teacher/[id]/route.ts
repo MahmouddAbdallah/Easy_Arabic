@@ -42,3 +42,35 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
         return NextResponse.json({ error: error.message, message: 'Error in server' })
     }
 }
+export async function DELETE(req: NextRequest, { params }: { params: Params }) {
+    try {
+        const { id } = params;
+        const lessons = await prisma.lesson.findMany({
+            where: {
+                userId: id,
+            }, select: {
+                id: true
+            }
+        });
+
+        // Delete all related lessons
+        const deleteLessonPromises = lessons.map(lesson =>
+            prisma.lesson.delete({
+                where: {
+                    id: lesson.id,
+                },
+            })
+        );
+
+        await Promise.all(deleteLessonPromises);
+
+        await prisma.user.delete({
+            where: {
+                id
+            }
+        })
+        return NextResponse.json({ message: 'Successfully deleted profile...' });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message, message: 'Error in server' })
+    }
+}

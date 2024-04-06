@@ -83,7 +83,7 @@ const TableProfile = ({ role, id }: { role: string, id: string }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {item.lessons?.map((item: any) => {
+                                    {item?.lessons?.map((item: any) => {
                                         const createdAt = readableFormat(item.createdAt)?.split(" ")
                                         const updatedAt = readableFormat(item.updatedAt)?.split(" ")
                                         return (

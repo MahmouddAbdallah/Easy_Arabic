@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import SearchFamily from './SearchFamily'
+import SearchFamily from '../../component/SearchFamily'
 import { useForm } from 'react-hook-form'
 import axios from 'axios'
 import { useRouter } from 'next/navigation'

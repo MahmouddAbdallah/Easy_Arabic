@@ -2,7 +2,6 @@
 import axios from 'axios'
 import React, { useState } from 'react'
 import { toast } from 'react-hot-toast'
-import ChangePassword from './ChangePassword'
 interface props {
     user: {
         id: string,
@@ -12,6 +11,7 @@ interface props {
         role: string
     }
 }
+
 const EditProfile: React.FC<props> = ({ user }) => {
     const [userData, setUserData] = useState(user)
     const [edit, setEdit] = useState(false)
@@ -27,6 +27,7 @@ const EditProfile: React.FC<props> = ({ user }) => {
             console.error(error);
         }
     }
+
     return (
         <div className='space-y-10'>
             <div className='bg-white py-3 px-5 md:flex justify-center lg:py-10 lg:px-10 rounded-xl space-y-10 shadow'>
@@ -76,11 +77,6 @@ const EditProfile: React.FC<props> = ({ user }) => {
                         </div>
                     </div>
                 </form>
-            </div>
-            <div className='bg-white py-3 px-5 md:flex justify-center lg:py-10 lg:px-10 rounded-xl space-y-10 shadow'>
-                <div className='pt-10'>
-                    <ChangePassword role={user.role} id={user.id} />
-                </div>
             </div>
         </div>
     )

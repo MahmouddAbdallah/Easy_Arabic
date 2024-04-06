@@ -1,6 +1,6 @@
 import React, { use, useState } from 'react'
 import { useForm } from 'react-hook-form';
-import SearchFamily from '../lesson/components/SearchFamily';
+import SearchFamily from './SearchFamily';
 import { CloseIcon, LoadingIcon } from './icons';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
@@ -21,8 +21,10 @@ interface props {
     setEdit: React.Dispatch<React.SetStateAction<editTypes>>
     setOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
+
 const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
-    const { register, setValue, handleSubmit } = useForm();
+
+    const { register, setValue, handleSubmit, formState: { errors } } = useForm();
     const [keyword, setKeyword] = useState(edit.family.name)
     const [status, setStatus] = useState(edit.status)
     const [loadDelete, setLoadDelete] = useState(false)
@@ -39,7 +41,6 @@ const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
             toast.error(error?.response?.data?.message || 'There is an error');
             console.error(error);
         }
-
     })
 
     const deleteRow = async () => {
@@ -54,6 +55,7 @@ const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
             console.error(error);
         }
     }
+
     return (
         <div className='fixed bg-black/20 w-full h-full left-0 top-0 flex justify-center items-center z-50 px-5'>
             <div onClick={() => {
@@ -160,6 +162,7 @@ const EditRowTable: React.FC<props> = ({ edit, setEdit, setOpen, open }) => {
                                 placeholder='Class date'
                                 className='border w-full rounded-md py-2 px-3 outline-none placeholder:text-sm'
                             />
+                            <ErrorMsg message={edit.classDate ? "" : "Please enter class date" as string} />
                         </label>
                         <div className='flex gap-3'>
                             <button

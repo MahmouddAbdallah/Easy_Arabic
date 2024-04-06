@@ -57,13 +57,14 @@ const ChangePassword = ({ role, id }: { role: string, id: string, }) => {
                     className=' p-2 rounded-md w-full border border-gray-400 disabled:placeholder:text-black/50  placeholder:text-blac outline-none focus:border-blue-500k'
                 />
                 <ErrorMsg message={errors.confirmPassword?.message as string} />
-
                 <div className='flex gap-5'>
                     <button
                         onClick={onSubmit}
                         disabled={!isValid}
-                        className="w-full py-2 rounded-md bg-blue-500 disabled:bg-blue-300 text-white font-semibold">Save</button>
-
+                        className="w-full py-2 rounded-md bg-blue-500 disabled:bg-blue-300 text-white font-semibold"
+                    >
+                        Save
+                    </button>
                 </div>
             </div>
         </form>

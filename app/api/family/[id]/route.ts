@@ -25,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
     try {
         const { id } = params;
         const body = await req.json();
-        const teacher = await prisma.family.update({
+        const family = await prisma.family.update({
             where: {
                 id
             }, data: {
@@ -35,8 +35,50 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
                 role: body.role,
             }
         })
-        return NextResponse.json({ user: teacher, message: 'Successfully updated' });
+        return NextResponse.json({ user: family, message: 'Successfully updated' });
     } catch (error: any) {
         return NextResponse.json({ error: error.message, message: 'Error in server' })
     }
 }
+export async function DELETE(req: NextRequest, { params }: { params: Params }) {
+    try {
+        const { id } = params;
+        const lessons = await prisma.lesson.findMany({
+            where: {
+                familyId: id,
+            }, select: {
+                id: true
+            }
+        });
+
+        // Delete all related lessons
+        const deleteLessonPromises = lessons.map(lesson =>
+            prisma.lesson.delete({
+                where: {
+                    id: lesson.id,
+                },
+            })
+        );
+
+        await Promise.all(deleteLessonPromises);
+        await prisma.family.delete({
+            where: {
+                id
+            }
+        })
+        return NextResponse.json({ message: 'Successfully deleted profile...' });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message, message: 'Error in server' })
+    }
+}
+/*
+        const url = new URL(req.url);
+        const searchParams = new URLSearchParams(url.search)
+        const select = searchParams.get("select");
+        const obj: { [key: string]: boolean } = {};
+        select?.split(',').forEach((element) => {
+            if (element in obj) return;
+            else obj[element] = true;
+        })
+        console.log(obj);
+*/

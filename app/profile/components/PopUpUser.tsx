@@ -1,41 +1,68 @@
-import { CloseIcon } from '@/app/component/icons'
 import Link from 'next/link'
-import React from 'react'
+import React, { useState } from 'react'
+import DeleteAccount from './DeleteAccount';
 interface props {
-    open: boolean,
     setOpen: React.Dispatch<React.SetStateAction<boolean>>,
     name: string,
     role: string,
 }
-const PopUpUser: React.FC<props> = ({ open, setOpen, name, role }) => {
+const PopUpUser: React.FC<props> = ({ setOpen, name, role }) => {
+    const [openDeleteAccount, setOpenDeleteAccount] = useState(false);
     const handleClosePopup = () => {
         setOpen(false)
         document.body.style.overflowY = 'auto'
     }
+
     return (
-        <div className='fixed w-full h-full left-0 top-0 bg-black/50 z-50 flex justify-center items-center'>
+        <div className='fixed w-full h-full left-0 top-0 bg-black/50 z-50 flex justify-center items-center px-5'>
+            <ul className='bg-white overflow-hidden rounded-xl w-full sm:w-[450px] z-50'>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-black/95'>
+                    <Link
+                        onClick={handleClosePopup}
+                        href={`${role == 'admin' ? 'teacher' : role}/edit`}
+                        className='w-full block py-[17px] font-medium'
+                    >
+                        Edit profile
+                    </Link>
+                </li>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-black/95'>
+                    <Link
+                        onClick={handleClosePopup}
+                        href={`${role == 'admin' ? 'teacher' : role}/rest-password`}
+                        className='w-full block py-[17px] font-medium'
+                    >
+                        Rest password
+                    </Link>
+                </li>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-red-500'>
+                    <button
+                        onClick={() => {
+                            setOpenDeleteAccount(true)
+                        }}
+                        className='w-full block py-[17px]'
+                    >
+                        Delete account
+                    </button>
+                </li>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-black/95'>
+                    <button
+                        onClick={handleClosePopup}
+                        className='w-full block py-[17px]'
+                    >
+                        Cancel
+                    </button>
+                </li>
+            </ul>
+            {
+                openDeleteAccount &&
+                <DeleteAccount
+                    name={name}
+                    setOpen={setOpenDeleteAccount}
+                    role={role}
+                />
+            }
             <div onClick={handleClosePopup} className='w-full h-full fixed left-0 top-0' />
-            <div className="px-5 w-full lg:flex justify-center">
-                <div className='bg-white overflow-hidden rounded-xl z-50 w-full lg:w-[450px]'>
-                    <div className='bg-gray-200 flex items-center justify-end px-2 py-2'>
-                        <button onClick={handleClosePopup}>
-                            <CloseIcon className='w-6 h-6 cursor-pointer ' />
-                        </button>
-                    </div>
-                    <div className='space-y-5'>
-                        <div className='px-4 pt-5'>
-                            <span className='text-sm'>Do you want to eidt &ldquo;<span className='font-semibold'>{name}</span>&ldquo; profile ?</span>
-                        </div>
-                        <div className='border-t '>
-                            <div className='float-right space-x-3 p-3'>
-                                <button onClick={handleClosePopup} className='px-5 py-2 font-medium bg-gray-400 text-xs text-white  rounded-md'>Cancel</button>
-                                <Link href={`${role == 'admin' ? 'teacher' : role}/edit`} onClick={handleClosePopup} className='px-5 py-2 font-medium bg-blue-500 text-xs text-white  rounded-md'>Edit</Link>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </div >
     )
 }
 

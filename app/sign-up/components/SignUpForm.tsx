@@ -24,8 +24,11 @@ const SignUpForm = ({ role }: { role: string }) => {
                 }
             })
             toast.success(data.message);
-            router.push("/dashboard")
             setLoading(false)
+            router.push("/dashboard")
+            setTimeout(() => {
+                document.location.reload()
+            }, 2000)
         } catch (error: any) {
             setLoading(false)
             toast.error(error?.response?.data?.message || 'There is an error');

@@ -1,7 +1,7 @@
 'use client'
 import axios from 'axios';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { FieldValues, UseFormSetValue } from 'react-hook-form';
+import { FieldValues, UseFormSetError, UseFormSetValue } from 'react-hook-form';
 import toast from 'react-hot-toast';
 interface props {
     className: string,

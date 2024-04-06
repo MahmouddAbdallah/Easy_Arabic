@@ -25,7 +25,9 @@ const Navbar = () => {
         }
     }
 
-    const elementRef = useClickOutside(() => setOpen(false))
+    const closeMenu = () => { setOpen(false) }
+    const elementRef = useClickOutside(closeMenu)
+
     return (
         !pathname.includes("sign") &&
         <nav className="bg-white p-container shadow-md">
@@ -36,38 +38,46 @@ const Navbar = () => {
                     </Link>
                 </div>
                 <div className="flex items-center md:gap-7">
-                    <ul className="flex gap-5">
+                    <ul className="hidden md:flex gap-5">
                         <li className={clsx(
-                            "hidden md:block font-semibold",
+                            "font-semibold",
                             { 'text-blue-500': pathname == "/" }
                         )}>
-                            <Link href={'/'}>Home</Link>
+                            <Link href={'/'}>
+                                Home
+                            </Link>
                         </li>
                         {
                             (context?.user?.role == 'teacher' || context?.user?.role == 'admin') &&
                             <li className={clsx(
-                                "hidden md:block font-semibold",
+                                "font-semibold",
                                 { 'text-blue-500': pathname.includes('lesson') }
                             )}>
-                                <Link href={'/lesson'}>Add Class</Link>
+                                <Link href={'/lesson'}>
+                                    Add Class
+                                </Link>
                             </li>
                         }
                         {
                             (context?.user?.role == 'admin') &&
                             <li className={clsx(
-                                "hidden md:block font-semibold",
+                                "font-semibold",
                                 { 'text-blue-500': pathname.includes('dashboard') }
                             )}>
-                                <Link href={'/dashboard'} className="w-full py-1">Dashboard</Link>
+                                <Link href={'/dashboard'} className="w-full py-1">
+                                    Dashboard
+                                </Link>
                             </li>
                         }
                         {
                             (context?.user?.role == 'admin') &&
                             <li className={clsx(
-                                "hidden md:block font-semibold",
+                                "font-semibold",
                                 { 'text-blue-500': pathname.includes('Sign up') }
                             )}>
-                                <Link href={'/sign-up'} className="w-full py-1">Sign up</Link>
+                                <Link href={'/sign-up'} className="w-full py-1">
+                                    Sign up
+                                </Link>
                             </li>
                         }
                     </ul>
@@ -75,32 +85,58 @@ const Navbar = () => {
                         context?.user?.name ?
                             <div ref={elementRef} className="relative">
                                 <button onClick={() => setOpen(!open)} className="flex items-center gap-2 md:bg-blue-50 px-3 py-[6px] rounded-md relative">
-                                    <div className="text-xs font-semibold bg-blue-500 text-white w-6 h-6 flex justify-center items-center rounded-full">{context?.user?.name?.split('')[0]}</div>
-                                    <span className="text-sm hidden md:block">{context?.user?.name}</span>
+                                    <div className="text-xs font-semibold bg-blue-500 text-white w-6 h-6 flex justify-center items-center rounded-full">
+                                        {context?.user?.name?.split('')[0]}
+                                    </div>
+                                    <span className="text-sm hidden md:block">
+                                        {context?.user?.name}
+                                    </span>
                                 </button>
                                 {
                                     open &&
                                     <ul className="absolute bg-white w-36 md:w-full border top-9 -right-2 md:right-0 rounded-b-md z-50 ">
-                                        <li><Link href={'/'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">Home</Link></li>
+                                        <li>
+                                            <Link onClick={closeMenu} href={'/'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">
+                                                Home
+                                            </Link>
+                                        </li>
                                         {
                                             (context?.user?.role == 'teacher' || context?.user?.role == 'admin') &&
-                                            <li><Link href={'/lesson'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">Lesson</Link></li>
+                                            <li>
+                                                <Link onClick={closeMenu} href={'/lesson'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">
+                                                    Add Class
+                                                </Link>
+                                            </li>
                                         }
                                         {
                                             (context?.user?.role == 'admin') &&
-                                            <li><Link href={'/dashboard'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">Dsahboard</Link></li>
+                                            <li>
+                                                <Link onClick={closeMenu} href={'/dashboard'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">
+                                                    Dsahboard
+                                                </Link>
+                                            </li>
                                         }
                                         {
                                             (context?.user?.role == 'admin') &&
-                                            <li><Link href={'/sign-up'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">sign-up</Link></li>
+                                            <li>
+                                                <Link onClick={closeMenu} href={'/sign-up'} className="w-full flex uppercase md:hidden px-5 py-3 font-medium text-sm text-center border-b">
+                                                    sign-up
+                                                </Link>
+                                            </li>
                                         }
-                                        <li><button onClick={logout} className="w-full flex uppercase px-5 py-3 font-medium text-sm text-center border-b ">logout</button></li>
+                                        <li>
+                                            <button onClick={logout} className="w-full flex uppercase px-5 py-3 font-medium text-sm text-center border-b ">
+                                                logout
+                                            </button>
+                                        </li>
                                     </ul>
                                 }
                             </div>
                             :
                             <div>
-                                <Link href={'/sign-in'} className="text-xs font-semibold bg-blue-500 text-white px-5 py-2 rounded-md">Sign In</Link>
+                                <Link href={'/sign-in'} className="text-xs font-semibold bg-blue-500 text-white px-5 py-2 rounded-md">
+                                    Sign In
+                                </Link>
                             </div>
                     }
                 </div>
