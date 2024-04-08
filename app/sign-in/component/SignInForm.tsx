@@ -12,7 +12,7 @@ const SignInForm = ({ role }: { role: string }) => {
 
     const [loading, setLoading] = useState(false)
     const router = useRouter()
-    const { register, handleSubmit, formState: { errors, isValid } } = useForm();
+    const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm();
 
 
     const onSubmit = handleSubmit(async (formData) => {
@@ -27,6 +27,7 @@ const SignInForm = ({ role }: { role: string }) => {
             localStorage.setItem('user', JSON.stringify(data.user))
             toast.success(data.message);
             router.push("/")
+            reset()
             window.location.reload();
             setLoading(false)
         } catch (error: any) {

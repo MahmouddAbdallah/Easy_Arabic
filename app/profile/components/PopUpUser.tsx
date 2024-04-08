@@ -16,7 +16,7 @@ const PopUpUser: React.FC<props> = ({ setOpen, name, role }) => {
     return (
         <div className='fixed w-full h-full left-0 top-0 bg-black/50 z-50 flex justify-center items-center px-5'>
             <ul className='bg-white overflow-hidden rounded-xl w-full sm:w-[450px] z-50'>
-                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-black/95'>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/20 text-black/95'>
                     <Link
                         onClick={handleClosePopup}
                         href={`${role == 'admin' ? 'teacher' : role}/edit`}
@@ -25,7 +25,7 @@ const PopUpUser: React.FC<props> = ({ setOpen, name, role }) => {
                         Edit profile
                     </Link>
                 </li>
-                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-black/95'>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/20 text-black/95'>
                     <Link
                         onClick={handleClosePopup}
                         href={`${role == 'admin' ? 'teacher' : role}/rest-password`}
@@ -34,7 +34,7 @@ const PopUpUser: React.FC<props> = ({ setOpen, name, role }) => {
                         Rest password
                     </Link>
                 </li>
-                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-red-500'>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/20 text-red-500'>
                     <button
                         onClick={() => {
                             setOpenDeleteAccount(true)
@@ -44,7 +44,7 @@ const PopUpUser: React.FC<props> = ({ setOpen, name, role }) => {
                         Delete account
                     </button>
                 </li>
-                <li className='w-full text-center text-sm border-b-[1.5px] border-black/50 text-black/95'>
+                <li className='w-full text-center text-sm border-b-[1.5px] border-black/20 text-black/95'>
                     <button
                         onClick={handleClosePopup}
                         className='w-full block py-[17px]'

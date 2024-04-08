@@ -13,8 +13,10 @@ interface props {
 }
 
 const EditProfile: React.FC<props> = ({ user }) => {
+
     const [userData, setUserData] = useState(user)
     const [edit, setEdit] = useState(false)
+
     const onSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
         try {
             e.preventDefault();
@@ -41,29 +43,33 @@ const EditProfile: React.FC<props> = ({ user }) => {
                             disabled={!edit}
                             value={userData.name}
                             onChange={(e) => setUserData({ ...userData, name: e.target.value })}
-                            className=' p-2 rounded-md w-full border border-gray-400 disabled:text-black/70 outline-none focus:border-blue-500 placeholder:text-black'
+                            className=' p-2 rounded-md w-full border border-gray-400 text-black disabled:text-black/70 outline-none focus:border-blue-500'
                         />
                         <input
                             type="text"
                             disabled={!edit}
                             value={userData.email}
                             onChange={(e) => setUserData({ ...userData, email: e.target.value })}
-                            className=' p-2 rounded-md w-full border border-gray-400 disabled:text-black/70 outline-none focus:border-blue-500 placeholder:text-black'
+                            className=' p-2 rounded-md w-full border border-gray-400 text-black disabled:text-black/70 outline-none focus:border-blue-500'
                         />
                         <input
                             type="text"
                             disabled={!edit}
                             value={userData.phone}
                             onChange={(e) => setUserData({ ...userData, phone: e.target.value })}
-                            className=' p-2 rounded-md w-full border border-gray-400 disabled:text-black/70 outline-none focus:border-blue-500 placeholder:text-black'
+                            className=' p-2 rounded-md w-full border border-gray-400 text-black disabled:text-black/70 outline-none focus:border-blue-500'
                         />
-                        <input
-                            type="text"
-                            disabled={!edit}
-                            value={userData.role}
-                            onChange={(e) => setUserData({ ...userData, role: e.target.value })}
-                            className=' p-2 rounded-md w-full border border-gray-400 disabled:text-black/70 outline-none focus:border-blue-500 placeholder:text-black'
-                        />
+                        {!(user.role == 'family') &&
+                            <select
+                                disabled={!edit}
+                                value={userData.role}
+                                onChange={(e) => setUserData({ ...userData, role: e.target.value })}
+                                className=' p-2 rounded-md w-full border border-gray-400 text-black disabled:text-black/70 outline-none focus:border-blue-500'
+                            >
+                                <option value="teacher">teacher</option>
+                                <option value="admin">admin</option>
+                            </select>
+                        }
                         <div className='flex gap-5'>
                             <button
                                 onClick={onSubmit}

@@ -13,7 +13,7 @@ const SignIn = ({ params }: { params: Params }) => {
         redirect('/sign-in')
     }
     return (
-        <div className='flex justify-center items-center h-screen px-5'>
+        <div className='flex justify-center items-center h-svh px-5'>
             <div className='w-full sm:w-[400px] bg-white px-10 sm:px-5 py-10 rounded-md '>
                 <div className="text-center pb-10">
                     <span className="text-lg uppercase font-semibold">{role}</span>

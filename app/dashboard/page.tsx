@@ -9,9 +9,14 @@ const Dashboard = async () => {
         if (user.role == 'admin') {
             return (
                 <div className='p-container py-10'>
-                    <div className='py-10 bg-white lg:px-5 shadow rounded-xl space-y-10'>
-                        <Teachers />
-                        <Families />
+                    <div className='py-10 bg-white lg:px-5 shadow rounded-xl space-y-2'>
+                        <div className="text-center">
+                            <span className='lg:text-lg font-medium'>Dashboard</span>
+                        </div>
+                        <div className='space-y-10'>
+                            <Teachers />
+                            <Families />
+                        </div>
                     </div>
                 </div>
             )

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
                     TeacherReward: body.TeacherReward
                 },
             })
-            return NextResponse.json({ lesson: newLesson, message: 'success' });
+            return NextResponse.json({ lesson: newLesson, message: 'Successfully create lesson' });
         } else {
             return NextResponse.json({ message: 'fail' });
         }

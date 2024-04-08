@@ -5,17 +5,23 @@ import { useForm } from 'react-hook-form'
 import axios from 'axios'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
+import { LoadingIcon } from '@/app/component/icons'
 
 const LessonForm = () => {
-    const { register, handleSubmit, setValue } = useForm()
+    const { register, handleSubmit, setValue, reset } = useForm()
     const [status, setStatus] = useState("")
     const [keyword, setKeyword] = useState('')
+    const [loading, setLoading] = useState(false)
+
 
     const router = useRouter();
     const onSubmit = handleSubmit(async (formData) => {
         try {
+            setLoading(true)
             const { data } = await axios.post('/api/lesson', { ...formData })
-            console.log(data);
+            toast.success(data.message as string);
+            reset();
+            setLoading(false)
             router.push("/")
         } catch (error: any) {
             toast.error(error?.response?.data?.message || 'There is an error');
@@ -39,7 +45,7 @@ const LessonForm = () => {
                 <label className='space-y-2'>
                     <span className='text-sm text-black/80 font-semibold'>Student Name:</span>
                     <input
-                        {...register('student')}
+                        {...register('student', { required: 'Student name' })}
                         type='text'
                         placeholder='Student Name...'
                         className='border w-full rounded-md py-2 px-3 outline-none placeholder:text-sm'
@@ -52,7 +58,7 @@ const LessonForm = () => {
                             <input type="radio"
                                 value="Attended"
                                 id="Attended"
-                                {...register("status")}
+                                {...register("status", { required: 'Attended or not' })}
                                 checked={status === "Attended"}
                                 onChange={(e) => setStatus(e.target.value as string)}
                                 className='w-5 h-5'
@@ -62,7 +68,7 @@ const LessonForm = () => {
                         <label className='w-full bg-gray-100 p-3 flex items-center gap-3 rounded-md'>
                             <input
                                 type='radio'
-                                {...register("status")}
+                                {...register("status", { required: 'Absent or not' })}
                                 value="Absent"
                                 id="Absent"
                                 checked={status === "Absent"}
@@ -76,7 +82,7 @@ const LessonForm = () => {
                 <label className='space-y-2'>
                     <span className='text-sm text-black/80 font-semibold'>Duration:</span>
                     <select
-                        {...register('duration')}
+                        {...register('duration', { required: 'Please enter a duration' })}
                         className='border w-full rounded-md py-2 px-3 outline-none placeholder:text-sm'
                     >
                         <option value="" >Choose</option>
@@ -101,13 +107,18 @@ const LessonForm = () => {
                 <label className='space-y-2'>
                     <span className='text-sm text-black/80 font-semibold'>Class date</span>
                     <input
-                        {...register("classDate")}
+                        {...register("classDate", { required: 'Please select a date' })}
                         type='date'
                         placeholder='Class date'
                         className='border w-full rounded-md py-2 px-3 outline-none placeholder:text-sm'
                     />
                 </label>
-                <button className='bg-blue-500 py-2 rounded-md text-white text-sm'>Add class</button>
+                <button
+                    disabled={loading}
+                    className='bg-blue-500 disabled:bg-blue-300 py-2 rounded-md text-white text-sm flex justify-center'
+                >
+                    {loading ? <LoadingIcon className='animate-spin w-5 h-5' /> : "Add class"}
+                </button>
             </div>
         </form>
     )

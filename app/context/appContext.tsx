@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 
 interface UserInterface {
@@ -21,12 +21,15 @@ interface appContextProps {
 }
 const AppContextProvider: React.FC<appContextProps> = ({ children }) => {
     const [user, setUser] = useState<UserInterface | null>(null)
-    useEffect(() => {
+    const fetchUser = useCallback(() => {
         const userData = localStorage?.getItem('user');
         if (userData) {
             setUser(JSON.parse(userData));
         }
-    }, []);
+    }, [])
+    useEffect(() => {
+        fetchUser()
+    }, [fetchUser]);
     return (
         <appContext.Provider value={{ user, setUser }}>
             {children}

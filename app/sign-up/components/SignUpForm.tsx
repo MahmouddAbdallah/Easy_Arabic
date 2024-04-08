@@ -9,10 +9,10 @@ import { useRouter } from 'next/navigation'
 import { LoadingIcon } from '@/app/component/icons';
 
 const SignUpForm = ({ role }: { role: string }) => {
-    const [loading, setLoading] = useState(false)
-    const router = useRouter()
 
-    const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm();
+    const router = useRouter()
+    const [loading, setLoading] = useState(false)
+    const { register, handleSubmit, watch, reset, formState: { errors, isValid } } = useForm();
 
     const onSubmit = handleSubmit(async (formData) => {
         try {
@@ -25,6 +25,7 @@ const SignUpForm = ({ role }: { role: string }) => {
             })
             toast.success(data.message);
             setLoading(false)
+            reset();
             router.push("/dashboard")
             setTimeout(() => {
                 document.location.reload()
