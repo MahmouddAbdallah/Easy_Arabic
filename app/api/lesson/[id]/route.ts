@@ -34,15 +34,15 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
                         updatedAt: new Date()
                     }
                 })
-                return NextResponse.json({ lesson: newLesson, message: 'Successfully updated' });
+                return NextResponse.json({ lesson: newLesson, message: 'Successfully updated' }, { status: 200 });
             } else {
-                return NextResponse.json({ message: 'Not allow' });
+                return NextResponse.json({ message: 'Not allow' }, { status: 400 });
             }
         } else {
-            return NextResponse.json({ message: 'fail' });
+            return NextResponse.json({ message: 'fail' }, { status: 400 });
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }
 
@@ -54,11 +54,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
             const newLesson = await prisma.lesson.delete({
                 where: { id: id }
             })
-            return NextResponse.json({ lesson: newLesson, message: 'Successfully deleted' });
+            return NextResponse.json({ lesson: newLesson, message: 'Successfully deleted' }, { status: 200 });
         } else {
-            return NextResponse.json({ message: 'fail' });
+            return NextResponse.json({ message: 'fail' }, { status: 400 });
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }

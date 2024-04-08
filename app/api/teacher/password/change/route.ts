@@ -19,18 +19,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Params }) {
                         where: { id: id },
                         data: { password: await bcrypt.hash(body.newPassword, 10) as string }
                     })
-                    return NextResponse.json({ message: 'Changed password' });
+                    return NextResponse.json({ message: 'Changed password' }, { status: 200 });
                 }
                 else {
-                    return NextResponse.json({ message: 'In valid user' });
+                    return NextResponse.json({ message: 'In valid user' }, { status: 400 });
                 }
             } else {
-                return NextResponse.json({ message: 'Not allow' });
+                return NextResponse.json({ message: 'Not allow' }, { status: 400 });
             }
         } else {
-            return NextResponse.json({ message: 'fail' });
+            return NextResponse.json({ message: 'fail' }, { status: 400 });
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }

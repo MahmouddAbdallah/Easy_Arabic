@@ -15,14 +15,14 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
                 },
             })
             if (data) {
-                return NextResponse.json({ data, message: 'successfully' });
+                return NextResponse.json({ data, message: 'successfully' }, { status: 200 });
             } else {
-                return NextResponse.json({ message: 'there is no family name ' });
+                return NextResponse.json({ message: 'there is no family name ' }, { status: 400 });
             }
         } else {
-            return NextResponse.json({ message: 'There is no  keyword provided' });
+            return NextResponse.json({ message: 'There is no  keyword provided' }, { status: 400 });
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }

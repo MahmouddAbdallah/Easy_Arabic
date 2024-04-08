@@ -68,7 +68,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
         })
         return NextResponse.json({ message: 'Successfully deleted profile...' });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }
 /*

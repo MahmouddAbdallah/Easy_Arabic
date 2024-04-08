@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
             if (user) {
                 delete (user as { password: unknown }).password;
             }
-            return NextResponse.json({ message: 'Sign In successfully!!', user, status: 201 })
+            return NextResponse.json({ message: 'Sign In successfully!!', user, status: 200 })
         }
     } catch (error: any) {
         return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })

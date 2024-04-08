@@ -56,6 +56,6 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
             }
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }

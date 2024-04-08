@@ -7,15 +7,15 @@ export async function GET(req: NextRequest,) {
         if (user) {
             if (user.role == 'admin') {
                 const families = await prisma?.family.findMany()
-                return NextResponse.json({ message: 'Get suessfully', families })
+                return NextResponse.json({ message: 'Get suessfully', families }, { status: 200 })
             } else {
-                return NextResponse.json({ message: 'Not Allow' })
+                return NextResponse.json({ message: 'Not Allow' }, { status: 400 })
             }
         }
         else {
-            return NextResponse.json({ message: 'Not Allow' })
+            return NextResponse.json({ message: 'Not Allow' }, { status: 400 })
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }

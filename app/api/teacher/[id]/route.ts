@@ -16,13 +16,14 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
                 role: true
             }
         })
-        return NextResponse.json({ user: teacher, message: 'success' });
-
+        return NextResponse.json({ user: teacher, message: 'success' }, { status: 200 });
 
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }
+
+
 export async function PUT(req: NextRequest, { params }: { params: Params }) {
     try {
         const { id } = params;
@@ -37,9 +38,9 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
                 role: body.role,
             }
         })
-        return NextResponse.json({ user: teacher, message: 'Successfully updated' });
+        return NextResponse.json({ user: teacher, message: 'Successfully updated' }, { status: 200 });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }
 export async function DELETE(req: NextRequest, { params }: { params: Params }) {
@@ -69,8 +70,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
                 id
             }
         })
-        return NextResponse.json({ message: 'Successfully deleted profile...' });
+        return NextResponse.json({ message: 'Successfully deleted profile...' }, { status: 200 });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }

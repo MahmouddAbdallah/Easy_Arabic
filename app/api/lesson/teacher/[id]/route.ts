@@ -47,12 +47,12 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
                     lessons
                 };
             });
-            return NextResponse.json({ tables })
+            return NextResponse.json({ tables }, { status: 200 })
 
         } else {
-            return NextResponse.json({ message: 'fail' });
+            return NextResponse.json({ message: 'fail' }, { status: 400 });
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message, message: 'Error in server' })
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
     }
 }
