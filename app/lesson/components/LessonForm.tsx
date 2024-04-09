@@ -23,6 +23,7 @@ const LessonForm = () => {
             reset();
             setLoading(false)
             router.push("/")
+            setTimeout(() => { window.location.reload() }, 1000)
         } catch (error: any) {
             toast.error(error?.response?.data?.message || 'There is an error');
             console.error(error);

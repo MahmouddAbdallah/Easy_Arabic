@@ -1,13 +1,16 @@
 'use client'
 import ErrorMsg from '@/app/component/ErrorMsg'
+import { LoadingIcon } from '@/app/component/icons'
 import axios from 'axios'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-hot-toast'
 
 const RestPassword = ({ role, id }: { role: string, id: string, }) => {
 
     const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm()
+    const [loading, setLoading] = useState(false)
     const router = useRouter()
     const onSubmit = handleSubmit(async (formData) => {
         try {
@@ -55,10 +58,10 @@ const RestPassword = ({ role, id }: { role: string, id: string, }) => {
                     <div className='flex gap-5'>
                         <button
                             onClick={onSubmit}
-                            disabled={!isValid}
+                            disabled={!isValid || loading}
                             className="w-full py-2 rounded-md bg-blue-500 disabled:bg-blue-300 text-white font-semibold"
                         >
-                            Rest password
+                            {loading ? <LoadingIcon className='animate-spin w-5 h-5' /> : "Rest password"}
                         </button>
                     </div>
                 </div>

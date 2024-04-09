@@ -1,14 +1,12 @@
 'use client'
-import axios from 'axios';
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useAppContext } from '../context/appContext';
 import EditRowTable from './EditRowTable';
+import { sumMoney } from '@/lib/function';
 
 const Table = () => {
-    const [data, setData] = useState([]);
-    const [open, setOpen] = useState(false);
     const context = useAppContext()
-
+    const [open, setOpen] = useState(false);
     const [edit, setEdit] = useState({
         family: { name: "" },
         student: "",
@@ -19,48 +17,10 @@ const Table = () => {
         TeacherReward: ""
     });
 
-    const fetchDataTeacher = useCallback(async () => {
-        try {
-            const { data } = await axios.get(`/api/lesson/teacher/${context?.user?.id}`)
-            setData(data.tables);
-        } catch (error) {
-            console.error(error);
-        }
-    }, [context?.user?.id])
-
-    useEffect(() => {
-        if ((context?.user?.role == 'teacher' || context?.user?.role == 'admin')) {
-            fetchDataTeacher();
-        }
-    }, [context?.user?.role, fetchDataTeacher])
-
-    const fetchDataFamily = useCallback(async () => {
-        try {
-            const { data } = await axios.get(`/api/lesson/family/${context?.user?.id}`)
-            setData(data.tables);
-        } catch (error) {
-            console.error(error);
-        }
-    }, [context?.user?.id])
-
-    useEffect(() => {
-        if (context?.user?.role == 'family') {
-            fetchDataFamily();
-        }
-    }, [context?.user?.role, fetchDataFamily])
-
-    const sumMoney = (lesson: any) => {
-        let sum: number = 0;
-        lesson?.map((lesson: any) => {
-            sum += lesson.money
-        })
-        return sum
-    }
-
     return (
         <div className='p-container py-10'>
             <div className='bg-white py-5 lg:py-10 lg:px-10 rounded-xl space-y-10 shadow'>
-                {data?.map((item: any) => (
+                {context?.data?.map((item: any) => (
                     <div key={item.monthYear} >
                         <div className='pb-5 pl-2 text-xs font-semibold uppercase'>
                             <span>DateTime : </span>
@@ -132,8 +92,15 @@ const Table = () => {
                                             <td className="px-6 py-4 text-xs">
                                                 {item.classDate}
                                             </td>
-                                            <td className="px-6 py-4 text-xs">
-                                                {item.TeacherReward}
+                                            <td className="px-6 py-4 text-xs text-center">
+                                                {item.TeacherReward ?
+                                                    item.TeacherReward :
+                                                    <div className='relative text-center flex items-center'>
+                                                        <span className='text-center w-full block text-2xl absolute'>
+                                                            -
+                                                        </span>
+                                                    </div>
+                                                }
                                             </td>
                                             <td className="px-6 py-4 text-xs whitespace-nowrap">
                                                 {item.user.name}
@@ -184,7 +151,7 @@ const Table = () => {
                         </div>
                     </div>
                 ))}
-                {!data?.length &&
+                {!context?.data?.length &&
                     <div>
                         <div className=' py-5 md:py-10 text-center bg-white rounded-md'>
                             No data available yet.

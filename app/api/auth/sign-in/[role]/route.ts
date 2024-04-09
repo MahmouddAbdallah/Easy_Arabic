@@ -42,6 +42,13 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
             if (user) {
                 delete (user as { password: unknown }).password;
             }
+            await prisma.notification.create({
+                data: {
+                    userId: user.id,
+                    isRead: false,
+                    type: 'UpdateLesson'
+                }
+            })
             return NextResponse.json({ message: 'Sign In successfully!!', user, status: 200 })
         }
     } catch (error: any) {

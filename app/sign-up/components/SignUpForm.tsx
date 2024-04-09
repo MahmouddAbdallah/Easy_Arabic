@@ -6,17 +6,19 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation'
-import { LoadingIcon } from '@/app/component/icons';
+import { EyeIcon, EyeOffIcon, LoadingIcon } from '@/app/component/icons';
 
 const SignUpForm = ({ role }: { role: string }) => {
 
     const router = useRouter()
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(false);
+    const [showPass, setShowPass] = useState(false);
     const { register, handleSubmit, watch, reset, formState: { errors, isValid } } = useForm();
 
     const onSubmit = handleSubmit(async (formData) => {
         try {
-            setLoading(true)
+            setLoading(true);
+            setShowPass(false)
             const { data } = await axios.post(`/api/auth/sign-up/${role}`, { ...formData }, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -72,16 +74,28 @@ const SignUpForm = ({ role }: { role: string }) => {
                     {...register('phone', { required: 'The phone is required' })}
                 />
                 <ErrorMsg message={errors.phone?.message as string} />
-                <input
-                    disabled={loading}
-                    type="password"
-                    placeholder='Password'
-                    className={clsx(
-                        'p-2 rounded-md w-full border outline-none focus:border-blue-500 placeholder:text-sm',
-                        { 'border-red-500 focus:border-red-500': errors?.password?.message }
-                    )}
-                    {...register('password', { required: 'The password is required' })}
-                />
+                <div className='relative flex items-center'>
+                    <input
+                        disabled={loading}
+                        type={showPass ? 'text' : 'password'}
+                        placeholder='Password'
+                        className={clsx(
+                            'p-2 rounded-md w-full border outline-none focus:border-blue-500 placeholder:text-sm',
+                            { 'border-red-500 focus:border-red-500': errors?.password?.message }
+                        )}
+                        {...register('password', { required: 'The password is required' })}
+                    />
+                    <button
+                        disabled={loading}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            setShowPass(!showPass)
+                        }} className='absolute right-3'>
+                        {showPass ? <EyeIcon className='w-5 h-5 fill-blue-500' /> :
+                            <EyeOffIcon className='w-5 h-5 fill-blue-500' />
+                        }
+                    </button>
+                </div>
                 <ErrorMsg message={errors.password?.message as string} />
                 <input
                     disabled={loading}

@@ -29,6 +29,17 @@ export async function POST(req: NextRequest) {
                     TeacherReward: body.TeacherReward
                 },
             })
+            const notification = await prisma.notification.create({
+                data: {
+                    lessonId: newLesson.id,
+                    userId: verify.id,
+                    isRead: false,
+                    type: 'NewLesson'
+                }
+            })
+            if (!notification) {
+                await prisma.lesson.delete({ where: { id: newLesson.id } })
+            }
             return NextResponse.json({ lesson: newLesson, message: 'Successfully create lesson' }, { status: 201 });
         } else {
             return NextResponse.json({ message: 'fail' }, { status: 400 });
