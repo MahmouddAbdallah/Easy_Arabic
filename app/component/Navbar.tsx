@@ -82,9 +82,12 @@ const Navbar = () => {
                             </li>
                         }
                     </ul>
-                    <div className="flex items-center">
-                        {/* <Notification /> */}
-                    </div>
+                    {
+                        (context?.user?.role == 'admin') &&
+                        <div className="flex items-center">
+                            <Notification />
+                        </div>
+                    }
                     <div>
                         {
                             context?.user?.name ?

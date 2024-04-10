@@ -34,16 +34,18 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
                         updatedAt: new Date()
                     }
                 })
-                const notification = await prisma.notification.create({
-                    data: {
-                        lessonId: updateLesson.id,
-                        userId: verify.id,
-                        isRead: false,
-                        type: 'UpdateLesson'
+                if (verify.role != 'admin') {
+                    const notification = await prisma.notification.create({
+                        data: {
+                            lessonId: updateLesson.id,
+                            userId: verify.id,
+                            isRead: false,
+                            type: 'UpdateLesson'
+                        }
+                    })
+                    if (!notification) {
+                        await prisma.lesson.delete({ where: { id: updateLesson.id } })
                     }
-                })
-                if (!notification) {
-                    await prisma.lesson.delete({ where: { id: updateLesson.id } })
                 }
                 return NextResponse.json({ lesson: updateLesson, message: 'Successfully updated' }, { status: 200 });
             } else {
@@ -65,16 +67,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
             const deletedLesson = await prisma.lesson.delete({
                 where: { id: id }
             })
-            const notification = await prisma.notification.create({
-                data: {
-                    lessonId: deletedLesson.id,
-                    userId: verify.id,
-                    isRead: false,
-                    type: 'DeletedLesson'
+            if (verify.role != 'admin') {
+                const notification = await prisma.notification.create({
+                    data: {
+                        lessonId: deletedLesson.id,
+                        userId: verify.id,
+                        isRead: false,
+                        type: 'deleted lesson'
+                    }
+                })
+                if (!notification) {
+                    await prisma.lesson.delete({ where: { id: deletedLesson.id } })
                 }
-            })
-            if (!notification) {
-                await prisma.lesson.delete({ where: { id: deletedLesson.id } })
             }
             return NextResponse.json({ lesson: deletedLesson, message: 'Successfully deleted' }, { status: 200 });
         } else {

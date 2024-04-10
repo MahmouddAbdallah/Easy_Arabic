@@ -14,7 +14,8 @@ type AppContextTypes = {
     user: UserInterface | null,
     setUser: React.Dispatch<React.SetStateAction<UserInterface | null>>,
     data: any,
-    notification: any
+    notification?: any
+    setNotification: React.Dispatch<React.SetStateAction<any>>
 }
 const appContext = createContext<AppContextTypes | undefined>(undefined);
 
@@ -68,7 +69,7 @@ const AppContextProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchNotification = useCallback(async () => {
         try {
             const { data } = await axios.get(`/api/notification`)
-            setNotification(data.notification);
+            setNotification(data);
         } catch (error) {
             console.error(error);
         }
@@ -79,7 +80,7 @@ const AppContextProvider = ({ children }: { children: React.ReactNode }) => {
         }
     }, [fetchNotification, user?.role])
     return (
-        <appContext.Provider value={{ user, setUser, data, notification }}>
+        <appContext.Provider value={{ user, setUser, data, notification, setNotification }}>
             {children}
             <Toaster position='bottom-right' toastOptions={{ 'duration': 3000 }} />
         </appContext.Provider>

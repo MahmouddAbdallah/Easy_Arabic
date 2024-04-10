@@ -66,16 +66,16 @@ const Families = async () => {
                                         <td className="px-6 py-4 text-xs whitespace-nowrap">
                                             {item.email}
                                         </td>
-                                        <td className="px-6 py-4 text-xs">
+                                        <td className="px-6 py-4 text-xs whitespace-nowrap">
                                             {item.phone}
                                         </td>
-                                        <td className="px-6 py-4 text-xs">
+                                        <td className="px-6 py-4 text-xs whitespace-nowrap">
                                             {item.role}
                                         </td>
-                                        <td className="px-6 py-4 text-xs">
+                                        <td className="px-6 py-4 text-xs whitespace-nowrap">
                                             {sumDuration(item.Lesson)}
                                         </td>
-                                        <td className="px-6 py-4 text-xs text-black">
+                                        <td className="px-6 py-4 text-xs whitespace-nowrap text-black">
                                             {sumMoney(item.Lesson)}
                                         </td>
                                     </tr>

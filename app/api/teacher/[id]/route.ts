@@ -62,8 +62,23 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
                 },
             })
         );
+        const notification = await prisma.notification.findMany({
+            where: {
+                userId: id,
+            }, select: {
+                id: true
+            }
+        });
+        const deleteNotificationPromises = notification.map(notification =>
+            prisma.lesson.delete({
+                where: {
+                    id: notification.id,
+                },
+            })
+        );
 
         await Promise.all(deleteLessonPromises);
+        await Promise.all(deleteNotificationPromises);
 
         await prisma.user.delete({
             where: {
