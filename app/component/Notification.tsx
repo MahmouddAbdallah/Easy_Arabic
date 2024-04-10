@@ -32,7 +32,7 @@ const Notification = () => {
                 }
             </button>
             {open &&
-                <div className="absolute top-10 bg-white z-50 rounded-xl w-80 md:w-96 right-1 lg:-right-20  overflow-y-auto max-h-[80svh]">
+                <div className="absolute top-10 bg-white z-50 rounded-xl w-80 md:w-96 -right-20 lg:-right-20  overflow-y-auto max-h-[80svh]">
                     {context?.notification?.data?.map((item: any) => {
                         console.log(item);
 
