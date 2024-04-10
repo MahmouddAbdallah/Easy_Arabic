@@ -65,12 +65,13 @@ const SignInForm = ({ role }: { role: string }) => {
                     {...register('password', { required: 'The password is required' })}
                 />
                 <button
-                    disabled={!isValid || loading}
+                    disabled={loading}
                     onClick={(e) => {
                         e.preventDefault();
                         setShowPass(!showPass)
                     }} className='absolute right-3'>
-                    {showPass ? <EyeIcon className='w-5 h-5 fill-blue-500' /> :
+                    {showPass
+                        ? <EyeIcon className='w-5 h-5 fill-blue-500' /> :
                         <EyeOffIcon className='w-5 h-5 fill-blue-500' />
                     }
                 </button>

@@ -29,9 +29,12 @@ export async function GET(req: NextRequest) {
                         type: true,
                         isRead: true,
                         createdAt: true,
-                    }
+                    },
+                    orderBy: { createdAt: "desc" }
                 });
-                const isRead = await prisma.notification.findMany({ where: { isRead: false } })
+                const isRead = await prisma.notification.findMany({
+                    where: { isRead: false },
+                })
                 return NextResponse.json({ message: 'Successfully fetch notification !!', data: notification, isRead: isRead.length }, { status: 200 });
 
             } else {
@@ -52,7 +55,7 @@ export async function PUT(req: NextRequest) {
                 await prisma.notification.updateMany({
                     data: {
                         isRead: true,
-                    }
+                    },
                 })
                 return NextResponse.json({ message: 'Readed' }, { status: 200 });
             } else {
