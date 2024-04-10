@@ -66,7 +66,7 @@ const SignInForm = ({ role }: { role: string }) => {
                 />
                 <button
                     disabled={!isValid || loading}
-                    onMouseDown={(e) => {
+                    onClick={(e) => {
                         e.preventDefault();
                         setShowPass(!showPass)
                     }} className='absolute right-3'>
