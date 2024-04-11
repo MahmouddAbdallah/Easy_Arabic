@@ -13,6 +13,7 @@ const SignUpForm = ({ role }: { role: string }) => {
     const router = useRouter()
     const [loading, setLoading] = useState(false);
     const [showPass, setShowPass] = useState(false);
+    const [showPassConfirm, setShowPassConfirm] = useState(false);
     const { register, handleSubmit, watch, reset, formState: { errors, isValid } } = useForm();
 
     const onSubmit = handleSubmit(async (formData) => {
@@ -97,25 +98,37 @@ const SignUpForm = ({ role }: { role: string }) => {
                     </button>
                 </div>
                 <ErrorMsg message={errors.password?.message as string} />
-                <input
-                    disabled={loading}
-                    type="password"
-                    placeholder='Confirm password'
-                    className={clsx(
-                        'p-2 rounded-md w-full border outline-none focus:border-blue-500 placeholder:text-sm',
-                        { 'border-red-500 focus:border-red-500': errors?.password?.message }
-                    )}
-                    {...register('confirmPassword', {
-                        required: 'Please Enter Password',
-                        validate: (val) => {
-                            if (!val) {
-                                return "Please enter your password again.";
-                            } else if (watch('password') != val) {
-                                return "Passwords do not match!";
+                <div className='relative flex items-center'>
+                    <input
+                        disabled={loading}
+                        type={showPassConfirm ? 'text' : 'password'}
+                        placeholder='Confirm password'
+                        className={clsx(
+                            'p-2 rounded-md w-full border outline-none focus:border-blue-500 placeholder:text-sm',
+                            { 'border-red-500 focus:border-red-500': errors?.password?.message }
+                        )}
+                        {...register('confirmPassword', {
+                            required: 'Please Enter Password',
+                            validate: (val) => {
+                                if (!val) {
+                                    return "Please enter your password again.";
+                                } else if (watch('password') != val) {
+                                    return "Passwords do not match!";
+                                }
                             }
+                        })}
+                    />
+                    <button
+                        disabled={loading}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            setShowPassConfirm(!showPassConfirm)
+                        }} className='absolute right-3'>
+                        {showPassConfirm ? <EyeIcon className='w-5 h-5 fill-blue-500' /> :
+                            <EyeOffIcon className='w-5 h-5 fill-blue-500' />
                         }
-                    })}
-                />
+                    </button>
+                </div>
                 <ErrorMsg message={errors.confirmPassword?.message as string} />
                 <button
                     disabled={!isValid || loading}
