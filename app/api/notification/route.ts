@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
                         id: true,
                         user: {
                             select: {
+                                id: true,
                                 name: true,
                                 email: true,
                             }
@@ -20,8 +21,8 @@ export async function GET(req: NextRequest) {
                             select: {
                                 family: {
                                     select: {
+                                        id: true,
                                         name: true,
-                                        email: true,
                                     }
                                 }
                             }
@@ -58,6 +59,23 @@ export async function PUT(req: NextRequest) {
                     },
                 })
                 return NextResponse.json({ message: 'Readed' }, { status: 200 });
+            } else {
+                return NextResponse.json({ message: 'Not allow' }, { status: 400 });
+            }
+        } else {
+            return NextResponse.json({ message: 'fail' }, { status: 400 });
+        }
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message, message: 'Error in server' }, { status: 400 })
+    }
+}
+export async function DELETE(req: NextRequest) {
+    try {
+        const verify = await verifyAuth();
+        if (verify) {
+            if (verify.role == 'admin') {
+                await prisma.notification.deleteMany()
+                return NextResponse.json({ message: 'Delete all notification successfully!!' }, { status: 200 });
             } else {
                 return NextResponse.json({ message: 'Not allow' }, { status: 400 });
             }

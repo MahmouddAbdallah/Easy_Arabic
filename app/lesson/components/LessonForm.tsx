@@ -6,13 +6,14 @@ import axios from 'axios'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
 import { LoadingIcon } from '@/app/component/icons'
+import { useAppContext } from '@/app/context/appContext'
 
 const LessonForm = () => {
     const { register, handleSubmit, setValue, reset } = useForm()
     const [status, setStatus] = useState("")
     const [keyword, setKeyword] = useState('')
     const [loading, setLoading] = useState(false)
-
+    const context = useAppContext()
 
     const router = useRouter();
     const onSubmit = handleSubmit(async (formData) => {
@@ -23,7 +24,7 @@ const LessonForm = () => {
             reset();
             setLoading(false)
             router.push("/")
-            setTimeout(() => { window.location.reload() }, 1000)
+            context?.setUpdateLesson(!context?.updateLesson)
         } catch (error: any) {
             toast.error(error?.response?.data?.message || 'There is an error');
             console.error(error);

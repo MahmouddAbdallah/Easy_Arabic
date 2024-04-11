@@ -15,7 +15,9 @@ type AppContextTypes = {
     setUser: React.Dispatch<React.SetStateAction<UserInterface | null>>,
     data: any,
     notification?: any
-    setNotification: React.Dispatch<React.SetStateAction<any>>
+    setNotification: React.Dispatch<React.SetStateAction<any>>,
+    updateLesson: boolean,
+    setUpdateLesson: React.Dispatch<React.SetStateAction<boolean>>,
 }
 const appContext = createContext<AppContextTypes | undefined>(undefined);
 
@@ -24,6 +26,7 @@ const AppContextProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<UserInterface | null>(null)
     const [data, setData] = useState([]);
     const [notification, setNotification] = useState([]);
+    const [updateLesson, setUpdateLesson] = useState(false)
 
     const fetchUser = useCallback(() => {
         const userData = localStorage?.getItem('user');
@@ -49,7 +52,7 @@ const AppContextProvider = ({ children }: { children: React.ReactNode }) => {
         if ((user?.role == 'teacher' || user?.role == 'admin')) {
             fetchDataTeacher();
         }
-    }, [user?.role, fetchDataTeacher])
+    }, [user?.role, fetchDataTeacher, updateLesson])
 
     const fetchDataFamily = useCallback(async () => {
         try {
@@ -80,7 +83,7 @@ const AppContextProvider = ({ children }: { children: React.ReactNode }) => {
         }
     }, [fetchNotification, user?.role])
     return (
-        <appContext.Provider value={{ user, setUser, data, notification, setNotification }}>
+        <appContext.Provider value={{ user, setUser, data, notification, setNotification, updateLesson, setUpdateLesson }}>
             {children}
             <Toaster position='bottom-right' toastOptions={{ 'duration': 3000 }} />
         </appContext.Provider>

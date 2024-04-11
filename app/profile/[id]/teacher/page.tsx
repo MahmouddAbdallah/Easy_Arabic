@@ -6,6 +6,14 @@ import axios from 'axios';
 import UserInfo from '../../components/UserInfo';
 import TableProfile from '../../components/TableProfile';
 
+export async function generateMetadata({ params }: { params: Params }) {
+    const { id } = params
+    const { data } = await axios.get(`/api/teacher/${id}`)
+    return {
+        title: data?.user?.name || 'DELETD ACCOUNT',
+    }
+}
+
 const Teacher = async ({ params }: { params: Params }) => {
     const user = await verifyAuth();
     if (user) {

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
                         lessonId: newLesson.id,
                         userId: verify.id,
                         isRead: false,
-                        type: 'create new Lesson'
+                        type: 'Create new lesson'
                     }
                 })
                 if (!notification) {

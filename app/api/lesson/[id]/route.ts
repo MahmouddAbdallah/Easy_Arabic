@@ -65,7 +65,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
         const verify = await verifyAuth();
         if (verify) {
             const deletedLesson = await prisma.lesson.delete({
-                where: { id: id }
+                where: { id: id },
+                select: {
+                    id: true,
+                    family: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
+                }
             })
             if (verify.role != 'admin') {
                 const notification = await prisma.notification.create({
@@ -73,7 +82,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
                         lessonId: deletedLesson.id,
                         userId: verify.id,
                         isRead: false,
-                        type: 'deleted lesson'
+                        type: `Deleted one lesson for family ${deletedLesson.family.name} family ${deletedLesson.family.id}`
                     }
                 })
                 if (!notification) {
