@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   description: `Easy Arabic this website is like exel and will work for you. this website has been designed to be table aligned with other languages, Mahmoud Ragab is the Admin of this website and he is can help family to find the best teacher for learning 
   if you want to learn more language please tell admin to immerse you in this website. 
   `,
+  icons: {
+    icon: "./favicon.svg"
+  }
 };
 axios.defaults.baseURL = 'http://localhost:3000';
 axios.defaults.withCredentials = true;
