@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 
 
 export const metadata: Metadata = {
-    title: "Add class",
-    description: `you can add a class in this page to your component.`
+    title: "Lessons",
 };
 export default function RootLayout({
     children,

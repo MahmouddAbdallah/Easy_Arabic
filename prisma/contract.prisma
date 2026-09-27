@@ -1,0 +1,82 @@
+// use prisma-8
+enum Role {
+  admin
+  teacher
+  family
+}
+
+enum Status {
+  active
+  banned
+  suspended
+}
+
+model User {
+  id                  String            @id @default(uuid())
+  name                String
+  email               String            @unique
+  phone               String
+  password            String
+  passwordLastChanged TimestamptzString @default(now())
+  role                Role              @default(family)
+  createdAt           TimestamptzString @default(now())
+  updatedAt           TimestamptzString @default(now())
+  status              Status            @default(active)
+  subject             String            @default("Quran")
+
+  @@index([role])
+}
+
+enum TeacherReward {
+  EXCELLENT
+  VERY_GOOD
+  GOOD
+  NEUTRAL
+  NOT_BAD
+  POOR
+  VERY_POOR
+  TERRIBLE
+}
+
+model Lesson {
+  id            String            @id @default(uuid())
+  teacherId     String
+  familyId      String
+  student       String
+  status        String
+  classDate     TimestamptzString
+  money         Int
+  duration      Int //['15', '30', '45', '60', '75', '90', '120'] 
+  TeacherReward TeacherReward     @default(GOOD)
+  createdAt     TimestamptzString @default(now())
+  updatedAt     TimestamptzString @default(now())
+
+  teacher       User              @relation(fields:[teacherId], references:[id], "TeacherLesson")
+  family        User              @relation(fields:[familyId], references:[id], "FamilyLesson")
+
+  @@index([familyId])
+  @@index([teacherId])
+  @@index([classDate])
+  @@index([createdAt])
+}
+
+model TeacherFamily {
+  id        String   @id @default(uuid())
+  teacherId String
+  familyId  String
+
+  teacher   User     @relation(fields:[teacherId], references:[id], "Teacher")
+  family    User     @relation(fields:[familyId], references:[id], "Family")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@unique([teacherId, familyId])
+}
+
+model MoneyPerLesson {
+  id        String @id @default(uuid())
+  money     Int    @default(0)
+  teacherId String @unique
+  teacher   User   @relation(fields:[teacherId], references:[id], "Teacher")
+}

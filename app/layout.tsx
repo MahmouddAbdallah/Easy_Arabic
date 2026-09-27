@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Geist } from "next/font/google";
 import "./globals.css";
-import Navbar from "./component/Navbar";
-import axios from "axios";
-import AppContextProvider from "./context/appContext";
+import { themeBootstrapScript } from "@/lib/theme";
+import { cn } from "@/lib/utils";
+import { authorization } from "@/lib/verifyAuth";
+import { AppProvider } from "@/components/AppContext";
+import { Toaster } from "react-hot-toast";
+
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,23 +20,37 @@ export const metadata: Metadata = {
     icon: "./favicon.svg"
   }
 };
-axios.defaults.baseURL = 'http://localhost:3000';
-axios.defaults.withCredentials = true;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { user } = await authorization();
+
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <AppContextProvider>
-          <Navbar />
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
+      <body className={inter.className} suppressHydrationWarning>
+        <AppProvider userData={user}>
           <main>
             {children}
           </main>
-        </AppContextProvider>
+          <Toaster
+            position={'bottom-right'}
+            reverseOrder={false}
+            gutter={12}
+            toastOptions={{
+              style: {
+                background: 'var(--card)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
+              }
+            }}
+          />
+        </AppProvider>
       </body>
     </html>
   );

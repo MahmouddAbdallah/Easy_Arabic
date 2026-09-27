@@ -1,16 +1,30 @@
-import Table from "./component/Table";
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+import About from '@/components/landing/About'
+import CTA from '@/components/landing/Cta'
+import Features from '@/components/landing/Features'
+import Footer from '@/components/Footer'
+import ForRoleSection from '@/components/landing/ForRole'
+import HeroSection from '@/components/landing/Hero'
+import { authorization } from '@/lib/verifyAuth'
 
-export default function Home() {
-  const token = cookies().get('token')
-
-  if (!token) {
-    redirect('/sign-in')
+const page = async () => {
+  const { user } = await authorization();
+  if (user) {
+    return (
+      <div>
+        login
+      </div>
+    )
   }
   return (
-    <div >
-      <Table />
+    <div>
+      <HeroSection />
+      <About />
+      <Features />
+      <ForRoleSection />
+      <CTA />
+      <Footer />
     </div>
-  );
+  )
 }
+
+export default page
