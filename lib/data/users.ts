@@ -1,3 +1,4 @@
+'use server';
 import { prismaArgs } from "@/lib/prismaArgs";
 import { db } from "@/prisma/db";
 
@@ -15,8 +16,6 @@ export const getUser = async (userId: string, select?: string[]) => {
         })
             .select(...(selectedFields as any))
             .first();
-
-
         return {
             success: true,
             data: user,

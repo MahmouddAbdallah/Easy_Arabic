@@ -77,7 +77,7 @@ const InputMessage = () => {
         <div className="p-3 md:p-4 border-t border-border/30 bg-card/10 backdrop-blur-md shrink-0">
             <form
                 onSubmit={handleSubmit(onSubmit)}
-                className="max-w-3xl mx-auto flex flex-col gap-2"
+                className="max-w-full mx-auto flex flex-col gap-2"
             >
                 {selectedFile && (
                     <div className="flex items-center gap-2 bg-muted/60 border border-border/40 rounded-xl px-3 py-1.5 text-xs text-muted-foreground w-fit">

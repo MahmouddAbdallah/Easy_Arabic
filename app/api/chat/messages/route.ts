@@ -97,14 +97,7 @@ export async function PATCH(req: NextRequest) {
         await batch.commit();
 
         return NextResponse.json(
-            {
-                success: true,
-                data: {
-                    chatId,
-                    messageId: messagesRef.id,
-                    sentAt: now,
-                },
-            },
+            { success: true, },
             { status: 200 }
         );
     } catch (error) {

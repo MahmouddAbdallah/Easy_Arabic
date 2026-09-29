@@ -2,10 +2,10 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BookOpen, Users, Award, Mail } from "lucide-react";
-import TabsListTeacher from "@/components/dashboard/teacher/TabsListTeacher";
+import TabsListTeacher from "@/components/dashboard/teachers/TabsListTeacher";
 import { getUser } from "@/lib/data/users";
 import { getMoney, getTeacherFamilies } from "@/lib/data/families";
-import TeacherRateBadge from '@/components/dashboard/teacher/MoneyPerLessonView';
+import TeacherRateBadge from '@/components/dashboard/teachers/MoneyPerLessonView';
 
 const RootLayout = async ({ children, params }: {
     params: Promise<{ id: string }>,

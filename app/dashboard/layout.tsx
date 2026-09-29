@@ -1,18 +1,18 @@
-import type { Metadata } from "next";
+import { Navbar } from "@/components/dashboard/Navbar/Navbar";
+import { Sidebar } from "@/components/dashboard/Navbar/Sidebar";
 
-
-export const metadata: Metadata = {
-    title: "Dashboard",
-    description: `you can add a class in this page to your component.`
-};
-export default function RootLayout({
-    children,
-}: Readonly<{
-    children: React.ReactNode;
-}>) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     return (
-        <>
-            {children}
-        </>
+        <div className="min-h-screen bg-slate-50/50 dark:bg-zinc-950 lg:flex">
+            <Sidebar />
+
+            <div className="flex-1 flex flex-col min-h-screen">
+                <Navbar />
+
+                <main className="flex-1">
+                    {children}
+                </main>
+            </div>
+        </div>
     );
 }

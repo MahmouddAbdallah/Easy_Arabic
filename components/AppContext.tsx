@@ -42,6 +42,7 @@ const AppProvider = ({ children, userData }: { children: ReactNode; userData?: u
             <div>
                 {!pathname.includes('sign') &&
                     !pathname.includes('chat') &&
+                    !pathname.includes('dashboard') &&
                     <Navbar />
                 }
                 {children}

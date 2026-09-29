@@ -6,34 +6,43 @@ import { Sparkles, Send, PhoneCall, Mail, ShieldCheck, CheckCircle2, Headphones,
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
+import ErrorMsg from '../ErrorMsg';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
 export default function ContactHero() {
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting }, } = useForm({
+  const { register, handleSubmit, reset, formState: { errors }, } = useForm({
     defaultValues: {
-      fullName: '',
+      name: '',
       email: '',
       phone: '',
-      topic: 'enrollment',
       message: '',
     },
   });
 
-  const onSubmit = async (data: any) => {
-    console.log('Form Data Submitted:', data);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+  const onSubmit = handleSubmit(async (data) => {
+    try {
+      setIsLoading(true);
+      console.log(data);
 
-    setSubmitted(true);
-  };
+      await axios.post('/api/contact', { ...data });
+      setSubmitted(true)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error?.message || error?.response?.data?.message || 'Something went wrong');
+    } finally {
+      setIsLoading(false);
+    }
+  })
 
   return (
-    <section className="relative w-full h-screen min-h-[850px] max-h-[1080px] overflow-hidden bg-background flex items-center justify-center border-b border-border/40">
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-linear-to-b from-primary/20 via-accent/10 to-transparent blur-[160px] rounded-full pointer-events-none -z-10" />
-      <div className="absolute top-1/2 -left-40 -translate-y-1/2 w-[550px] h-[550px] bg-secondary/15 blur-[180px] rounded-full pointer-events-none -z-10" />
-      <div className="absolute bottom-0 -right-32 w-[600px] h-[600px] bg-primary/10 blur-[180px] rounded-full pointer-events-none -z-10" />
-      <div className="absolute inset-0 bg-[linear-linear(to_right,#80808012_1px,transparent_1px),linear-linear(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-linear(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
+    <section className="relative w-full overflow-hidden bg-background flex items-center justify-center border-b border-border/40">
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-225 h-125 bg-linear-to-b from-primary/20 via-accent/10 to-transparent blur-[160px] rounded-full pointer-events-none -z-10" />
+      <div className="absolute top-1/2 -left-40 -translate-y-1/2 size-138 bg-secondary/15 blur-[180px] rounded-full pointer-events-none -z-10" />
+      <div className="absolute bottom-0 -right-32 size-150 bg-primary/10 blur-[180px] rounded-full pointer-events-none -z-10" />
+      <div className="absolute inset-0 bg-[linear-linear(to_right,#80808012_1px,transparent_1px),linear-linear(to_bottom,#80808012_1px,transparent_1px)] bg-size-[40px_40px] mask-[radial-linear(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
       <div className="container max-w-7xl px-4 md:px-6 h-full flex flex-col justify-between py-8 md:py-12">
 
         <div className="h-2" />
@@ -115,7 +124,7 @@ export default function ContactHero() {
                   </Button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
+                <form onSubmit={onSubmit} className="space-y-3.5">
 
                   <div className="space-y-1 mb-1">
                     <h2 className="text-xl font-bold text-foreground">Send us a Message</h2>
@@ -124,13 +133,11 @@ export default function ContactHero() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-foreground">Full Name</label>
                     <Input
-                      placeholder="e.g. Dr. Ahmed Al-Mansoor"
-                      {...register('fullName')}
+                      placeholder="e.g. Ahmed Al-Mansoor"
+                      {...register('name', { required: 'Please Enter your name.' })}
                       className="h-10 rounded-xl border-border/80 bg-background/60 backdrop-blur-md text-sm focus-visible:ring-primary/50"
                     />
-                    {errors.fullName && (
-                      <p className="text-[11px] font-medium text-destructive">{errors.fullName.message}</p>
-                    )}
+                    <ErrorMsg message={errors?.name?.message as string} />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div className="space-y-1.5">
@@ -138,42 +145,21 @@ export default function ContactHero() {
                       <Input
                         type="email"
                         placeholder="ahmed@example.com"
-                        {...register('email')}
+                        {...register('email', { required: 'Please enter your email.' })}
                         className="h-10 rounded-xl border-border/80 bg-background/60 backdrop-blur-md text-sm focus-visible:ring-primary/50"
                       />
-                      {errors.email && (
-                        <p className="text-[11px] font-medium text-destructive">{errors.email.message}</p>
-                      )}
+                      <ErrorMsg message={errors?.email?.message as string} />
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-foreground">Phone Number</label>
                       <Input
-                        placeholder="+1 (555) 000-0000"
+                        placeholder="+20 10 000 000 00"
                         {...register('phone')}
                         className="h-10 rounded-xl border-border/80 bg-background/60 backdrop-blur-md text-sm focus-visible:ring-primary/50"
                       />
-                      {errors.phone && (
-                        <p className="text-[11px] font-medium text-destructive">{errors.phone.message}</p>
-                      )}
+                      <ErrorMsg message={errors?.phone?.message as string} />
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-foreground">Topic of Inquiry</label>
-                    <Select>
-                      <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background/60 backdrop-blur-md text-sm focus:ring-primary/50">
-                        <SelectValue placeholder="Select a topic" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-border/80 bg-card/95 backdrop-blur-xl">
-                        <SelectItem value="enrollment">Family Membership & Enrollment</SelectItem>
-                        <SelectItem value="tutor">Request Specific Sanad Tutor</SelectItem>
-                        <SelectItem value="custom">Custom Schedule & Private Classes</SelectItem>
-                        <SelectItem value="other">General Question</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.topic && (
-                      <p className="text-[11px] font-medium text-destructive">{errors.topic.message}</p>
-                    )}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-foreground">Your Message</label>
@@ -183,17 +169,15 @@ export default function ContactHero() {
                       {...register('message')}
                       className="rounded-xl border-border/80 bg-background/60 backdrop-blur-md text-sm focus-visible:ring-primary/50 resize-none"
                     />
-                    {errors.message && (
-                      <p className="text-[11px] font-medium text-destructive">{errors.message.message}</p>
-                    )}
+                    <ErrorMsg message={errors?.message?.message as string} />
                   </div>
                   <Button
                     type="submit"
                     size="lg"
-                    disabled={isSubmitting}
+                    disabled={isLoading}
                     className="w-full h-11 text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_25px_-5px_rgba(0,0,0,0.3)] shadow-primary/40 transition-all hover:scale-[1.01] active:scale-[0.98] rounded-xl mt-1"
                   >
-                    {isSubmitting ? (
+                    {isLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         <span>Sending Message...</span>

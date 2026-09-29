@@ -4,10 +4,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ArrowLeftIcon, ImageIcon, InfoIcon, MoreVerticalIcon, PhoneIcon, SearchIcon, VideoIcon } from 'lucide-react'
 import { useChat } from '../ChatProvider'
-import UserStatusDisplay from '../UserStatusDisplay'
+import UserStatusDisplay from '../UserStatusDisplay';
+import { useRouter } from 'next/navigation'
 
 const ChatHeader = () => {
-    const { receiver } = useChat();
+    const { receiver, } = useChat();
+    const { back } = useRouter();
     return (
         <div className="h-16 px-4 md:px-6 border-b border-border/40 flex items-center justify-between bg-card/20 backdrop-blur-md shrink-0">
             <div className="flex items-center gap-3">
@@ -15,7 +17,9 @@ const ChatHeader = () => {
                 <Button
                     variant="ghost"
                     size="icon"
-                    // onClick={onBack}
+                    onClick={() => {
+                        back();
+                    }}
                     className="md:hidden h-9 w-9 text-muted-foreground rounded-xl"
                 >
                     <ArrowLeftIcon className="h-5 w-5" />

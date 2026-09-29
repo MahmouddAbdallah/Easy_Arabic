@@ -80,7 +80,7 @@ const Navbar = () => {
         {
             label: "Sign Up",
             href: "/sign-up",
-            show: context?.user?.role === 'admin',
+            show: context?.user ? false : true,
             icon: <UserPlus className="w-4 h-4" />
         },
     ]

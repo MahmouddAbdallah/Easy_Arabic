@@ -95,7 +95,6 @@ const LessonForm: React.FC<LessonFormProps> = ({
         <Card className={clsx(
             " rounded-lg bg-card",
             initialData ? 'w-full ring-0' : ' max-w-3xl mx-auto border border-border/80 shadow-sm',
-
         )}>
             <CardHeader className="border-b border-border/70 pb-4">
                 <div className="flex items-center gap-2">

@@ -80,3 +80,18 @@ model MoneyPerLesson {
   teacherId String @unique
   teacher   User   @relation(fields:[teacherId], references:[id], "Teacher")
 }
+
+
+model Contact {
+  id        String   @id @default(uuid())
+  email     String
+  name      String
+  subject   String?
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt     TimestamptzString @default(now())
+  updatedAt     TimestamptzString @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+}

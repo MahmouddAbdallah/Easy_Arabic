@@ -44,10 +44,10 @@ const PaginationPage = ({
     const endRecord = Math.min(page * pageSize, records);
 
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-3.5 bg-background/60 backdrop-blur-md border-t border-border/40 text-xs text-muted-foreground select-none">
+      <div className="flex flex-row items-center justify-between md:gap-4 px-3 md:px-6 py-3.5 bg-background/60 backdrop-blur-md border-t border-border/40 text-xs text-muted-foreground select-none">
         {/* Info Text */}
         <div className="flex items-center gap-1.5 font-medium tracking-wide">
-          <span>Showing</span>
+          <span className="hidden md:block">Showing</span>
           <span className="font-semibold text-foreground px-1.5 py-0.5 rounded-md bg-muted/50 border border-border/30">
             {startRecord}–{endRecord}
           </span>
@@ -55,11 +55,11 @@ const PaginationPage = ({
           <span className="font-semibold text-foreground px-1.5 py-0.5 rounded-md bg-muted/50 border border-border/30">
             {records}
           </span>
-          <span>results</span>
+          <span className="hidden md:block">results</span>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center md:gap-3">
           <div className="text-xs font-semibold px-3 py-1 rounded-full bg-muted/40 border border-border/30 text-foreground">
             Page {page} <span className="text-muted-foreground font-normal">of {total}</span>
           </div>

@@ -1,4 +1,4 @@
-import { StudentsList } from '@/components/dashboard/teacher/StudentsList';
+import { StudentsList } from '@/components/dashboard/teachers/StudentsList';
 import { TabsContent } from '@/components/ui/tabs'
 import { getFamiliesOfTeacher } from '@/lib/data/users';
 

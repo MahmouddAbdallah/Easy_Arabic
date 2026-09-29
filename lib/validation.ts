@@ -102,3 +102,13 @@ export const reorderSchema = z.object({
 export function firstValidationMessage(error: z.ZodError): string {
     return error.issues[0]?.message ?? 'Invalid input';
 }
+
+export const contactSchema = z.object({
+    name: z.string('Please enter the name'),
+    email: z.string().email('Please enter valid email!'),
+    phone: z.preprocess(
+        (val) => (val === '' ? undefined : val),
+        z.string().optional().nullable()
+    ),
+    message: z.string('Please enter your message')
+});

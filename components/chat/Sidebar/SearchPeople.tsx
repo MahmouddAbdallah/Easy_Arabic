@@ -52,7 +52,6 @@ const SearchPeople = () => {
 
             try {
                 const { data } = await axios.get(`/api/chat/sidebar/search?keyword=${searchQuery}`);
-                console.log(data?.users);
                 setResults(data?.users || []);
             } catch (error) {
                 console.error("Error fetching people:", error);
