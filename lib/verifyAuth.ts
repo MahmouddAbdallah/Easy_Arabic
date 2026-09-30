@@ -62,8 +62,6 @@ export const authorization = async (
                 'status',
                 'passwordLastChanged',
                 'phone',
-                'createdAt',
-                'updatedAt'
             ).first();
 
         if (!user) {

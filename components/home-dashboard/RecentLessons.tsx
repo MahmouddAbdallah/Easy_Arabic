@@ -1,7 +1,7 @@
 import { BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { STATUS_MAP, REWARD_MAP, DURATION_MAP } from '@/components/lesson/LessonOptions';
-import type { RecentLessonRow } from '@/lib/data/dashboard';
+import type { RecentLessonRow } from '@/lib/data/home-data';
 
 export function formatWhen(classDate: string | Date) {
     const d = new Date(classDate);

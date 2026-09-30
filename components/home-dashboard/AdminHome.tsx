@@ -3,7 +3,7 @@ import WelcomeBanner from './WelcomeBanner';
 import StatCard from './StatCard';
 import QuickLinks, { type QuickLink } from './QuickLinks';
 import RecentLessons from './RecentLessons';
-import { getAdminOverview } from '@/lib/data/dashboard';
+import { getAdminOverview } from '@/lib/data/home-data';
 
 const quickLinks: QuickLink[] = [
     { href: '/dashboard/teacher', label: 'Manage Teachers', description: 'View and manage the teacher directory', icon: GraduationCap },

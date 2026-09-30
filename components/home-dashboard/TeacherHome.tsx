@@ -3,7 +3,7 @@ import WelcomeBanner from './WelcomeBanner';
 import StatCard from './StatCard';
 import QuickLinks, { type QuickLink } from './QuickLinks';
 import RecentLessons from './RecentLessons';
-import { getTeacherOverview } from '@/lib/data/dashboard';
+import { getTeacherOverview } from '@/lib/data/home-data';
 
 const quickLinks: QuickLink[] = [
     { href: '/lesson/new-lesson', label: 'Log a Lesson', description: 'Record a lesson you just taught', icon: PlusCircle },

@@ -3,7 +3,7 @@ import WelcomeBanner from './WelcomeBanner';
 import StatCard from './StatCard';
 import QuickLinks, { type QuickLink } from './QuickLinks';
 import RecentLessons, { formatWhen } from './RecentLessons';
-import { getFamilyOverview } from '@/lib/data/dashboard';
+import { getFamilyOverview } from '@/lib/data/home-data';
 import { DURATION_MAP } from '@/components/lesson/LessonOptions';
 
 const quickLinks: QuickLink[] = [

@@ -143,7 +143,7 @@ export function Sidebar({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setIsCollapsed(true)}
-                                className="h-8 w-8 text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 rounded-xl transition-all"
+                                className="hidden lg:block h-8 w-8 text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 rounded-xl transition-all"
                             >
                                 <PanelLeftClose className="h-4 w-4" />
                             </Button>
