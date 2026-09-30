@@ -10,12 +10,14 @@ import { useAppContext } from "@/components/AppContext";
 import { collection, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { firebaseClientDB } from "@/lib/config/firebase-client";
 import ReceiverInfo from "./ReceiverInfo";
+import { getUnreadCount, type UnreadCount } from "../lib/unread";
 import Link from "next/link";
 
 export interface ChatItemType {
     id: string;
     lastMessage: string;
-    unreadCount?: number;
+    /** Per-user counters ({ [userId]: number }); old chats still hold one shared number. Read it with getUnreadCount(). */
+    unreadCount?: UnreadCount;
     isRead?: boolean;
     updatedAt?: Timestamp;
     participants: string[]
@@ -90,7 +92,7 @@ export function ChatSidebar() {
                                     lastSend={chat?.updatedAt as Timestamp}
                                     message={chat?.lastMessage}
                                     isSelected={isSelected}
-                                    unreadCount={chat?.unreadCount}
+                                    unreadCount={getUnreadCount(chat?.unreadCount, user?.id)}
                                 />
                             </Link>
                         );

@@ -5,12 +5,19 @@ import { firebaseAdminDB } from "@/lib/config/firebase-admin";
 import { authorization } from "@/lib/verifyAuth";
 import { MessageRequestSchema, type MessageRequest } from "@/components/chat/lib/schemas";
 import { getMessagePreview } from "@/components/chat/lib/constants";
+import { getChatId } from "@/components/chat/lib/chatId";
 import {
     ChatApiError,
     deleteMessage,
     editMessage,
+    markChatRead,
     reactToMessage,
 } from "@/components/chat/lib/messageOperations.server";
+import {
+    newUnreadCounts,
+    unreadIncrementUpdates,
+    updateChat,
+} from "@/components/chat/lib/unread.server";
 
 function errorResponse(code: string, message: string, status: number, details?: unknown) {
     return NextResponse.json(
@@ -19,17 +26,20 @@ function errorResponse(code: string, message: string, status: number, details?: 
     );
 }
 
-function generateChatId(id1: string, id2: string): string {
-    return [id1, id2].sort().join("_");
-}
-
 type SendMessageRequest = Extract<MessageRequest, { action: "send" }>;
 
 const UNAUTHENTICATED_CODES = ["NO_TOKEN", "TOKEN_EXPIRED", "INVALID_TOKEN", "USER_NOT_FOUND"];
 
-/** Existing send behaviour, unchanged — except the sender now comes from the session. */
+/**
+ * Same send behaviour as before (the sender comes from the session), plus: the receiver's unread
+ * counter goes up by one (`unreadCount.<receiverId>`; the sender's own counter is untouched).
+ *
+ * A transaction instead of a blind batch: the chat is read first so that an old chat, which still
+ * holds one shared numeric counter, is converted to the per-user shape instead of being incremented
+ * as a number. The increment itself is FieldValue.increment on the receiver's own key.
+ */
 async function sendMessage(senderId: string, { receiverId, text, attachment }: SendMessageRequest) {
-    const chatId = generateChatId(senderId, receiverId);
+    const chatId = getChatId(senderId, receiverId);
     const now = new Date().toISOString();
 
     const chatRef = firebaseAdminDB.collection("chats").doc(chatId);
@@ -47,32 +57,43 @@ async function sendMessage(senderId: string, { receiverId, text, attachment }: S
     };
 
     const displayLastMessage = getMessagePreview(text, attachment);
+    const participants = [senderId, receiverId];
 
-    const batch = firebaseAdminDB.batch();
+    await firebaseAdminDB.runTransaction(async (tx) => {
+        // Reads must happen before writes inside a transaction.
+        const chatSnap = await tx.get(chatRef);
 
-    batch.set(messagesRef, newMessage);
+        tx.set(messagesRef, newMessage);
 
-    batch.set(
-        chatRef,
-        {
-            id: chatId,
-            participants: [senderId, receiverId],
-            lastMessage: displayLastMessage,
-            lastSenderId: senderId,
-            time: now,
-            isRead: false,
-            unreadCount: FieldValue.increment(1),
-            updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-    );
+        if (!chatSnap.exists) {
+            tx.set(chatRef, {
+                id: chatId,
+                participants,
+                lastMessage: displayLastMessage,
+                lastSenderId: senderId,
+                time: now,
+                isRead: false,
+                unreadCount: newUnreadCounts(participants, receiverId),
+                updatedAt: FieldValue.serverTimestamp(),
+            });
+            return;
+        }
 
-    await batch.commit();
+        updateChat(tx, chatRef, [
+            ["id", chatId],
+            ["participants", participants],
+            ["lastMessage", displayLastMessage],
+            ["lastSenderId", senderId],
+            ["time", now],
+            ["updatedAt", FieldValue.serverTimestamp()],
+            ...unreadIncrementUpdates(chatSnap.get("unreadCount"), participants, receiverId),
+        ]);
+    });
 }
 
 /**
  * Message mutations. Body is a discriminated union on `action`:
- *   send (default) | edit | delete | react
+ *   send (default) | edit | delete | react | markRead
  * The acting user is always taken from the authenticated session, never from the body.
  */
 export async function PATCH(req: NextRequest) {
@@ -133,6 +154,9 @@ export async function PATCH(req: NextRequest) {
                     messageId: request.messageId,
                     reaction: request.reaction,
                 });
+                break;
+            case "markRead":
+                await markChatRead({ actorId, chatId: request.chatId });
                 break;
         }
 

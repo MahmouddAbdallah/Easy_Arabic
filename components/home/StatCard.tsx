@@ -10,7 +10,7 @@ interface StatCardProps {
 
 export default function StatCard({ icon: Icon, label, value, hint }: StatCardProps) {
     return (
-        <Card className="border-border/60">
+        <Card className="border-border/60 pb-2!">
             <CardContent className="flex items-center gap-4">
                 <div className="p-3 rounded-xl bg-brand-soft text-brand border border-brand/20 shrink-0">
                     <Icon className="h-5 w-5" />

@@ -4,12 +4,14 @@ import { useForm, useWatch } from 'react-hook-form';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import AuthNotice from '@/components/auth/AuthNotice';
+import { formatWait, getApiError, passwordTooLong, PASSWORD_MAX_BYTES } from '@/lib/auth/client';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,6 +26,9 @@ interface FormInputs {
 const SignUpForm = () => {
     const [showPass, setShowPass] = useState(false);
     const [showPassConfirm, setShowPassConfirm] = useState(false);
+    // Set after a successful submit. The server answers identically whether or
+    // not the email was already registered, so we can't sign the user in here.
+    const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
 
     const {
         register,
@@ -33,7 +38,6 @@ const SignUpForm = () => {
         formState: { errors, isSubmitting }
     } = useForm<FormInputs>();
 
-    const { push, refresh } = useRouter();
     const watchPassword = useWatch({ control, name: 'password' });
 
     const onSubmit = handleSubmit(async (formData) => {
@@ -45,13 +49,26 @@ const SignUpForm = () => {
                 }
             });
             reset();
-            toast.success(data.message || 'Account created successfully');
-            refresh();
-            push('/');
+            setSubmittedMessage(data.message || 'Check your inbox to verify your email, then sign in.');
         } catch (error: any) {
-            toast.error(error?.response?.data?.error?.message || error?.response?.data?.message || 'Something went wrong');
+            const err = getApiError(error);
+            toast.error(err.retryAfterSeconds ? `${err.message} Try again in ${formatWait(err.retryAfterSeconds)}.` : err.message);
         }
     });
+
+    if (submittedMessage) {
+        return (
+            <div className="space-y-4">
+                <AuthNotice tone="success">
+                    <p className="font-medium">Almost there!</p>
+                    <p>{submittedMessage}</p>
+                </AuthNotice>
+                <Link href="/sign-in" className={buttonVariants({ className: 'w-full font-semibold' })}>
+                    Go to sign in
+                </Link>
+            </div>
+        );
+    }
 
     return (
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
@@ -65,7 +82,8 @@ const SignUpForm = () => {
                     placeholder="John Doe"
                     autoComplete="name"
                     aria-invalid={!!errors.name}
-                    {...register('name', { required: 'Name is required' })}
+                    maxLength={100}
+                    {...register('name', { required: 'Name is required', validate: (v) => v.trim().length > 0 || 'Name is required' })}
                 />
                 {errors.name && (
                     <p className="text-xs text-destructive font-medium">{errors.name.message}</p>
@@ -124,6 +142,7 @@ const SignUpForm = () => {
                         {...register('password', {
                             required: 'Password is required',
                             minLength: { value: 8, message: 'Password must be at least 8 characters' },
+                            validate: (v) => !passwordTooLong(v ?? '') || `Password is too long (maximum ${PASSWORD_MAX_BYTES} bytes)`,
                         })}
                     />
                     <button

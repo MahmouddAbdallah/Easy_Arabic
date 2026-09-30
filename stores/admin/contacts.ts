@@ -12,7 +12,9 @@ export type ContactMessage = {
 };
 export type contactState = {
     contacts: ContactMessage[];
-    count: number
+    count: number;
+    /** The server payload `contacts` was last synced from (lets the UI avoid an empty first paint). */
+    syncedFrom: ContactMessage[] | null;
 }
 
 
@@ -31,8 +33,9 @@ export type contactStore = contactState & UserActions
 export const useContactStore = create<contactStore>()((set) => ({
     contacts: [],
     count: 0,
+    syncedFrom: null,
 
-    setContacts: (contacts) => set({ contacts }),
+    setContacts: (contacts) => set({ contacts, syncedFrom: contacts }),
     setCount: (count) => set({ count }),
 
     addContact: (newContact) =>
@@ -51,8 +54,8 @@ export const useContactStore = create<contactStore>()((set) => ({
     removeContact: (id) =>
         set((state) => ({
             contacts: state.contacts.filter((user) => user.id !== id),
-            count: state.count - 1
+            count: Math.max(state.count - 1, 0)
         })),
 
-    clearContacts: () => set({ contacts: [] }),
+    clearContacts: () => set({ contacts: [], syncedFrom: null }),
 }))

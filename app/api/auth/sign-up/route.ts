@@ -1,67 +1,75 @@
-import { NextResponse, NextRequest } from "next/server";
-import bcrypt from 'bcrypt'
+import { NextResponse, NextRequest, after } from "next/server";
 import { signUpSchema, firstValidationMessage } from "@/lib/validation";
+import { authConfig } from "@/lib/auth/config";
+import { hashPassword } from "@/lib/auth/password";
+import { findUserByEmail } from "@/lib/auth/users";
+import { issueToken } from "@/lib/auth/tokens";
+import { consume, rateLimitKey } from "@/lib/auth/rateLimit";
+import { sendAccountExistsEmail, sendVerificationEmail } from "@/lib/auth/email";
+import { errorResponse, forbiddenOrigin, getClientIp, invalidBody, isSameOrigin, readJsonBody, tooManyRequests } from "@/lib/auth/request";
 import { db } from "@/prisma/db";
-import jwt from 'jsonwebtoken';
-import { cookies } from "next/headers";
-const MAX_AGE = 60 * 60 * 24 * 365; // 365 days in seconds
+
+// The SAME response is returned whether or not the email is already
+// registered, so this form can't be used to discover who has an account.
+const GENERIC = {
+    message: 'Thanks! If this email can be registered, your account is ready. Check your inbox to verify your email, then sign in.',
+};
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
+        if (!isSameOrigin(req)) return forbiddenOrigin();
+
+        const body = await readJsonBody(req);
+        if (body === null) return invalidBody();
         const validation = signUpSchema.safeParse(body);
         if (!validation.success) {
-            return NextResponse.json({
-                success: false, error: {
-                    code: 'VALIDATION_ERROR',
-                    message: firstValidationMessage(validation.error)
-                }
-            }, { status: 400 });
+            return errorResponse('VALIDATION_ERROR', firstValidationMessage(validation.error), 400);
         }
-
         const data = validation.data;
 
-        const isUser = await db.orm.public.User
-            .where({ email: data.email })
-            .first();
-
-        if (isUser) {
-            return NextResponse.json(
-                { success: false, error: { code: 'CONFLICT', message: 'This user already exists, please sign in' } },
-                { status: 409 }
-            );
-        }
-        const isPhone = await db.orm.public.User
-            .where({ phone: data.phone })
-            .first();
-
-        if (isPhone) {
-            return NextResponse.json(
-                { success: false, error: { code: 'CONFLICT', message: 'This phone number already exists, please sign in' } },
-                { status: 409 }
-            );
+        // Abuse limits: per IP (mass registration) and per address (so the form
+        // can't be used to mail-bomb someone). Both are keyed on the submitted
+        // values, so they behave the same for new and existing emails.
+        const [byIp, byEmail] = await Promise.all([
+            consume(rateLimitKey('signup:ip', getClientIp(req)), { limit: 5, windowSeconds: 60 * 60 }),
+            consume(rateLimitKey('signup:email', data.email), { limit: 3, windowSeconds: 60 * 60 }),
+        ]);
+        if (!byIp.allowed || !byEmail.allowed) {
+            return tooManyRequests(Math.max(byIp.allowed ? 0 : byIp.retryAfterSeconds, byEmail.allowed ? 0 : byEmail.retryAfterSeconds));
         }
 
+        // Hash first, always: the request takes the same time either way.
+        const passwordHash = await hashPassword(data.password);
 
-        const user = await db.orm.public.User.create({
-            ...data,
-            password: await bcrypt.hash(data.password, 10)
-        });
+        const existing = await findUserByEmail(data.email);
+        if (existing) {
+            after(() => sendAccountExistsEmail(existing.email));
+            return NextResponse.json(GENERIC, { status: 201 });
+        }
 
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET as string, { expiresIn: MAX_AGE });
-        const cookieStore = await cookies();
-        cookieStore.set({
-            name: 'token',
-            value: token,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: MAX_AGE,
-        });
-        return NextResponse.json({ message: 'Sign up successfully' }, { status: 201 });
+        try {
+            const user = await db.orm.public.User.create({
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                password: passwordHash,
+            });
+            after(async () => {
+                const token = await issueToken(user.id, 'email_verification', authConfig.tokens.emailVerificationTtlSeconds);
+                await sendVerificationEmail(user.email, token);
+            });
+        } catch (error) {
+            // Two simultaneous sign-ups for one email: the unique index lets
+            // exactly one win. The loser gets the same generic response.
+            if (await findUserByEmail(data.email)) return NextResponse.json(GENERIC, { status: 201 });
+            throw error;
+        }
+
+        // Deliberately no session here: signing the caller in only on "new
+        // email" would reveal which emails already exist.
+        return NextResponse.json(GENERIC, { status: 201 });
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ success: false, error: { code: 'SERVER_ERROR', message: 'Error in server' } }, { status: 500 });
+        console.error('sign-up failed:', error instanceof Error ? error.message : error);
+        return errorResponse('SERVER_ERROR', 'Error in server', 500);
     }
 }

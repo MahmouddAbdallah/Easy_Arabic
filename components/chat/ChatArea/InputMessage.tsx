@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2Icon, Mic2Icon, PaperclipIcon, SendHorizontalIcon, SmileIcon, XIcon, } from "lucide-react";
 import { useChat } from "../ChatProvider";
 import { useAppContext } from "@/components/AppContext";
+import { useTypingIndicator } from "../hooks/useTyping";
 
 interface MessageFormValues {
     text: string;
@@ -15,7 +16,8 @@ interface MessageFormValues {
 
 const InputMessage = () => {
     const { user } = useAppContext();
-    const { receiverId } = useChat();
+    const { receiverId, chatId } = useChat();
+    const { notifyTyping, stopTyping } = useTypingIndicator(chatId, user?.id);
 
     const [loading, setLoading] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -29,6 +31,14 @@ const InputMessage = () => {
 
     const textValue = useWatch({ name: "text", control });
 
+    // Typing follows the input: text present = typing (idle/heartbeat handled inside the hook, no
+    // request per keystroke); empty or whitespace-only input = not typing, right away.
+    // Only `textValue` drives this, so switching chats with a leftover draft doesn't start typing.
+    useEffect(() => {
+        if (textValue?.trim()) notifyTyping();
+        else stopTyping();
+    }, [textValue, notifyTyping, stopTyping]);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setSelectedFile(e.target.files[0]);
@@ -39,6 +49,9 @@ const InputMessage = () => {
         const trimmedText = data.text?.trim() || "";
 
         if (!trimmedText && !selectedFile) return;
+
+        // Sending ends "typing" at once, without waiting for the request or the idle timer.
+        stopTyping();
 
         try {
             setLoading(true);

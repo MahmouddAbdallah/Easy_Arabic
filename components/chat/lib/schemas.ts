@@ -55,6 +55,12 @@ const ReactMessageSchema = z.object({
     reaction: z.enum(REACTION_KEYS).nullable(),
 });
 
+/** The current user has read the chat: clears their own unread counter. */
+const MarkReadSchema = z.object({
+    action: z.literal("markRead"),
+    chatId: firestoreId,
+});
+
 /** A body without `action` is treated as "send" so the existing send payload keeps working. */
 export const MessageRequestSchema = z.preprocess(
     (body) =>
@@ -66,6 +72,7 @@ export const MessageRequestSchema = z.preprocess(
         EditMessageSchema,
         DeleteMessageSchema,
         ReactMessageSchema,
+        MarkReadSchema,
     ])
 );
 
@@ -73,3 +80,4 @@ export type MessageRequest = z.output<typeof MessageRequestSchema>;
 export type EditMessageRequest = z.output<typeof EditMessageSchema>;
 export type DeleteMessageRequest = z.output<typeof DeleteMessageSchema>;
 export type ReactMessageRequest = z.output<typeof ReactMessageSchema>;
+export type MarkReadRequest = z.output<typeof MarkReadSchema>;

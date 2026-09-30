@@ -10,7 +10,6 @@ enum Status {
   banned
   suspended
 }
-
 model User {
   id                  String            @id @default(uuid())
   name                String
@@ -23,8 +22,48 @@ model User {
   updatedAt           TimestamptzString @default(now())
   status              Status            @default(active)
   subject             String            @default("Quran")
+  // Set when the user proves ownership of `email` (verification link or a
+  // completed password reset). NULL = not verified yet.
+  emailVerifiedAt     TimestamptzString?
 
   @@index([role])
+}
+
+enum AuthTokenType {
+  password_reset
+  email_verification
+}
+
+// One-time, expiring tokens for password reset and email verification.
+// Only a SHA-256 hash of the token is stored, so a database leak does not
+// yield usable links. A token is consumed by deleting its row (single use).
+model AuthToken {
+  id        String            @id @default(uuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String            @unique
+  expiresAt TimestamptzString
+  createdAt TimestamptzString @default(now())
+
+  user      User              @relation(fields:[userId], references:[id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+// Generic atomic counters used for login lockout and endpoint rate limits.
+// `key` encodes scope + subject (e.g. "login:pair:<sha256>"), and identifiers
+// are hashed so no raw email/IP is stored. All updates go through single
+// INSERT .. ON CONFLICT statements (see lib/auth/rateLimit.ts) so concurrent
+// requests can never lose an increment.
+model AuthRateLimit {
+  key          String             @id
+  count        Int                @default(0)
+  windowStart  TimestamptzString  @default(now())
+  blockedUntil TimestamptzString?
+  updatedAt    TimestamptzString  @default(now())
+
+  @@index([updatedAt])
 }
 
 enum TeacherReward {

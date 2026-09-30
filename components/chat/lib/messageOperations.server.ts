@@ -1,14 +1,15 @@
 /**
  * SERVER ONLY — uses firebase-admin. Never import this from a client component.
  *
- * Edit / delete / react operations for chat messages. Each one runs in a Firestore
+ * Edit / delete / react / mark-read operations for chats. Each one runs in a Firestore
  * transaction so the checks (exists, participant, owner, not deleted) and the write are
  * atomic: e.g. a reaction can't land on a message that was deleted a moment earlier.
  */
-import { FieldPath, FieldValue, type Transaction } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { firebaseAdminDB } from "@/lib/config/firebase-admin";
 import { DELETED_MESSAGE_PREVIEW, getMessagePreview } from "./constants";
 import type { ReactionKey } from "./reactions";
+import { markReadUpdates, unreadIncrementUpdates, updateChat } from "./unread.server";
 import type { StoredMessage } from "../types";
 
 export class ChatApiError extends Error {
@@ -22,6 +23,20 @@ export class ChatApiError extends Error {
     }
 }
 
+/** The chat must exist and the actor must be one of its participants. Returns the participants. */
+function assertParticipant(chatSnap: DocumentSnapshot, actorId: string): string[] {
+    if (!chatSnap.exists) {
+        throw new ChatApiError("CHAT_NOT_FOUND", "Chat not found.", 404);
+    }
+
+    const participants: unknown = chatSnap.get("participants");
+    if (!Array.isArray(participants) || !participants.includes(actorId)) {
+        throw new ChatApiError("NOT_A_PARTICIPANT", "You are not a participant in this chat.", 403);
+    }
+
+    return participants as string[];
+}
+
 /**
  * Loads the chat + message and enforces: chat exists, actor is a participant, message exists.
  * The actor always comes from the verified session, never from the request body.
@@ -32,20 +47,13 @@ async function loadMessage(tx: Transaction, actorId: string, chatId: string, mes
 
     const [chatSnap, messageSnap] = await Promise.all([tx.get(chatRef), tx.get(messageRef)]);
 
-    if (!chatSnap.exists) {
-        throw new ChatApiError("CHAT_NOT_FOUND", "Chat not found.", 404);
-    }
-
-    const participants: unknown = chatSnap.get("participants");
-    if (!Array.isArray(participants) || !participants.includes(actorId)) {
-        throw new ChatApiError("NOT_A_PARTICIPANT", "You are not a participant in this chat.", 403);
-    }
+    const participants = assertParticipant(chatSnap, actorId);
 
     if (!messageSnap.exists) {
         throw new ChatApiError("MESSAGE_NOT_FOUND", "Message not found.", 404);
     }
 
-    return { chatRef, messageRef, message: messageSnap.data() as StoredMessage };
+    return { chatRef, chatSnap, messageRef, participants, message: messageSnap.data() as StoredMessage };
 }
 
 /** Is this the newest message of the chat (i.e. the one the sidebar preview shows)? */
@@ -138,7 +146,12 @@ export async function reactToMessage({
     reaction,
 }: BaseParams & { reaction: ReactionKey | null }) {
     await firebaseAdminDB.runTransaction(async (tx) => {
-        const { messageRef, message } = await loadMessage(tx, actorId, chatId, messageId);
+        const { chatRef, chatSnap, messageRef, participants, message } = await loadMessage(
+            tx,
+            actorId,
+            chatId,
+            messageId
+        );
 
         if (message.deleted) {
             throw new ChatApiError("MESSAGE_DELETED", "This message was deleted.", 409);
@@ -149,5 +162,29 @@ export async function reactToMessage({
 
         // FieldPath avoids any dot/escape surprises in the user id used as the map key.
         tx.update(messageRef, new FieldPath("reactions", actorId), reaction ?? FieldValue.delete());
+
+        // A reaction to someone else's message is news for them: it counts as one unread event
+        // for the message's author. Reacting to your own message doesn't, and taking a reaction
+        // back never lowers anyone's count.
+        if (reaction !== null && message.senderId !== actorId && participants.includes(message.senderId)) {
+            updateChat(tx, chatRef, unreadIncrementUpdates(chatSnap.get("unreadCount"), participants, message.senderId));
+        }
+    });
+}
+
+/**
+ * The actor has read the chat: clears the actor's own unread counter. Only that counter is written,
+ * so it can't interfere with the other user's count, and `updatedAt` is left alone (reading a chat
+ * must not reorder the sidebar). Idempotent: nothing is written when the count is already 0.
+ */
+export async function markChatRead({ actorId, chatId }: { actorId: string; chatId: string }) {
+    await firebaseAdminDB.runTransaction(async (tx) => {
+        const chatRef = firebaseAdminDB.collection("chats").doc(chatId);
+        const chatSnap = await tx.get(chatRef);
+
+        const participants = assertParticipant(chatSnap, actorId);
+
+        const updates = markReadUpdates(chatSnap.get("unreadCount"), participants, actorId);
+        if (updates) updateChat(tx, chatRef, updates);
     });
 }

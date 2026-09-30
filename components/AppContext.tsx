@@ -11,6 +11,8 @@ interface AppContextValue {
     user: userType | null | undefined
     setUser: (user: userType | null) => void
 }
+const AUTH_PAGES = ['sign', 'forgot-password', 'reset-password', 'verify-email', 'change-password']
+
 
 const ProviderAppContext = createContext<AppContextValue | undefined>(undefined)
 
@@ -40,7 +42,7 @@ const AppProvider = ({ children, userData }: { children: ReactNode; userData?: u
             value={{ user, setUser }}
         >
             <div>
-                {!pathname.includes('sign') &&
+                {!AUTH_PAGES.some((page) => pathname.includes(page)) &&
                     !pathname.includes('chat') &&
                     !pathname.includes('dashboard') &&
                     <Navbar />

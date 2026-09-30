@@ -10,7 +10,7 @@ interface Status {
     last_changed: number;
 }
 
-export default function UserStatusDisplay({ userId, ping = false, showStatus = false }: { userId: string; ping?: boolean, showStatus?: boolean }) {
+export default function UserStatusDisplay({ userId, ping = false, showStatus = false, typing = false }: { userId: string; ping?: boolean, showStatus?: boolean, typing?: boolean }) {
     const [status, setStatus] = useState<Status | null>(null);
 
     useEffect(() => {
@@ -38,14 +38,20 @@ export default function UserStatusDisplay({ userId, ping = false, showStatus = f
                 />
             </div>
 
-            {showStatus &&
+            {showStatus && (typing ? (
+                // Replaces the Online/Offline label while the other user is typing, and steps aside
+                // again (back to the normal status) as soon as they stop.
+                <span className="text-[11px] font-medium text-primary animate-pulse">
+                    Typing...
+                </span>
+            ) : (
                 <span className={clsx(
                     "text-[11px] font-medium",
                     isOnline ? 'text-emerald-500' : 'text-gray-500'
                 )}>
                     {isOnline ? 'Online' : 'Offline'}
                 </span>
-            }
+            ))}
         </div>
     );
 }

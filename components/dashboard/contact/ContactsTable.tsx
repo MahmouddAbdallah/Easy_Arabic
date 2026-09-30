@@ -1,185 +1,173 @@
-'use client';
-import { MoreHorizontal, Mail, MailOpen, Trash2, Reply, Eye, Calendar, MailOpenIcon, MailIcon, } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
-import { Card } from "@/components/ui/card";
-import { QuickReplyDialog } from "./QuickReplyDialog";
+"use client";
+
 import { useEffect, useState } from "react";
-import { ContactDetailsDialog } from "./ContactDetailsDialog";
+import { Card } from "@/components/ui/card";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import PaginationPage from "@/components/PaginationPage";
+import { cn } from "@/lib/utils";
 import { ContactMessage, useContactStore } from "@/stores/admin/contacts";
-import MarkAsRead from "./MarkAsRead";
+import { ContactDetailsDialog } from "./ContactDetailsDialog";
+import { ContactRow } from "./ContactRow";
+import { ContactsEmptyState } from "./ContactsEmptyState";
+import { ContactCounts, ContactsToolbar } from "./ContactsToolbar";
+import { ContactQuery, CONTACTS_PAGE_SIZE, hasActiveContactFilters } from "./contactUtils";
 import { DeleteContactDialog } from "./DeleteContactDialog";
+import { QuickReplyDialog } from "./QuickReplyDialog";
+import { useContactActions } from "./useContactActions";
+import { useContactQuery } from "./useContactQuery";
 
-export function ContactsTable({ contacts }: { contacts: ContactMessage[] }) {
-    const [isQuickReply, setIsQuickReply] = useState(false);
-    const [isDeleteContact, setIsDeleteContact] = useState(false);
-    const [isViewDetails, setIsViewDetails] = useState(false);
-    const [data, setData] = useState<Partial<ContactMessage>>({});
+type ActiveDialog = { type: "view" | "reply" | "delete"; id: string } | null;
 
-    const messages = useContactStore(state => state.contacts);
-    const setContacts = useContactStore(state => state.setContacts);
+interface ContactsTableProps {
+    /** The messages for the current URL — supplied by page.tsx. */
+    contacts: ContactMessage[];
+    /** Total number of messages matching the current URL (across all pages). */
+    count?: number;
+    /** The query the server used to produce `contacts` (see `parseContactQuery`). */
+    query: ContactQuery;
+    pageSize?: number;
+    /** Optional totals shown on the status tabs. */
+    counts?: ContactCounts;
+}
+
+export function ContactsTable({
+    contacts,
+    count = contacts.length,
+    query,
+    pageSize = CONTACTS_PAGE_SIZE,
+    counts,
+}: ContactsTableProps) {
+    const api = useContactQuery();
+    const { toggleRead, markRead } = useContactActions();
+    const [active, setActive] = useState<ActiveDialog>(null);
+
+    // Keep the store in sync with the server payload. It carries optimistic edits
+    // (read/unread, delete); until the first sync we render the props directly.
+    const stored = useContactStore((state) => state.contacts);
+    const syncedFrom = useContactStore((state) => state.syncedFrom);
+    const setContacts = useContactStore((state) => state.setContacts);
+    const storedCount = useContactStore((state) => state.count);
+    const setCount = useContactStore((state) => state.setCount);
     useEffect(() => {
         setContacts(contacts);
-    }, [setContacts, contacts]);
+        setCount(count);
+    }, [contacts, count, setContacts, setCount]);
+
+    const isSynced = syncedFrom === contacts;
+    const rows = isSynced ? stored : contacts;
+    const total = isSynced ? storedCount : count;
+    const hasFilters = hasActiveContactFilters(query);
+    const activeContact = active ? rows.find((row) => row.id === active.id) : undefined;
+    const showPagination = count > contacts.length || query.page > 1;
+
+    const open = (type: NonNullable<ActiveDialog>["type"], contact: ContactMessage) =>
+        setActive({ type, id: contact.id });
+    const close = () => setActive(null);
+
+    const openMessage = (contact: ContactMessage) => {
+        open("view", contact);
+        if (!contact.isRead) void markRead(contact);
+    };
 
     return (
-        <div>
-            <Card className="shadow-sm border">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="bg-muted/50">
-                            <TableHead className="w-20">Status</TableHead>
-                            <TableHead className="w-50">Sender</TableHead>
-                            <TableHead className="w-55">Subject</TableHead>
-                            <TableHead>Message Preview</TableHead>
-                            <TableHead className="w-37.5">Date</TableHead>
-                            <TableHead className="w-15 text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {(messages ?? contacts)
-                            ?.map((contact) => (
-                                <TableRow
-                                    key={contact.id}
-                                    className={!contact.isRead ? "bg-primary/2 font-medium" : undefined}
-                                >
-                                    {/* Status Badge */}
-                                    <TableCell>
-                                        {!contact.isRead ? (
-                                            <Badge variant="default" className="bg-primary hover:bg-primary/90 gap-1 text-[11px] font-normal">
-                                                <Mail className="h-3 w-3" /> Unread
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="secondary" className="gap-1 text-[11px] font-normal text-muted-foreground">
-                                                <MailOpen className="h-3 w-3" /> Read
-                                            </Badge>
-                                        )}
-                                    </TableCell>
+        <TooltipProvider delay={400}>
+            <Card className="gap-0 py-0 shadow-sm">
+                <ContactsToolbar api={api} counts={counts} />
 
-                                    {/* Sender Details */}
-                                    <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold text-foreground text-sm">{contact.name}</span>
-                                            <span className="text-xs text-muted-foreground">{contact.email}</span>
-                                        </div>
-                                    </TableCell>
+                {hasFilters && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+                        <p aria-live="polite">
+                            {total === 0 ? (
+                                "No messages"
+                            ) : (
+                                <>
+                                    <span className="font-medium text-foreground">{total}</span>{" "}
+                                    {total === 1 ? "message" : "messages"}
+                                </>
+                            )}
+                            {query.keyword && (
+                                <>
+                                    {" "}
+                                    matching <span className="font-medium text-foreground">“{query.keyword}”</span>
+                                </>
+                            )}
+                            {query.status && (
+                                <>
+                                    {" "}
+                                    · <span className="font-medium text-foreground capitalize">{query.status}</span>
+                                </>
+                            )}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={api.clearAll}
+                            className="font-medium text-foreground underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
+                )}
 
-                                    {/* Subject */}
-                                    <TableCell>
-                                        <span className="text-sm truncate block max-w-50 text-foreground">
-                                            {contact.subject || <span className="text-muted-foreground italic">No Subject</span>}
-                                        </span>
-                                    </TableCell>
+                <div aria-busy={api.isPending} className="relative border-t">
+                    {api.isPending && (
+                        <div className="absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/70" />
+                    )}
 
-                                    {/* Message Preview */}
-                                    <TableCell>
-                                        <p className="text-sm text-muted-foreground truncate max-w-[320px]">
-                                            {contact.message}
-                                        </p>
-                                    </TableCell>
+                    <div className={cn("transition-opacity duration-150", api.isPending && "opacity-60")}>
+                        {rows.length === 0 ? (
+                            <ContactsEmptyState hasFilters={hasFilters} query={query} onClear={api.clearAll} />
+                        ) : (
+                            <>
+                                <div className="hidden grid-cols-[2.25rem_13rem_minmax(0,1fr)_6rem] gap-4 border-b bg-muted/30 px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground md:grid">
+                                    <span className="sr-only">Status</span>
+                                    <span className="col-start-2">Sender</span>
+                                    <span>Message</span>
+                                    <span className="text-right">Received</span>
+                                </div>
+                                <ul className="divide-y">
+                                    {rows.map((contact) => (
+                                        <ContactRow
+                                            key={contact.id}
+                                            contact={contact}
+                                            keyword={query.keyword}
+                                            onOpen={openMessage}
+                                            onReply={(c) => open("reply", c)}
+                                            onDelete={(c) => open("delete", c)}
+                                            onToggleRead={toggleRead}
+                                        />
+                                    ))}
+                                </ul>
+                            </>
+                        )}
+                    </div>
+                </div>
 
-                                    {/* Created At */}
-                                    <TableCell>
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                            <Calendar className="h-3.5 w-3.5" />
-                                            {new Date(contact.createdAt).toLocaleDateString("en-US", {
-                                                month: "short",
-                                                day: "numeric",
-                                                year: "numeric",
-                                            })}
-                                        </div>
-                                    </TableCell>
-
-                                    {/* Actions Dropdown */}
-                                    <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger >
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">Open menu</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-45">
-                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                                                    Actions
-                                                </div>
-                                                <DropdownMenuItem
-                                                    className="gap-2"
-                                                    onClick={() => {
-                                                        setData(contact)
-                                                        setIsViewDetails(true);
-                                                    }}
-                                                >
-                                                    <Eye className="h-4 w-4 text-muted-foreground" /> View Details
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="gap-2"
-                                                    onClick={() => {
-                                                        setData(contact)
-                                                        setIsQuickReply(true);
-                                                    }}
-                                                >
-                                                    <Reply className="h-4 w-4 text-primary" /> Quick Reply
-                                                </DropdownMenuItem>
-
-                                                <DropdownMenuSeparator />
-
-                                                <MarkAsRead contact={contact} >
-                                                    {!contact.isRead ? (
-                                                        <DropdownMenuItem
-                                                            className="gap-2">
-                                                            <MailOpenIcon className="h-4 w-4 text-emerald-600" /> Mark as Read
-                                                        </DropdownMenuItem>
-                                                    ) : (
-                                                        <DropdownMenuItem
-                                                            className="gap-2">
-                                                            <MailIcon className="h-4 w-4 text-primary" /> Mark as Unread
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                </MarkAsRead>
-
-                                                <DropdownMenuSeparator />
-
-                                                <DropdownMenuItem
-                                                    onClick={() => {
-                                                        setData(contact)
-                                                        setIsDeleteContact(true);
-                                                    }}
-                                                    className="gap-2 text-destructive focus:text-destructive"
-                                                >
-                                                    <Trash2 className="h-4 w-4" /> Delete Message
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                    </TableBody>
-                </Table>
+                {showPagination && <PaginationPage variant="table" count={total} pageSize={pageSize} />}
             </Card>
-            {isQuickReply &&
-                <QuickReplyDialog
-                    open={isQuickReply}
-                    setOpen={setIsQuickReply}
-                    contact={data}
-                />
-            }
-            {isViewDetails &&
+
+            {active?.type === "view" && activeContact && (
                 <ContactDetailsDialog
-                    open={isViewDetails}
-                    setOpen={setIsViewDetails}
-                    contactId={data?.id}
+                    open
+                    onOpenChange={(next) => !next && close()}
+                    contact={activeContact}
+                    onReply={() => open("reply", activeContact)}
+                    onDelete={() => open("delete", activeContact)}
                 />
-            }
-            {isDeleteContact &&
+            )}
+            {active?.type === "reply" && activeContact && (
+                <QuickReplyDialog
+                    open
+                    onOpenChange={(next) => !next && close()}
+                    contact={activeContact}
+                />
+            )}
+            {active?.type === "delete" && activeContact && (
                 <DeleteContactDialog
-                    open={isDeleteContact}
-                    setOpen={setIsDeleteContact}
-                    contact={data}
+                    open
+                    onOpenChange={(next) => !next && close()}
+                    contact={activeContact}
                 />
-            }
-        </div>
+            )}
+        </TooltipProvider>
     );
 }

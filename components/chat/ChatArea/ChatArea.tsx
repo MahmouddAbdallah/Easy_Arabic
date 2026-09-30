@@ -11,25 +11,23 @@ import ChatHeader from "./ChatHeader";
 import { MessageItem } from "./Message/MessageItem";
 import { DeleteMessageDialog } from "./Message/DeleteMessageDialog";
 import { useMessageActions } from "../hooks/useMessageActions";
+import { useMarkChatRead } from "../hooks/useMarkChatRead";
 import { mapMessageDoc } from "../lib/mapMessage";
 import type { MessageType } from "../types";
-
-function generateChatId(id1: string, id2: string): string {
-    return [id1, id2].sort().join("_");
-}
 
 export function ChatArea() {
     const [messages, setMessages] = useState<MessageType[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<MessageType | null>(null);
-    const { receiverId, receiver } = useChat();
+    const { receiver, chatId } = useChat();
     const { user } = useAppContext();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const currentUserId = user?.id;
-    const chatId = currentUserId && receiverId ? generateChatId(currentUserId, receiverId) : null;
     const { editMessage, deleteMessage, reactToMessage, isPending } = useMessageActions(chatId);
+    // Opening the chat (and keeping it open) clears the current user's own unread counter.
+    useMarkChatRead(chatId, currentUserId);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

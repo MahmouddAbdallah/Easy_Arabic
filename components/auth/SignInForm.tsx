@@ -4,12 +4,16 @@ import { useForm } from 'react-hook-form';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useState } from 'react';
 import { EyeIcon, EyeOffIcon, Loader2Icon, MailIcon, LockIcon } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import AuthNotice from '@/components/auth/AuthNotice';
+import { useCountdown } from '@/hooks/useCountdown';
+import { formatCountdown, getApiError } from '@/lib/auth/client';
 
 interface FormInputs {
     email: string;
@@ -18,6 +22,11 @@ interface FormInputs {
 
 const SignInForm = () => {
     const [showPass, setShowPass] = useState(false);
+    // Set when the server says the email still has to be verified.
+    const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+    const [resending, setResending] = useState(false);
+    const lockout = useCountdown();
+    const resendCooldown = useCountdown();
     const router = useRouter();
 
     const {
@@ -28,6 +37,8 @@ const SignInForm = () => {
     } = useForm<FormInputs>();
 
     const onSubmit = handleSubmit(async (formData) => {
+        if (lockout.active) return;
+        setUnverifiedEmail(null);
         try {
             const { data } = await axios.post(`/api/auth/sign-in`, formData, {
                 headers: {
@@ -36,15 +47,40 @@ const SignInForm = () => {
                 }
             });
 
-            localStorage.setItem('user', JSON.stringify(data.user));
             toast.success(data.message || 'Signed in successfully');
             reset();
-            router.refresh();
+            // Navigate first, then refresh: refreshing before the push doesn't
+            // reliably refetch the root layout, leaving the navbar signed-out.
             router.push('/');
+            router.refresh();
         } catch (error: any) {
-            toast.error(error?.response?.data?.error?.message || error?.response?.data?.message || 'Something went wrong');
+            const err = getApiError(error);
+            if (err.code === 'LOGIN_LOCKED' && err.retryAfterSeconds) {
+                // Temporary, server-enforced lockout: show the countdown instead of a toast.
+                lockout.start(err.retryAfterSeconds);
+            } else if (err.code === 'EMAIL_NOT_VERIFIED') {
+                setUnverifiedEmail(formData.email);
+            } else {
+                toast.error(err.message);
+            }
         }
     });
+
+    const resendVerification = async () => {
+        if (!unverifiedEmail || resending || resendCooldown.active) return;
+        setResending(true);
+        try {
+            const { data } = await axios.post('/api/auth/resend-verification', { email: unverifiedEmail });
+            toast.success(data.message);
+            resendCooldown.start(60);
+        } catch (error: any) {
+            const err = getApiError(error);
+            if (err.retryAfterSeconds) resendCooldown.start(err.retryAfterSeconds);
+            toast.error(err.message);
+        } finally {
+            setResending(false);
+        }
+    };
 
     return (
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
@@ -73,6 +109,12 @@ const SignInForm = () => {
             <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                     <Label htmlFor="password">Password</Label>
+                    <Link
+                        href="/forgot-password"
+                        className="text-xs text-primary hover:underline font-medium"
+                    >
+                        Forgot password?
+                    </Link>
                 </div>
                 <div className="relative flex items-center">
                     <LockIcon className="w-4 h-4 absolute left-3 text-muted-foreground pointer-events-none" />
@@ -101,10 +143,40 @@ const SignInForm = () => {
                 )}
             </div>
 
+            {/* Temporary lockout (server-enforced) */}
+            {lockout.active && (
+                <AuthNotice tone="error">
+                    <p className="font-medium">Too many failed attempts.</p>
+                    <p>
+                        For your security, sign-in is paused. You can try again in{' '}
+                        <span className="font-semibold tabular-nums" aria-hidden="true">{formatCountdown(lockout.remaining)}</span>
+                        <span className="sr-only">{Math.ceil(lockout.remaining / 60)} minute(s)</span>.
+                    </p>
+                </AuthNotice>
+            )}
+
+            {/* Email not verified yet */}
+            {unverifiedEmail && (
+                <AuthNotice tone="info">
+                    <p className="font-medium">Please verify your email to continue.</p>
+                    <p className="text-muted-foreground">We sent a link when you signed up. Can&apos;t find it?</p>
+                    <button
+                        type="button"
+                        onClick={resendVerification}
+                        disabled={resending || resendCooldown.active}
+                        className="text-primary hover:underline font-semibold disabled:opacity-50 disabled:no-underline"
+                    >
+                        {resendCooldown.active
+                            ? `Resend available in ${resendCooldown.remaining}s`
+                            : resending ? 'Sending...' : 'Resend verification email'}
+                    </button>
+                </AuthNotice>
+            )}
+
             {/* Submit Button */}
             <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || lockout.active}
                 className="w-full mt-2 font-semibold"
             >
                 {isSubmitting ? (
@@ -112,6 +184,8 @@ const SignInForm = () => {
                         <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                         Signing in...
                     </>
+                ) : lockout.active ? (
+                    `Try again in ${formatCountdown(lockout.remaining)}`
                 ) : (
                     'Sign in'
                 )}

@@ -1,64 +1,63 @@
-'use client';
+"use client";
 
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, } from "@/components/ui/alert-dialog";
 import { useState } from "react";
-import { ContactMessage, useContactStore } from "@/stores/admin/contacts";
-import { deleteContact } from "@/lib/data/contact";
-import toast from "react-hot-toast";
+import { Loader2, Trash2 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogMedia,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { ContactMessage } from "@/stores/admin/contacts";
+import { useContactActions } from "./useContactActions";
 
 interface DeleteContactDialogProps {
     open: boolean;
-    setOpen: (open: boolean) => void;
-    contact: Partial<ContactMessage>;
+    onOpenChange: (open: boolean) => void;
+    contact: ContactMessage;
 }
 
-export function DeleteContactDialog({
-    open,
-    setOpen,
-    contact,
-}: DeleteContactDialogProps) {
-    const [isLoading, setIsLoading] = useState(false);
-    const removeContact = useContactStore(state => state.removeContact);
+export function DeleteContactDialog({ open, onOpenChange, contact }: DeleteContactDialogProps) {
+    const [isDeleting, setIsDeleting] = useState(false);
+    const { deleteMessage } = useContactActions();
 
     const handleDelete = async () => {
-        if (!contact.id) return;
-        try {
-            setIsLoading(true);
-            await deleteContact(contact.id)
-            removeContact(contact.id)
-            setOpen(false);
-        } catch (error: any) {
-            toast.error(error.error.message)
-            console.error("Failed to delete contact:", error);
-        } finally {
-            setIsLoading(false);
-        }
+        setIsDeleting(true);
+        const deleted = await deleteMessage(contact);
+        setIsDeleting(false);
+        if (deleted) onOpenChange(false);
     };
 
     return (
-        <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialog open={open} onOpenChange={(next) => !isDeleting && onOpenChange(next)}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                        <Trash2 />
+                    </AlertDialogMedia>
+                    <AlertDialogTitle>Delete this message?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the message from{" "}
-                        <span className="font-semibold text-foreground">
-                            {contact.name || contact.email}
-                        </span>.
+                        The message from{" "}
+                        <span className="font-medium text-foreground">{contact.name || contact.email}</span>
+                        {contact.subject?.trim() && (
+                            <>
+                                {" "}
+                                about <span className="font-medium text-foreground">“{contact.subject.trim()}”</span>
+                            </>
+                        )}{" "}
+                        will be permanently deleted. This can’t be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-
-                    <AlertDialogAction
-                        onClick={(e) => {
-                            e.preventDefault(); // يمنع إغلاق الـ Dialog تلقائياً لحين انتهاء طلب الـ API
-                            handleDelete();
-                        }}
-                        disabled={isLoading}
-                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                    >
-                        {isLoading ? "Deleting..." : "Delete"}
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                        {isDeleting && <Loader2 className="animate-spin" />}
+                        {isDeleting ? "Deleting…" : "Delete"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

@@ -5,11 +5,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ArrowLeftIcon, ImageIcon, InfoIcon, MoreVerticalIcon, PhoneIcon, SearchIcon, VideoIcon } from 'lucide-react'
 import { useChat } from '../ChatProvider'
 import UserStatusDisplay from '../UserStatusDisplay';
+import { useTypingStatus } from '../hooks/useTyping';
 import { useRouter } from 'next/navigation'
 
 const ChatHeader = () => {
-    const { receiver, } = useChat();
+    const { receiver, receiverId, chatId } = useChat();
     const { back } = useRouter();
+    // Real-time "Typing..." of the other user; shown instead of Online/Offline while it lasts.
+    const isTyping = useTypingStatus(chatId, receiverId);
     return (
         <div className="h-16 px-4 md:px-6 border-b border-border/40 flex items-center justify-between bg-card/20 backdrop-blur-md shrink-0">
             <div className="flex items-center gap-3">
@@ -41,6 +44,7 @@ const ChatHeader = () => {
                             userId={receiver?.id as string}
                             ping={true}
                             showStatus={true}
+                            typing={isTyping}
                         />
                     </span>
                 </div>

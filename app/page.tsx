@@ -6,9 +6,9 @@ import ForRoleSection from '@/components/landing/ForRole'
 import HeroSection from '@/components/landing/Hero'
 import { authorization } from '@/lib/verifyAuth'
 import { displayFont } from '@/lib/fonts'
-import AdminHome from '@/components/home-dashboard/AdminHome'
-import TeacherHome from '@/components/home-dashboard/TeacherHome'
-import FamilyHome from '@/components/home-dashboard/FamilyHome'
+import AdminHome from '@/components/home/AdminHome'
+import TeacherHome from '@/components/home/TeacherHome'
+import FamilyHome from '@/components/home/FamilyHome'
 
 const page = async () => {
   const { user } = await authorization();

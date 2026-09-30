@@ -4,14 +4,18 @@ import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useAppContext } from '@/components/AppContext';
 import { ChatSidebar } from './Sidebar/ChatSidebar';
 import { ChatArea } from './ChatArea/ChatArea';
 import NoChatSelected from './ChatArea/NoChatSelected';
+import { getChatId } from './lib/chatId';
 
 
 interface ChatContextType {
     receiverId: string | null;
     receiver: Partial<userType>
+    /** chats/{chatId} between the current user and the receiver; null until both are known. */
+    chatId: string | null;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -20,6 +24,8 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 export const ChatProvider: React.FC = () => {
     const searchParams = useSearchParams();
     const receiverId = searchParams.get('receiverId');
+    const { user } = useAppContext();
+    const chatId = user?.id && receiverId ? getChatId(user.id, receiverId) : null;
     const [receiver, setReceiver] = useState<Partial<userType>>({})
 
     useEffect(() => {
@@ -39,7 +45,8 @@ export const ChatProvider: React.FC = () => {
         <ChatContext.Provider
             value={{
                 receiverId,
-                receiver
+                receiver,
+                chatId
             }}
         >
             <div className="flex h-dvh min-h-dvh w-full items-center justify-center p-2 sm:p-4">

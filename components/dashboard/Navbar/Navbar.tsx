@@ -30,11 +30,9 @@ export function Navbar() {
             {/* Search & Mobile Trigger */}
             <div className="flex lg:hidden items-center gap-4 flex-1 max-w-md">
                 <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-                    <SheetTrigger >
-                        <Button variant="outline" size="icon" className="lg:hidden shrink-0 rounded-xl">
-                            <Menu className="h-5 w-5" />
-                            <span className="sr-only">Toggle Menu</span>
-                        </Button>
+                    <SheetTrigger className="lg:hidden shrink-0 rounded-xl">
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Toggle Menu</span>
                     </SheetTrigger>
                     <SheetContent side="left" className="w-72 p-0 border-r">
                         <Sidebar onNavigate={() => setIsMobileOpen(false)} />
@@ -81,22 +79,19 @@ export function Navbar() {
 
                 {/* Profile Dropdown */}
                 <DropdownMenu>
-                    <DropdownMenuTrigger >
-                        <Button
-                            variant="ghost"
-                            className="relative h-10 flex items-center gap-3 rounded-xl px-2 hover:bg-accent/60"
-                        >
-                            <Avatar className="h-8 w-8 border border-primary/20">
-                                <AvatarImage src="/avatar-placeholder.png" alt="User Avatar" />
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                                    AD
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="hidden md:flex flex-col text-left">
-                                <span className="text-xs font-bold leading-none">Admin User</span>
-                                <span className="text-[10px] text-muted-foreground mt-1">Super Admin</span>
-                            </div>
-                        </Button>
+                    <DropdownMenuTrigger
+                        className="relative h-10 flex items-center gap-3 rounded-xl px-2 hover:bg-accent/60"
+                    >
+                        <Avatar className="h-8 w-8 border border-primary/20">
+                            <AvatarImage src="/avatar-placeholder.png" alt="User Avatar" />
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                                AD
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="hidden md:flex flex-col text-left">
+                            <span className="text-xs font-bold leading-none">Admin User</span>
+                            <span className="text-[10px] text-muted-foreground mt-1">Super Admin</span>
+                        </div>
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent align="end" className="w-56 rounded-xl p-2 shadow-xl border">

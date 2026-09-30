@@ -5,6 +5,7 @@ export type userType = {
     email: string;
     phone: string;
     passwordLastChanged: string;
+    emailVerifiedAt?: string | null;
     role: "admin" | "teacher" | "family";
     createdAt: Date;
     updatedAt: Date

@@ -1,4 +1,8 @@
-import { Send, Sparkles } from "lucide-react";
+"use client";
+
+import { FormEvent, KeyboardEvent, useState } from "react";
+import { Send } from "lucide-react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -8,67 +12,102 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dispatch, SetStateAction } from "react";
-import { ContactMessage } from "@/stores/admin/contacts";
+import { Textarea } from "@/components/ui/textarea";
+import type { ContactMessage } from "@/stores/admin/contacts";
+import { useContactActions } from "./useContactActions";
 
-export function QuickReplyDialog({
-    open,
-    setOpen,
-    contact
-}: {
-    open?: boolean,
-    setOpen: Dispatch<SetStateAction<boolean>>,
-    contact: Partial<ContactMessage>
-}) {
+interface QuickReplyDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    contact: ContactMessage;
+}
+
+export function QuickReplyDialog({ open, onOpenChange, contact }: QuickReplyDialogProps) {
+    const { markRead } = useContactActions();
+    const originalSubject = contact.subject?.trim();
+    const [subject, setSubject] = useState(
+        originalSubject ? (/^re:/i.test(originalSubject) ? originalSubject : `Re: ${originalSubject}`) : "Re: Your message",
+    );
+    const [body, setBody] = useState(`Hi ${contact.name.split(" ")[0]},\n\n`);
+
+    const canSend = body.trim().length > 0 && subject.trim().length > 0;
+
+    // There is no outgoing-mail backend, so the reply is handed to the admin's own mail app.
+    // Replace the body of this function with a server action when one exists.
+    const send = () => {
+        if (!canSend) return;
+        const url = `mailto:${contact.email}?subject=${encodeURIComponent(
+            subject.trim(),
+        )}&body=${encodeURIComponent(body.trim())}`;
+        window.location.href = url;
+        void markRead(contact);
+        toast.success("Reply opened in your email app");
+        onOpenChange(false);
+    };
+
+    const onSubmit = (event: FormEvent) => {
+        event.preventDefault();
+        send();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            send();
+        }
+    };
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="sm:max-w-137.5">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Send className="h-5 w-5 text-primary" />
-                        Quick Reply
-                    </DialogTitle>
+                    <DialogTitle>Quick reply</DialogTitle>
                     <DialogDescription>
-                        Send a direct reply to <span className="font-medium text-foreground">alex.morgan@example.com</span>.
+                        Replying to <span className="font-medium text-foreground">{contact.name}</span>
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="to">To</Label>
-                        <Input id="to" value="Alex Morgan <alex.morgan@example.com>" disabled />
+                <form id="quick-reply-form" onSubmit={onSubmit} onKeyDown={onKeyDown} className="grid gap-3">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="reply-to">To</Label>
+                        <Input id="reply-to" value={contact.email} readOnly className="text-muted-foreground" />
                     </div>
-                    {contact.subject &&
-                        <div className="grid gap-2">
-                            <Label htmlFor="subject">Subject</Label>
-                            <Input id="subject" defaultValue="Re: Inquiry about enterprise plan pricing" />
-                        </div>
-                    }
-
-                    <div className="grid gap-2">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="reply-message">Reply Message</Label>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-primary gap-1">
-                                <Sparkles className="h-3.5 w-3.5" /> Auto-generate AI Response
-                            </Button>
-                        </div>
-                        <Textarea
-                            id="reply-message"
-                            rows={5}
-                            placeholder="Type your response here..."
-                            defaultValue="Hi Alex, Thank you for reaching out! We would be happy to discuss our enterprise options with you..."
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="reply-subject">Subject</Label>
+                        <Input
+                            id="reply-subject"
+                            value={subject}
+                            onChange={(event) => setSubject(event.target.value)}
                         />
                     </div>
-                </div>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="reply-message">Message</Label>
+                        <Textarea
+                            id="reply-message"
+                            rows={6}
+                            autoFocus
+                            value={body}
+                            onChange={(event) => setBody(event.target.value)}
+                            placeholder="Write your reply…"
+                            className="max-h-64 min-h-32"
+                        />
+                    </div>
+                </form>
 
-                <DialogFooter className="gap-2 sm:gap-0">
-                    <Button variant="outline">Cancel</Button>
-                    <Button className="gap-2">
-                        <Send className="h-4 w-4" /> Send Reply
-                    </Button>
+                <DialogFooter className="items-center sm:justify-between">
+                    <p className="hidden text-xs text-muted-foreground sm:block">
+                        Opens in your email app · <kbd className="font-mono">Ctrl</kbd>+<kbd className="font-mono">Enter</kbd> to send
+                    </p>
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" form="quick-reply-form" disabled={!canSend}>
+                            <Send /> Send reply
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
