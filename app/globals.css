@@ -179,3 +179,74 @@ body {
     @apply font-sans;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Easy Arabic brand layer (Home page + Dashboard)
+   Teal and gold are sampled from the logo (LogoLoadingIcon). This block is
+   purely additive: the neutral shadcn tokens above are untouched, so pages
+   that don't use these tokens look exactly as before.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --brand: #066e6a;              /* logo teal */
+  --brand-foreground: #ffffff;
+  --brand-deep: #053f3d;         /* deep teal panels (always dark) */
+  --brand-soft: #e8f2f0;         /* teal tint for quiet backgrounds */
+  --gold: #c3912e;               /* logo gold: lines, fills, large text */
+  --gold-ink: #86610f;           /* gold for small text on light surfaces */
+  --gold-soft: #f8eed6;          /* gold tint for quiet backgrounds */
+}
+
+.dark {
+  --brand: #3dbdb3;
+  --brand-foreground: #052422;
+  --brand-deep: #0a2f2d;
+  --brand-soft: #10292a;
+  --gold: #e0b45a;
+  --gold-ink: #e6bd66;
+  --gold-soft: #2a2314;
+}
+
+@theme {
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+
+  --animate-ea-rise: ea-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-ea-settle: ea-settle 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-ea-grow: ea-grow 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes ea-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes ea-settle {
+    from { opacity: 0; transform: scale(1.08); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes ea-grow {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+}
+
+/* Display serif is loaded per page (lib/fonts.ts) and exposed as --font-alegreya.
+   "inline" makes the utility resolve the variable where it is used. */
+@theme inline {
+  --font-display: var(--font-alegreya), ui-serif, Georgia, "Times New Roman", serif;
+}
+
+/* Eight-pointed star lattice, drawn as a mask so its colour follows
+   currentColor (e.g. text-gold/20) and works in light and dark mode. */
+.pattern-khatam {
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none' stroke='black' stroke-width='1' stroke-linejoin='round'%3E%3Cpath d='M31 20 20 31 9 20 20 9Z M27.78 27.78 12.22 27.78 12.22 12.22 27.78 12.22Z'/%3E%3Cpath d='M31 20H40 M0 20H9 M20 31V40 M20 0V9'/%3E%3Cpath d='M27.78 27.78 37.5 37.5 M12.22 27.78 2.5 37.5 M12.22 12.22 2.5 2.5 M27.78 12.22 37.5 2.5'/%3E%3Cpath d='M35 40 40 35 M0 35 5 40 M0 5 5 0 M35 0 40 5'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none' stroke='black' stroke-width='1' stroke-linejoin='round'%3E%3Cpath d='M31 20 20 31 9 20 20 9Z M27.78 27.78 12.22 27.78 12.22 12.22 27.78 12.22Z'/%3E%3Cpath d='M31 20H40 M0 20H9 M20 31V40 M20 0V9'/%3E%3Cpath d='M27.78 27.78 37.5 37.5 M12.22 27.78 2.5 37.5 M12.22 12.22 2.5 2.5 M27.78 12.22 37.5 2.5'/%3E%3Cpath d='M35 40 40 35 M0 35 5 40 M0 5 5 0 M35 0 40 5'/%3E%3C/svg%3E");
+  -webkit-mask-size: var(--pattern-size, 56px) var(--pattern-size, 56px);
+  mask-size: var(--pattern-size, 56px) var(--pattern-size, 56px);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
