@@ -8,6 +8,7 @@ import { getMessagePreview } from "@/components/chat/lib/constants";
 import { getChatId } from "@/components/chat/lib/chatId";
 import { ChatApiError, deleteMessage, editMessage, markChatRead, reactToMessage, } from "@/components/chat/lib/messageOperations.server";
 import { newUnreadCounts, unreadIncrementUpdates, updateChat, } from "@/components/chat/lib/unread.server";
+import { readUnreadTotal, writeUnreadTotal } from "@/components/chat/lib/unreadTotal.server";
 
 function errorResponse(code: string, message: string, status: number, details?: unknown) {
     return NextResponse.json(
@@ -22,7 +23,8 @@ const UNAUTHENTICATED_CODES = ["NO_TOKEN", "TOKEN_EXPIRED", "INVALID_TOKEN", "US
 
 /**
  * Same send behaviour as before (the sender comes from the session), plus: the receiver's unread
- * counter goes up by one (`unreadCount.<receiverId>`; the sender's own counter is untouched).
+ * counter goes up by one (`unreadCount.<receiverId>`; the sender's own counter is untouched), and so
+ * does their centralized total (unreadMessageCount/{receiverId}) in the same transaction.
  *
  * A transaction instead of a blind batch: the chat is read first so that an old chat, which still
  * holds one shared numeric counter, is converted to the per-user shape instead of being incremented
@@ -52,8 +54,11 @@ async function sendMessage(senderId: string, { receiverId, text, attachment }: S
     await firebaseAdminDB.runTransaction(async (tx) => {
         // Reads must happen before writes inside a transaction.
         const chatSnap = await tx.get(chatRef);
+        const receiverTotal = await readUnreadTotal(tx, receiverId);
 
         tx.set(messagesRef, newMessage);
+        // Both branches below add exactly one unread message for the receiver.
+        writeUnreadTotal(tx, receiverTotal, 1);
 
         if (!chatSnap.exists) {
             tx.set(chatRef, {

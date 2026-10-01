@@ -9,7 +9,9 @@ import { FieldPath, FieldValue, type DocumentSnapshot, type Transaction } from "
 import { firebaseAdminDB } from "@/lib/config/firebase-admin";
 import { DELETED_MESSAGE_PREVIEW, getMessagePreview } from "./constants";
 import type { ReactionKey } from "./reactions";
+import { getUnreadCount } from "./unread";
 import { markReadUpdates, unreadIncrementUpdates, updateChat } from "./unread.server";
+import { readUnreadTotal, writeUnreadTotal } from "./unreadTotal.server";
 import type { StoredMessage } from "../types";
 
 export class ChatApiError extends Error {
@@ -160,14 +162,21 @@ export async function reactToMessage({
         const current = message.reactions?.[actorId] ?? null;
         if (current === reaction) return;
 
-        // FieldPath avoids any dot/escape surprises in the user id used as the map key.
-        tx.update(messageRef, new FieldPath("reactions", actorId), reaction ?? FieldValue.delete());
-
         // A reaction to someone else's message is news for them: it counts as one unread event
         // for the message's author. Reacting to your own message doesn't, and taking a reaction
         // back never lowers anyone's count.
-        if (reaction !== null && message.senderId !== actorId && participants.includes(message.senderId)) {
+        const notifiesAuthor =
+            reaction !== null && message.senderId !== actorId && participants.includes(message.senderId);
+
+        // Reads must happen before writes inside a transaction.
+        const authorTotal = notifiesAuthor ? await readUnreadTotal(tx, message.senderId) : null;
+
+        // FieldPath avoids any dot/escape surprises in the user id used as the map key.
+        tx.update(messageRef, new FieldPath("reactions", actorId), reaction ?? FieldValue.delete());
+
+        if (authorTotal) {
             updateChat(tx, chatRef, unreadIncrementUpdates(chatSnap.get("unreadCount"), participants, message.senderId));
+            writeUnreadTotal(tx, authorTotal, 1);
         }
     });
 }
@@ -176,6 +185,9 @@ export async function reactToMessage({
  * The actor has read the chat: clears the actor's own unread counter. Only that counter is written,
  * so it can't interfere with the other user's count, and `updatedAt` is left alone (reading a chat
  * must not reorder the sidebar). Idempotent: nothing is written when the count is already 0.
+ *
+ * The same number of unread messages is taken off the actor's centralized total
+ * (unreadMessageCount/{actorId}) in the same transaction.
  */
 export async function markChatRead({ actorId, chatId }: { actorId: string; chatId: string }) {
     await firebaseAdminDB.runTransaction(async (tx) => {
@@ -184,7 +196,14 @@ export async function markChatRead({ actorId, chatId }: { actorId: string; chatI
 
         const participants = assertParticipant(chatSnap, actorId);
 
-        const updates = markReadUpdates(chatSnap.get("unreadCount"), participants, actorId);
-        if (updates) updateChat(tx, chatRef, updates);
+        const unreadCount = chatSnap.get("unreadCount");
+        const updates = markReadUpdates(unreadCount, participants, actorId);
+        if (!updates) return;
+
+        // Reads must happen before writes inside a transaction.
+        const actorTotal = await readUnreadTotal(tx, actorId);
+
+        updateChat(tx, chatRef, updates);
+        writeUnreadTotal(tx, actorTotal, -getUnreadCount(unreadCount, actorId));
     });
 }

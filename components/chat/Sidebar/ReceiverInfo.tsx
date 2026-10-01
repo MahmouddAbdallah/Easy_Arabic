@@ -72,7 +72,7 @@ const ReceiverInfo = ({
 
     return (
         <div className={clsx(
-            "group relative flex w-full cursor-pointer items-center gap-3.5 rounded-2xl border border-transparent p-3 transition-all duration-300 ease-out active:scale-[1.1]",
+            "group relative flex w-full cursor-pointer items-center gap-3.5 rounded-2xl border border-transparent p-3 transition-all duration-300 ease-out active:scale-95 active:transition-none",
             isSelected ? "border-border/60 bg-accent/40 shadow-sm  hover:border-border/90 hover:bg-accent/60 hover:shadow-sm" :
                 "hover:border-border/60 hover:bg-accent/40 hover:shadow-sm"
         )}>

@@ -59,54 +59,34 @@ const ChatHeader = () => {
             <div className="flex items-center gap-0.5 md:gap-1">
                 <TooltipProvider>
                     <Tooltip>
-                        <TooltipTrigger >
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
-                            >
-                                <PhoneIcon className="h-4 w-4" />
-                            </Button>
+                        <TooltipTrigger
+                            className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
+                        >
+
+                            <PhoneIcon className="h-4 w-4" />
                         </TooltipTrigger>
                         <TooltipContent>Voice Call</TooltipContent>
                     </Tooltip>
 
                     <Tooltip>
-                        <TooltipTrigger >
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
-                            >
-                                <VideoIcon className="h-4 w-4" />
-                            </Button>
+                        <TooltipTrigger className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                            <VideoIcon className="h-4 w-4" />
                         </TooltipTrigger>
                         <TooltipContent>Video Call</TooltipContent>
                     </Tooltip>
 
                     <Tooltip>
-                        <TooltipTrigger >
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
-                            >
-                                <SearchIcon className="h-4 w-4" />
-                            </Button>
+                        <TooltipTrigger className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                            <SearchIcon className="h-4 w-4" />
                         </TooltipTrigger>
                         <TooltipContent>Search in Chat</TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
 
                 <DropdownMenu>
-                    <DropdownMenuTrigger >
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
-                        >
-                            <MoreVerticalIcon className="h-4 w-4" />
-                        </Button>
+                    <DropdownMenuTrigger className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+
+                        <MoreVerticalIcon className="h-4 w-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         align="end"
