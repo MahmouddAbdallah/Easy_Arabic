@@ -9,8 +9,19 @@ interface Status {
     state: 'online' | 'offline';
     last_changed: number;
 }
-
-export default function UserStatusDisplay({ userId, ping = false, showStatus = false, typing = false }: { userId: string; ping?: boolean, showStatus?: boolean, typing?: boolean }) {
+type UserStatusDisplayProps = {
+    userId: string;
+    ping?: boolean,
+    showStatus?: boolean,
+    typing?: boolean
+}
+export default function UserStatusDisplay({
+    userId,
+    ping = false,
+    showStatus = false,
+    typing = false
+}: UserStatusDisplayProps
+) {
     const [status, setStatus] = useState<Status | null>(null);
 
     useEffect(() => {
