@@ -63,6 +63,8 @@ export const userSchema = z.object({
  * that keeps the `.default()`s, so an edit that only sent `{ name }` silently
  * reset `role` to "family" and `status` to "active" (un-banning users).
  */
+
+
 export const userUpdateSchema = z.object({
     name: nameSchema,
     email: emailSchema,
@@ -71,6 +73,17 @@ export const userUpdateSchema = z.object({
     role: RoleEnum,
     status: StatusEnum,
 }).partial();
+
+
+
+export const fcmTokenSchema = z.object({
+    fcmToken: z
+        .string()
+        .min(30, 'Invalid FCM token length')
+        .regex(/^[a-zA-Z0-9_:-]+$/, 'Invalid FCM token format'),
+    deviceType: z.string().optional(),
+});
+
 
 export const addFamilyToTeacherSchema = z.object({
     teacherId: z

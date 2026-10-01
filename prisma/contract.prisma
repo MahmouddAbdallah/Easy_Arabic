@@ -10,18 +10,19 @@ enum Status {
   banned
   suspended
 }
+
 model User {
-  id                  String            @id @default(uuid())
+  id                  String             @id @default(uuid())
   name                String
-  email               String            @unique
+  email               String             @unique
   phone               String
   password            String
-  passwordLastChanged TimestamptzString @default(now())
-  role                Role              @default(family)
-  createdAt           TimestamptzString @default(now())
-  updatedAt           TimestamptzString @default(now())
-  status              Status            @default(active)
-  subject             String            @default("Quran")
+  passwordLastChanged TimestamptzString  @default(now())
+  role                Role               @default(family)
+  createdAt           TimestamptzString  @default(now())
+  updatedAt           TimestamptzString  @default(now())
+  status              Status             @default(active)
+  subject             String             @default("Quran")
   // Set when the user proves ownership of `email` (verification link or a
   // completed password reset). NULL = not verified yet.
   emailVerifiedAt     TimestamptzString?
@@ -66,6 +67,19 @@ model AuthRateLimit {
   @@index([updatedAt])
 }
 
+model UserFCMToken {
+  id         String            @id @default(uuid())
+  userId     String
+  user       User              @relation(fields:[userId], references:[id], onDelete: Cascade)
+  fcmToken   String
+  deviceType String? // "Chrome on Windows" or "Mobile"
+  createdAt  TimestamptzString @default(now())
+  updatedAt  TimestamptzString @default(now())
+
+  @@unique([userId, fcmToken])
+  @@index([userId])
+}
+
 enum TeacherReward {
   EXCELLENT
   VERY_GOOD
@@ -100,15 +114,15 @@ model Lesson {
 }
 
 model TeacherFamily {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   teacherId String
   familyId  String
 
-  teacher   User     @relation(fields:[teacherId], references:[id], "Teacher")
-  family    User     @relation(fields:[familyId], references:[id], "Family")
+  teacher   User              @relation(fields:[teacherId], references:[id], "Teacher")
+  family    User              @relation(fields:[familyId], references:[id], "Family")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  createdAt TimestamptzString @default(now())
+  updatedAt TimestamptzString @default(now())
 
   @@unique([teacherId, familyId])
 }
@@ -120,16 +134,15 @@ model MoneyPerLesson {
   teacher   User   @relation(fields:[teacherId], references:[id], "Teacher")
 }
 
-
 model Contact {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   email     String
   name      String
   subject   String?
   message   String
-  isRead    Boolean  @default(false)
-  createdAt     TimestamptzString @default(now())
-  updatedAt     TimestamptzString @default(now())
+  isRead    Boolean           @default(false)
+  createdAt TimestamptzString @default(now())
+  updatedAt TimestamptzString @default(now())
 
   @@index([isRead])
   @@index([createdAt])

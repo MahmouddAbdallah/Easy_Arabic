@@ -34,9 +34,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'a28e0d6e56f1739c26adcf681fd73f4cdfdd5a0f43f755c75c438cd39acf034e'>;
+  StorageHashBase<'5c6868feae7e53768198c54aba65b346d5950a5f7a6f14c5754d4d863007b061'>;
 export type ExecutionHash =
-  ExecutionHashBase<'8dfcf506e221c9568bb498d819659fd5f51bb30894eca0295872ef2ce9b755f7'>;
+  ExecutionHashBase<'10d80df995694e2b6517fd2c4fe94f7d56a34da9731d23f3b9bef8d7569e7119'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -314,7 +314,7 @@ export type FieldOutputTypes = {
       readonly subject: CodecTypes['pg/text@1']['output'];
       readonly emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     };
-    readonly UserFCMToken: {
+    readonly UserToken: {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly userId: CodecTypes['pg/text@1']['output'];
       readonly fcmToken: CodecTypes['pg/text@1']['output'];
@@ -398,7 +398,7 @@ export type FieldInputTypes = {
       readonly subject: CodecTypes['pg/text@1']['input'];
       readonly emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
     };
-    readonly UserFCMToken: {
+    readonly UserToken: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly userId: CodecTypes['pg/text@1']['input'];
       readonly fcmToken: CodecTypes['pg/text@1']['input'];
@@ -482,7 +482,7 @@ export type StorageColumnTypes = {
       readonly subject: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
-    readonly userFCMToken: {
+    readonly userToken: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly deviceType: CodecTypes['pg/text@1']['output'] | null;
       readonly fcmToken: CodecTypes['pg/text@1']['output'];
@@ -566,7 +566,7 @@ export type StorageColumnInputTypes = {
       readonly subject: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
-    readonly userFCMToken: {
+    readonly userToken: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly deviceType: CodecTypes['pg/text@1']['input'] | null;
       readonly fcmToken: CodecTypes['pg/text@1']['input'];
@@ -611,7 +611,7 @@ export namespace Models {
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     readonly [RelationKeys]?: never;
   };
-  export type public_UserFCMToken = {
+  export type public_UserToken = {
     id: CodecTypes['pg/text@1']['output'];
     userId: CodecTypes['pg/text@1']['output'];
     fcmToken: CodecTypes['pg/text@1']['output'];
@@ -680,7 +680,7 @@ export declare const models: {
     User: Models.public_User;
     AuthToken: Models.public_AuthToken;
     AuthRateLimit: Models.public_AuthRateLimit;
-    UserFCMToken: Models.public_UserFCMToken;
+    UserToken: Models.public_UserToken;
     Lesson: Models.public_Lesson;
     TeacherFamily: Models.public_TeacherFamily;
     MoneyPerLesson: Models.public_MoneyPerLesson;
@@ -1212,7 +1212,7 @@ type ContractBase = Omit<
               ];
               foreignKeys: readonly [];
             };
-            readonly userFCMToken: {
+            readonly userToken: {
               columns: {
                 readonly id: {
                   readonly nativeType: 'text';
@@ -1251,8 +1251,8 @@ type ContractBase = Omit<
               uniques: readonly [{ readonly columns: readonly ['userId', 'fcmToken'] }];
               indexes: readonly [
                 {
-                  readonly name: 'userFCMToken_userId_idx_a489d58a';
-                  readonly prefix: 'userFCMToken_userId_idx';
+                  readonly name: 'userToken_userId_idx_a489d58a';
+                  readonly prefix: 'userToken_userId_idx';
                   readonly columns: readonly ['userId'];
                   readonly unique: false;
                 },
@@ -1261,7 +1261,7 @@ type ContractBase = Omit<
                 {
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'userFCMToken';
+                    readonly tableName: 'userToken';
                     readonly columns: readonly ['userId'];
                   };
                   readonly target: {
@@ -1316,10 +1316,7 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'AuthRateLimit';
     };
-    readonly userFCMToken: {
-      readonly namespace: 'public' & NamespaceId;
-      readonly model: 'UserFCMToken';
-    };
+    readonly userToken: { readonly namespace: 'public' & NamespaceId; readonly model: 'UserToken' };
     readonly lesson: { readonly namespace: 'public' & NamespaceId; readonly model: 'Lesson' };
     readonly teacherFamily: {
       readonly namespace: 'public' & NamespaceId;
@@ -1768,7 +1765,7 @@ type ContractBase = Omit<
               };
             };
           };
-          readonly UserFCMToken: {
+          readonly UserToken: {
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
@@ -1813,7 +1810,7 @@ type ContractBase = Omit<
               };
             };
             readonly storage: {
-              readonly table: 'userFCMToken';
+              readonly table: 'userToken';
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
@@ -1941,7 +1938,7 @@ type ContractBase = Omit<
         {
           readonly ref: {
             readonly namespace: 'public';
-            readonly table: 'userFCMToken';
+            readonly table: 'userToken';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };

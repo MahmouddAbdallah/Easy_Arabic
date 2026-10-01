@@ -2,6 +2,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getDatabase } from 'firebase-admin/database';
 import { getAuth } from 'firebase-admin/auth';
+import { getMessaging } from 'firebase-admin/messaging';
 
 if (!getApps().length) {
     initializeApp({
@@ -19,3 +20,6 @@ export const firebaseAdminDBRealTime = getDatabase();
 
 // Auth
 export const auth = getAuth();
+
+// Messaging
+export const adminMessaging = getMessaging();
