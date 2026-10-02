@@ -68,16 +68,16 @@ export default function TeacherRateBadge({
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent className="sm:max-w-95">
                     <DialogHeader>
-                        <DialogTitle>Edit Rate Per Lesson</DialogTitle>
+                        <DialogTitle>Edit Rate Per Hour</DialogTitle>
                         <DialogDescription>
-                            Set the price per lesson for this teacher.
+                            Set the price per Hour for this teacher.
                         </DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={onSubmit} className="space-y-4 pt-2">
                         <div className="space-y-2">
                             <Label htmlFor="rate-input" className="text-sm font-medium">
-                                Amount per lesson ($)
+                                Amount per Hour ($)
                             </Label>
                             <div className="relative">
                                 <Input

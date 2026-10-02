@@ -162,7 +162,7 @@ export const LessonsFilter = () => {
               {/* 2. Teacher Reward */}
               <div className="space-y-1 flex-1">
                 <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                  <Award className="h-3 w-3 text-amber-500" /> Teacher Reward
+                  <Award className="h-3 w-3 text-amber-500" /> <span className='hidden md:block'>Teacher</span> Reward
                 </label>
                 <Controller
                   name="teacherReward"

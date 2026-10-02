@@ -7,7 +7,7 @@ import { getAdminOverview } from '@/lib/data/home-data';
 
 const quickLinks: QuickLink[] = [
     { href: '/dashboard/teacher', label: 'Manage Teachers', description: 'View and manage the teacher directory', icon: GraduationCap },
-    { href: '/dashboard/family', label: 'Manage Families', description: 'View and manage the family directory', icon: Users },
+    { href: '/dashboard/families', label: 'Manage Families', description: 'View and manage the family directory', icon: Users },
     { href: '/lesson/new-lesson', label: 'Log a Lesson', description: 'Record a new lesson', icon: PlusCircle },
     { href: '/chat', label: 'Messages', description: 'Open your conversations', icon: MessageCircle },
 ];
