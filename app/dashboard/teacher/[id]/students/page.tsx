@@ -1,5 +1,4 @@
 import TeacherFamiliesList from '@/components/dashboard/teachers/TeacherFamiliesList';
-import { TabsContent } from '@/components/ui/tabs'
 import { getFamiliesOfTeacher } from '@/lib/data/users';
 
 
@@ -25,9 +24,7 @@ const page = async ({ params }: {
     });
 
     return (
-        <TabsContent value="students" className="space-y-4">
-            <TeacherFamiliesList students={data} />
-        </TabsContent>
+        <TeacherFamiliesList students={data} />
     )
 }
 

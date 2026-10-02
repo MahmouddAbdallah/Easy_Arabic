@@ -14,6 +14,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from '@/components/lesson/LessonOptions';
 import SelectFamiliesLessonDashboard from './SelectFamiliesLessonDashboard';
 import { userType } from '@/types/userTypes';
+import { clsx } from 'cn';
 
 interface FilterFormValues {
   status: string;
@@ -229,17 +230,14 @@ export const LessonsDashboardFilter = () => {
               </div>
 
               {/* More Filters Icon Button */}
-              <CollapsibleTrigger >
-                <Button
-                  type="button"
-                  variant={isOpen ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-8 mb-1 px-2.5 text-xs font-medium gap-1 border-border/70 rounded-md shrink-0"
-                  title="More filters"
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                </Button>
+              <CollapsibleTrigger
+                className={clsx(
+                  "flex justify-center items-center border h-8 mb-1 px-2.5 text-xs font-medium gap-1 border-border/70 rounded-md shrink-0",
+                )}
+                title="More filters"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
               </CollapsibleTrigger>
 
             </div>

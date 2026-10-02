@@ -84,18 +84,16 @@ const AddFamily = () => {
     const filteredUsers = users.filter(user => !teacherFamilies.some(tf => tf.family.id === user.id));
     return (
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger >
-                <Button size="sm" className="h-9 gap-2 shrink-0 font-medium">
-                    <UserPlusIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">Add Student</span>
-                </Button>
+            <DialogTrigger className="text-sm bg-primary flex items-center justify-center text-primary-foreground px-3 lg:px-4 cursor-pointer rounded-md h-9 gap-2 shrink-0 font-medium">
+                <UserPlusIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Add Family</span>
             </DialogTrigger>
 
             <DialogContent className="sm:max-w-120 p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-4 bg-muted/20 border-b">
-                    <DialogTitle className="text-base font-semibold">Add Students to Class</DialogTitle>
+                    <DialogTitle className="text-base font-semibold">Add Familys to Class</DialogTitle>
                     <DialogDescription className="text-xs">
-                        Search by student name or email address to add them.
+                        Search by Family name or email address to add them.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -113,7 +111,7 @@ const AddFamily = () => {
 
                     {!isSearchLoading && filteredUsers.length > 0 && (
                         <div className="flex justify-between items-center px-1 text-xs text-muted-foreground font-medium">
-                            <span>Found {count} student{count !== 1 ? 's' : ''}</span>
+                            <span>Found {count} Family{count !== 1 ? 's' : ''}</span>
                             <span>{selectedUserIds.length} selected</span>
                         </div>
                     )}
@@ -166,7 +164,7 @@ const AddFamily = () => {
                                     <SearchIcon className="h-5 w-5" />
                                 </div>
                                 <p className="text-xs text-muted-foreground max-w-55">
-                                    Start typing to search available students from the system.
+                                    Start typing to search available Familys from the system.
                                 </p>
                             </div>
                         )}

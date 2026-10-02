@@ -1,6 +1,5 @@
 import { getLessons } from "@/lib/data/lessons";
 import LessonsTable from "@/components/lesson/LessonsTable";
-import { TabsContent } from "@/components/ui/tabs";
 import { LessonsDashboardFilter } from '@/components/dashboard/lessons/LessonsDashboardFilter';
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
@@ -50,15 +49,13 @@ async function LessonsPage({ params, searchParams }: {
     });
 
     return (
-        <TabsContent value="lessons" className="space-y-4">
-            <div className="space-y-6 max-w-7xl mx-auto">
-                <LessonsDashboardFilter />
-                <LessonsTable
-                    count={count}
-                    data={data}
-                />
-            </div>
-        </TabsContent>
+        <div className="space-y-6">
+            <LessonsDashboardFilter />
+            <LessonsTable
+                count={count}
+                data={data}
+            />
+        </div>
     )
 }
 

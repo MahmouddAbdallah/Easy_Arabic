@@ -187,13 +187,19 @@ body {
    that don't use these tokens look exactly as before.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --brand: #066e6a;              /* logo teal */
+  --brand: #066e6a;
+  /* logo teal */
   --brand-foreground: #ffffff;
-  --brand-deep: #053f3d;         /* deep teal panels (always dark) */
-  --brand-soft: #e8f2f0;         /* teal tint for quiet backgrounds */
-  --gold: #c3912e;               /* logo gold: lines, fills, large text */
-  --gold-ink: #86610f;           /* gold for small text on light surfaces */
-  --gold-soft: #f8eed6;          /* gold tint for quiet backgrounds */
+  --brand-deep: #053f3d;
+  /* deep teal panels (always dark) */
+  --brand-soft: #e8f2f0;
+  /* teal tint for quiet backgrounds */
+  --gold: #c3912e;
+  /* logo gold: lines, fills, large text */
+  --gold-ink: #86610f;
+  /* gold for small text on light surfaces */
+  --gold-soft: #f8eed6;
+  /* gold tint for quiet backgrounds */
 }
 
 .dark {
@@ -220,16 +226,61 @@ body {
   --animate-ea-grow: ea-grow 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 
   @keyframes ea-rise {
-    from { opacity: 0; transform: translateY(14px); }
-    to { opacity: 1; transform: none; }
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
+
   @keyframes ea-settle {
-    from { opacity: 0; transform: scale(1.08); }
-    to { opacity: 1; transform: none; }
+    from {
+      opacity: 0;
+      transform: scale(1.08);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
+
   @keyframes ea-grow {
-    from { transform: scaleY(0); }
-    to { transform: scaleY(1); }
+    from {
+      transform: scaleY(0);
+    }
+
+    to {
+      transform: scaleY(1);
+    }
+  }
+}
+
+@media (width >=40rem
+  /* 640px */
+) {
+  .sm-grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (width >=48rem
+  /* 768px */
+) {
+  .md-grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (width >=64rem
+  /* 1024px */
+) {
+  .lg-grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
