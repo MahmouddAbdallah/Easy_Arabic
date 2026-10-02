@@ -7,6 +7,7 @@ import axios from 'axios'
 import { Loader2Icon, LoaderIcon, SearchIcon, UserPlusIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useParams } from 'next/navigation'
+import { useTeacherFamilyStore } from '@/stores/admin/teacherFamilies'
 
 interface User {
     id: string;
@@ -24,6 +25,8 @@ const AddFamily = () => {
     const [isSearchLoading, setIsSearchLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+    const addTeacherFamily = useTeacherFamilyStore((state) => state.addTeacherFamily);
+    const teacherFamilies = useTeacherFamilyStore((state) => state.teacherFamilies);
 
     const { id } = useParams()
 
@@ -59,15 +62,17 @@ const AddFamily = () => {
     const handleDone = async () => {
         try {
             setLoading(true)
-            await axios.post(`/api/teacher/${id}/add-family/`, {
+            const { data } = await axios.post(`/api/teacher/${id}/family`, {
                 familiesIds: selectedUserIds,
                 teacherId: id,
             })
+            data.teacherFamilies.forEach((teacherFamily: any) => {
+                addTeacherFamily(teacherFamily);
+            });
+
             setIsAddDialogOpen(false);
             setUsers([]);
         } catch (error: any) {
-            console.log(error?.response?.data);
-
             toast.error(error?.response?.data?.error?.message || 'Something went wrong');
         }
         finally {
@@ -75,6 +80,8 @@ const AddFamily = () => {
         }
     };
 
+    // filter out already linked families from the search results
+    const filteredUsers = users.filter(user => !teacherFamilies.some(tf => tf.family.id === user.id));
     return (
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger >
@@ -104,7 +111,7 @@ const AddFamily = () => {
                         />
                     </div>
 
-                    {!isSearchLoading && users.length > 0 && (
+                    {!isSearchLoading && filteredUsers.length > 0 && (
                         <div className="flex justify-between items-center px-1 text-xs text-muted-foreground font-medium">
                             <span>Found {count} student{count !== 1 ? 's' : ''}</span>
                             <span>{selectedUserIds.length} selected</span>
@@ -117,8 +124,8 @@ const AddFamily = () => {
                                 <Loader2Icon className="h-5 w-5 animate-spin text-muted-foreground" />
                                 <p className="text-xs text-muted-foreground">Searching...</p>
                             </div>
-                        ) : users.length > 0 ? (
-                            users.map((user) => {
+                        ) : filteredUsers.length > 0 ? (
+                            filteredUsers.map((user) => {
                                 const isChecked = selectedUserIds.includes(user.id);
                                 return (
                                     <label
@@ -180,7 +187,7 @@ const AddFamily = () => {
                         type="button"
                         size="sm"
                         onClick={handleDone}
-                        disabled={selectedUserIds.length === 0 && !loading}
+                        disabled={selectedUserIds.length === 0 || loading}
                         className="h-9 px-4 text-xs font-medium"
                     >
                         {loading && <LoaderIcon className='size-5 animate-spin' />}

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
             familyId: data.familyId,
             classDate: new Date(data.classDate).toISOString(),
             duration: data.duration,
-            money: money?.money ?? 0,
+            money: money?.money ?? 50,
             status: data.status,
             student: data.student,
             teacherId: data.teacherId,

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import AuthNotice from '@/components/auth/AuthNotice';
 import { useCountdown } from '@/hooks/useCountdown';
 import { formatCountdown, getApiError } from '@/lib/auth/client';
+import ErrorMsg from '../ErrorMsg';
 
 interface FormInputs {
     email: string;
@@ -100,9 +101,7 @@ const SignInForm = () => {
                         {...register('email', { required: 'Email is required' })}
                     />
                 </div>
-                {errors.email && (
-                    <p className="text-xs text-destructive font-medium">{errors.email.message}</p>
-                )}
+                {<ErrorMsg message={errors.email?.message} />}
             </div>
 
             {/* Password */}
@@ -138,9 +137,7 @@ const SignInForm = () => {
                         {showPass ? <EyeIcon className="w-4 h-4" /> : <EyeOffIcon className="w-4 h-4" />}
                     </button>
                 </div>
-                {errors.password && (
-                    <p className="text-xs text-destructive font-medium">{errors.password.message}</p>
-                )}
+                {<ErrorMsg message={errors.password?.message} />}
             </div>
 
             {/* Temporary lockout (server-enforced) */}

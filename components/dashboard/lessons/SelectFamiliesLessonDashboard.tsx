@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { UsersIcon, Loader2, AlertCircle, Mail, Phone, Activity, UserIcon } from 'lucide-react'
 import { Controller, useFormContext } from 'react-hook-form'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../ui/select'
-import { Avatar, AvatarFallback } from '../ui/avatar'
-import { useFamilyStore } from '@/stores/families'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import axios from 'axios'
-import { useAppContext } from '../AppContext'
-import ErrorMsg from '../ErrorMsg'
-import { Input } from '../ui/input'
+import ErrorMsg from '@/components/ErrorMsg'
+import { Input } from '@/components/ui/input'
+import { useParams } from 'next/navigation'
 import { userType } from '@/types/userTypes'
 
 const getInitials = (name: string) => {
@@ -19,23 +18,26 @@ const getInitials = (name: string) => {
     return name.slice(0, 2).toUpperCase()
 }
 
-const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
-    const { user } = useAppContext()
-    const { control, register, formState: { errors } } = useFormContext()
-
-    const setFamilies = useFamilyStore((state) => state.setFamilies)
-    const families = (useFamilyStore((state) => state.families) as userType[]) || []
-
+const SelectFamiliesLessonDashboard = ({
+    isFilter,
+    families,
+    setFamilies
+}:
+    {
+        isFilter?: boolean,
+        families: userType[],
+        setFamilies: React.Dispatch<React.SetStateAction<userType[]>>
+    }) => {
+    const { id } = useParams();
+    const { control, register, formState: { errors } } = useFormContext();
     const [loading, setLoading] = useState<boolean>(false)
 
     useEffect(() => {
-        if (!user?.id) return;
         if (families?.length) return;
-
         const fetchFamilies = async () => {
             setLoading(true)
             try {
-                const { data } = await axios.get(`/api/teacher/${user.id}/families`)
+                const { data } = await axios.get(`/api/teacher/${id}/families`)
                 setFamilies(data.families || [])
             } catch (err) {
                 console.error('Failed to fetch families:', err)
@@ -46,7 +48,7 @@ const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
         }
 
         fetchFamilies()
-    }, [setFamilies, user?.id, families?.length])
+    }, [setFamilies, id, families?.length])
 
     return (
         <div className="space-y-1.5">
@@ -62,7 +64,7 @@ const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
                         <span>Family</span>
                     </label>
                     {loading ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground border p-2 rounded-md">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground  border p-2 rounded-md">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             <span>Loading families...</span>
                         </div>
@@ -72,6 +74,8 @@ const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
                             control={control}
                             rules={isFilter ? {} : { required: "Please select family" }}
                             render={({ field }) => {
+                                console.log(field);
+
                                 const selectedFamily = families.find((f) => f.id === field.value)
                                 return (
                                     <div className="space-y-1">
@@ -81,6 +85,7 @@ const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
                                             disabled={loading}
                                         >
                                             <SelectTrigger className="w-full h-auto py-2">
+
                                                 <SelectValue placeholder="Select a family">
                                                     {selectedFamily ? (
                                                         <div className="flex items-center gap-2">
@@ -95,6 +100,7 @@ const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
                                                         'Select a family'
                                                     )}
                                                 </SelectValue>
+
                                             </SelectTrigger>
 
                                             <SelectContent>
@@ -181,4 +187,4 @@ const SelectFamilies = ({ isFilter }: { isFilter?: boolean }) => {
     )
 }
 
-export default SelectFamilies
+export default SelectFamiliesLessonDashboard

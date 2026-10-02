@@ -75,11 +75,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
             families.push({ id: family.id, email: family.email, name: family.name });
         }
 
+        const teacherFamilies = [];
         try {
             for (const family of families) {
-                await db.orm.public.TeacherFamily.create({
+                const teacherFamily = await db.orm.public.TeacherFamily.create({
                     familyId: family.id,
                     teacherId,
+                });
+                teacherFamilies.push({
+                    id: teacherFamily.id, family: {
+                        id: family.id,
+                        name: family.name, email: family.email
+                    }
                 });
             }
         } catch (err) {
@@ -90,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
         }
 
         return NextResponse.json(
-            { success: true, message: "Successfully added", families },
+            { success: true, message: "Successfully added", teacherFamilies },
             { status: 201 }
         );
     } catch (error) {

@@ -6,7 +6,7 @@ import Link from "next/link"
 
 const SignIn = async () => {
     return (
-        <div className="relative h-screen flex items-center justify-center p-4 sm:p-6 md:p-10 overflow-hidden bg-background">
+        <div className="relative h-svh flex items-center justify-center p-4 sm:p-6 md:p-10 overflow-hidden bg-background">
             <BackgroundImage />
             <div className="absolute size-150 bg-primary/10 rounded-full blur-3xl pointer-events-none -z-10" />
             <div className="relative w-full max-w-4xl bg-card/95 backdrop-blur-sm border border-border/80 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2">

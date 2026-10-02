@@ -1,14 +1,20 @@
 import { userType } from '@/types/userTypes'
 import { create } from 'zustand'
 
+export interface TeacherFamilyType {
+    id: string;
+    family: Partial<userType>;
+    createdAt: Temporal.Instant
+}
+
 export type TeacherFamilyState = {
-    teacherFamilies: userType[]
+    teacherFamilies: TeacherFamilyType[]
 }
 
 export type UserActions = {
-    setTeacherFamilies: (teacherFamilies: userType[]) => void
-    addTeacherFamily: (newTeacherFamily: userType) => void
-    updateTeacherFamily: (id: string, updatedFields: Partial<userType>) => void
+    setTeacherFamilies: (teacherFamilies: TeacherFamilyType[]) => void
+    addTeacherFamily: (newTeacherFamily: TeacherFamilyType) => void
+    updateTeacherFamily: (id: string, updatedFields: Partial<TeacherFamilyType>) => void
     removeTeacherFamily: (id: string) => void
     clearTeacherFamilies: () => void
 }

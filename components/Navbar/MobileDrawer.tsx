@@ -36,7 +36,7 @@ export const MobileDrawer = ({ isOpen, onClose, user, onLogout }: MobileDrawerPr
                     {/* Header */}
                     <div className="flex items-center justify-between p-5 border-b border-border/60">
                         <div className="flex items-center gap-2">
-                            <LogoIcon className="w-7 h-7 text-primary" />
+                            <LogoIcon className="w-7 h-7 sm:w-8 sm:h-8 fill-primary stroke-primary dark:fill-blue-500 dark:stroke-blue-500 transition-transform" />
                             <span className="text-sm font-black text-foreground uppercase tracking-wider">Navigation</span>
                         </div>
                         <button

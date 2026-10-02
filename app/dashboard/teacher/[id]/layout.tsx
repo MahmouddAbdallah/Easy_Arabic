@@ -29,7 +29,6 @@ const RootLayout = async ({ children, params }: {
     });
 
     const { money } = await getMoney(id);
-    console.log(money);
 
 
     return (

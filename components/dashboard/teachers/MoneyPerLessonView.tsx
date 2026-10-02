@@ -21,13 +21,13 @@ interface TeacherRateBadgeProps {
 export default function TeacherRateBadge({
     initialMoney = {
         id: '',
-        money: 0
+        money: 50
     },
     teacherId
 }: TeacherRateBadgeProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [money, setMoney] = useState<number>(initialMoney.money);
-    const { handleSubmit, register, formState: { isLoading, } } = useForm({
+    const [money, setMoney] = useState<number>(initialMoney.money == 0 ? 50 : initialMoney.money);
+    const { handleSubmit, register, formState: { isSubmitting }, } = useForm({
         defaultValues: { money }
     });
 
@@ -41,7 +41,7 @@ export default function TeacherRateBadge({
             });
             setMoney(formData.money)
             setIsOpen(false)
-            toast.success(data.message || 'Added money successfully successfully');
+            toast.success(data.message || 'update money successfully successfully');
         } catch (error: any) {
             toast.error(error?.response?.data?.error?.message || error?.response?.data?.message || 'Something went wrong');
         }
@@ -103,10 +103,10 @@ export default function TeacherRateBadge({
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={isLoading}
+                                disabled={isSubmitting}
                                 className="gap-2"
                             >
-                                {isLoading ?
+                                {isSubmitting ?
                                     <Loader2Icon className="size-4 animate-spin" /> :
                                     <Check className="size-4" />
                                 }

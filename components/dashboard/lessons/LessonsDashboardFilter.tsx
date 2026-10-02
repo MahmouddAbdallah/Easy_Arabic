@@ -11,8 +11,9 @@ import { RotateCcw, CalendarIcon, Clock, ChevronDown, Award, Timer, Filter, Slid
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
-import SelectFamilies from './SelectFamilies';
+import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from '@/components/lesson/LessonOptions';
+import SelectFamiliesLessonDashboard from './SelectFamiliesLessonDashboard';
+import { userType } from '@/types/userTypes';
 
 interface FilterFormValues {
   status: string;
@@ -32,7 +33,9 @@ const EMPTY_VALUES: FilterFormValues = {
   familyId: undefined,
 };
 
-export const LessonsFilter = () => {
+export const LessonsDashboardFilter = () => {
+  const [families, setFamilies] = useState<userType[]>([]);
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -246,7 +249,11 @@ export const LessonsFilter = () => {
               <div className="p-3 pt-2 border-t border-border/60 bg-muted/20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {/* Select Family */}
-                  <SelectFamilies isFilter={true} />
+                  <SelectFamiliesLessonDashboard
+                    isFilter={true}
+                    setFamilies={setFamilies}
+                    families={families}
+                  />
 
                   {/* Date From */}
                   <div className="space-y-1">

@@ -177,9 +177,6 @@ export const reorderSchema = z.object({
 /** Shared helper so every route formats a Zod failure into the same
  * {success:false,error:{code,message}} shape instead of each one
  * re-deriving the message slightly differently. */
-export function firstValidationMessage(error: z.ZodError): string {
-    return error.issues[0]?.message ?? 'Invalid input';
-}
 
 export const contactSchema = z.object({
     name: z.string('Please enter the name'),
@@ -190,3 +187,7 @@ export const contactSchema = z.object({
     ),
     message: z.string('Please enter your message')
 });
+
+export function firstValidationMessage(error: z.ZodError): string {
+    return error.issues[0]?.message ?? 'Invalid input';
+}

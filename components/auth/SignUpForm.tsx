@@ -12,6 +12,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import AuthNotice from '@/components/auth/AuthNotice';
 import { formatWait, getApiError, passwordTooLong, PASSWORD_MAX_BYTES } from '@/lib/auth/client';
+import ErrorMsg from '../ErrorMsg';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -85,9 +86,8 @@ const SignUpForm = () => {
                     maxLength={100}
                     {...register('name', { required: 'Name is required', validate: (v) => v.trim().length > 0 || 'Name is required' })}
                 />
-                {errors.name && (
-                    <p className="text-xs text-destructive font-medium">{errors.name.message}</p>
-                )}
+                {<ErrorMsg message={errors.name?.message} />}
+
             </div>
 
             {/* Email */}
@@ -105,9 +105,7 @@ const SignUpForm = () => {
                         pattern: { value: EMAIL_PATTERN, message: 'Enter a valid email address' },
                     })}
                 />
-                {errors.email && (
-                    <p className="text-xs text-destructive font-medium">{errors.email.message}</p>
-                )}
+                {<ErrorMsg message={errors.email?.message} />}
             </div>
 
             {/* Phone Number */}
@@ -122,9 +120,8 @@ const SignUpForm = () => {
                     aria-invalid={!!errors.phone}
                     {...register('phone', { required: 'Phone number is required' })}
                 />
-                {errors.phone && (
-                    <p className="text-xs text-destructive font-medium">{errors.phone.message}</p>
-                )}
+                {<ErrorMsg message={errors.phone?.message} />}
+
             </div>
 
             {/* Password */}
@@ -155,9 +152,8 @@ const SignUpForm = () => {
                         {showPass ? <EyeIcon className="w-4 h-4" /> : <EyeOffIcon className="w-4 h-4" />}
                     </button>
                 </div>
-                {errors.password && (
-                    <p className="text-xs text-destructive font-medium">{errors.password.message}</p>
-                )}
+                {<ErrorMsg message={errors.password?.message} />}
+
             </div>
 
             {/* Confirm Password */}
@@ -187,9 +183,7 @@ const SignUpForm = () => {
                         {showPassConfirm ? <EyeIcon className="w-4 h-4" /> : <EyeOffIcon className="w-4 h-4" />}
                     </button>
                 </div>
-                {errors.confirmPassword && (
-                    <p className="text-xs text-destructive font-medium">{errors.confirmPassword.message}</p>
-                )}
+                {<ErrorMsg message={errors.confirmPassword?.message} />}
             </div>
 
             {/* Submit Button */}
