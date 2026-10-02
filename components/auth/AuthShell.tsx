@@ -27,7 +27,7 @@ export default function AuthShell({
             <div className="relative w-full max-w-4xl bg-card/95 backdrop-blur-sm border border-border/80 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2">
                 <div className="h-150 relative hidden md:flex flex-col justify-between p-8 bg-muted/40 border-r border-border/50 overflow-hidden">
                     <Image
-                        src="/sign-up.jpg"
+                        src="/assets/sign-up.jpg"
                         alt="Quran Sign In Illustration"
                         fill
                         priority

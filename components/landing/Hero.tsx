@@ -69,19 +69,19 @@ export default function Hero() {
 
                     {/* RIGHT: Visual */}
                     <div className="lg:col-span-6 relative animate-ea-settle [animation-delay:120ms]">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-brand/15 via-gold/10 to-transparent blur-3xl rounded-[40px] -z-10" />
+                        <div className="absolute inset-0 bg-linear-to-tr from-brand/15 via-gold/10 to-transparent blur-3xl rounded-[40px] -z-10" />
 
                         <div className="relative rounded-[28px] overflow-hidden border border-border/70 bg-card shadow-xl">
                             <div className="relative aspect-[4/3]">
                                 <Image
-                                    src="/hero.jpg"
+                                    src="/assets/hero.jpg"
                                     alt="The Quran, open and ready for a lesson"
                                     fill
                                     priority
                                     sizes="(min-width: 1024px) 42vw, 90vw"
                                     className="object-cover"
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+                                <div className="absolute inset-0 bg-linear-to-t from-black/55 via-black/5 to-transparent" />
                             </div>
 
                             {/* Illustrative lesson card — a real example of what lesson

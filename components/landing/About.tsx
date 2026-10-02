@@ -36,10 +36,10 @@ export default function About() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                     {/* LEFT: image */}
                     <div className="lg:col-span-5 relative">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-brand/15 to-gold/10 blur-3xl rounded-[32px] -z-10" />
+                        <div className="absolute inset-0 bg-linear-to-tr from-brand/15 to-gold/10 blur-3xl rounded-[32px] -z-10" />
                         <div className="relative aspect-[4/5] rounded-[24px] overflow-hidden border border-border/70 shadow-lg">
                             <Image
-                                src="/about.jpg"
+                                src="/assets/about.jpg"
                                 alt="An open Quran, ready for study"
                                 fill
                                 sizes="(min-width: 1024px) 38vw, 90vw"

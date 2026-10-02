@@ -12,15 +12,15 @@ export default function CTA() {
 
                     <div className="relative grid grid-cols-1 lg:grid-cols-12 items-center">
                         {/* Image column */}
-                        <div className="lg:col-span-5 relative h-56 lg:h-full min-h-[280px]">
+                        <div className="lg:col-span-5 relative h-56 lg:h-full min-h-70">
                             <Image
-                                src="/sign-up.jpg"
+                                src="/assets/sign-up.jpg"
                                 alt="A lantern, lit for the evening"
                                 fill
                                 sizes="(min-width: 1024px) 40vw, 100vw"
                                 className="object-cover"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#053f3d] lg:bg-gradient-to-r lg:from-transparent lg:to-brand-deep" />
+                            <div className="absolute inset-0 bg-linear-to-r from-transparent via-transparent to-[#053f3d] lg:bg-linear-to-r lg:from-transparent lg:to-brand-deep" />
                         </div>
 
                         {/* Copy column */}
