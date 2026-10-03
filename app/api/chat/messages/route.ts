@@ -1,26 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { after, NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { firebaseAdminDB } from "@/lib/config/firebase-admin";
-import { authorization } from "@/lib/verifyAuth";
 import { MessageRequestSchema, type MessageRequest } from "@/components/chat/lib/schemas";
+import { getAttachmentResourceType } from "@/components/chat/lib/attachments";
 import { getMessagePreview } from "@/components/chat/lib/constants";
 import { getChatId } from "@/components/chat/lib/chatId";
-import { ChatApiError, deleteMessage, editMessage, markChatRead, reactToMessage, } from "@/components/chat/lib/messageOperations.server";
+import { deleteMessage, editMessage, markChatRead, reactToMessage, } from "@/components/chat/lib/messageOperations.server";
+import { destroyUploadedAssets, resolveAttachments } from "@/components/chat/lib/attachments.server";
+import { errorResponse, handleRouteError, parseBody, requireUser } from "@/components/chat/lib/http.server";
+import type { MessageAttachment } from "@/components/chat/types";
 import { newUnreadCounts, unreadIncrementUpdates, updateChat, } from "@/components/chat/lib/unread.server";
 import { readUnreadTotal, writeUnreadTotal } from "@/components/chat/lib/unreadTotal.server";
-import { sendNotification } from "@/components/notification/lib/sendNotification";
-
-function errorResponse(code: string, message: string, status: number, details?: unknown) {
-    return NextResponse.json(
-        { success: false, error: { code, message, ...(details ? { details } : {}) } },
-        { status }
-    );
-}
 
 type SendMessageRequest = Extract<MessageRequest, { action: "send" }>;
-
-const UNAUTHENTICATED_CODES = ["NO_TOKEN", "TOKEN_EXPIRED", "INVALID_TOKEN", "USER_NOT_FOUND"];
 
 /**
  * Same send behaviour as before (the sender comes from the session), plus: the receiver's unread
@@ -31,7 +23,11 @@ const UNAUTHENTICATED_CODES = ["NO_TOKEN", "TOKEN_EXPIRED", "INVALID_TOKEN", "US
  * holds one shared numeric counter, is converted to the per-user shape instead of being incremented
  * as a number. The increment itself is FieldValue.increment on the receiver's own key.
  */
-async function sendMessage(senderId: string, { receiverId, text, attachment }: SendMessageRequest) {
+async function sendMessage(
+    senderId: string,
+    { receiverId, text }: SendMessageRequest,
+    attachments: MessageAttachment[]
+) {
     const chatId = getChatId(senderId, receiverId);
     const now = new Date().toISOString();
 
@@ -45,11 +41,11 @@ async function sendMessage(senderId: string, { receiverId, text, attachment }: S
         text,
         time: now,
         status: "sent",
-        ...(attachment && { attachment }),
+        ...(attachments.length > 0 && { attachments }),
         createdAt: FieldValue.serverTimestamp(),
     };
 
-    const displayLastMessage = getMessagePreview(text, attachment);
+    const displayLastMessage = getMessagePreview(text, attachments);
     const participants = [senderId, receiverId];
 
     await firebaseAdminDB.runTransaction(async (tx) => {
@@ -84,15 +80,6 @@ async function sendMessage(senderId: string, { receiverId, text, attachment }: S
             ["updatedAt", FieldValue.serverTimestamp()],
             ...unreadIncrementUpdates(chatSnap.get("unreadCount"), participants, receiverId),
         ]);
-        await sendNotification({
-            userId: receiverId,
-            type: "chat_message",
-            title: "Message",
-            body: text,
-            link: `/chat?receiverId=${senderId}`,
-            data: { chatId: "123" },
-            tag: 'new account'
-        });
     });
 }
 
@@ -103,31 +90,14 @@ async function sendMessage(senderId: string, { receiverId, text, attachment }: S
  */
 export async function PATCH(req: NextRequest) {
     try {
-        const { error: authError, user } = await authorization();
-        if (authError || !user) {
-            const code = authError?.code ?? "NO_TOKEN";
-            const status = UNAUTHENTICATED_CODES.includes(code) ? 401 : code === "SERVER_ERROR" ? 500 : 403;
-            return errorResponse(code, authError?.message ?? "You're not logged in.", status);
-        }
+        const auth = await requireUser();
+        if (auth.response) return auth.response;
+        const { user } = auth;
 
-        let body: unknown;
-        try {
-            body = await req.json();
-        } catch {
-            return errorResponse("INVALID_JSON", "Request body must be valid JSON.", 400);
-        }
+        const parsed = await parseBody(req, MessageRequestSchema);
+        if (parsed.response) return parsed.response;
 
-        const validation = MessageRequestSchema.safeParse(body);
-        if (!validation.success) {
-            return errorResponse(
-                "VALIDATION_ERROR",
-                "Invalid payload provided",
-                400,
-                z.flattenError(validation.error).fieldErrors
-            );
-        }
-
-        const request = validation.data;
+        const request = parsed.data;
         const actorId = user.id;
 
         switch (request.action) {
@@ -135,10 +105,16 @@ export async function PATCH(req: NextRequest) {
                 if (request.senderId && request.senderId !== actorId) {
                     return errorResponse("SENDER_MISMATCH", "You can only send messages as yourself.", 403);
                 }
-                if (!request.text && !request.attachment) {
+                if (!request.text && !request.attachments?.length) {
                     return errorResponse("EMPTY_MESSAGE", "Message must contain text or an attachment.", 400);
                 }
-                await sendMessage(actorId, request);
+                // Checked against Cloudinary before anything is written: nothing is stored for a bad file.
+                const attachments = await resolveAttachments(
+                    actorId,
+                    getChatId(actorId, request.receiverId),
+                    request.attachments ?? []
+                );
+                await sendMessage(actorId, request, attachments);
                 break;
             }
             case "edit":
@@ -149,9 +125,17 @@ export async function PATCH(req: NextRequest) {
                     text: request.text,
                 });
                 break;
-            case "delete":
-                await deleteMessage({ actorId, chatId: request.chatId, messageId: request.messageId });
+            case "delete": {
+                const removed = await deleteMessage({ actorId, chatId: request.chatId, messageId: request.messageId });
+                // The files go too, but after the response: the user doesn't wait for Cloudinary.
+                const files = removed.flatMap((attachment) =>
+                    attachment.publicId
+                        ? [{ publicId: attachment.publicId, resourceType: getAttachmentResourceType(attachment) }]
+                        : []
+                );
+                if (files.length > 0) after(() => destroyUploadedAssets(files));
                 break;
+            }
             case "react":
                 await reactToMessage({
                     actorId,
@@ -164,16 +148,13 @@ export async function PATCH(req: NextRequest) {
                 await markChatRead({ actorId, chatId: request.chatId });
                 break;
         }
+
         return NextResponse.json({ success: true }, { status: 200 });
     } catch (error) {
-        if (error instanceof ChatApiError) {
-            return errorResponse(error.code, error.message, error.status);
-        }
-        console.error("Error handling chat message request:", error);
-        return errorResponse(
-            "SERVER_ERROR",
-            "An internal server error occurred while processing the message.",
-            500
+        return handleRouteError(
+            error,
+            "Error handling chat message request",
+            "An internal server error occurred while processing the message."
         );
     }
 }

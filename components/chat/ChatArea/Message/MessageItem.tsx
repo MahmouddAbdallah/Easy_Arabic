@@ -43,6 +43,7 @@ export function MessageItem({
     const rootRef = useRef<HTMLDivElement>(null);
 
     const canInteract = !deleted && !isEditing;
+    const hasAttachments = message.attachments.length > 0;
     const myReaction = message.reactions[currentUserId] ?? null;
 
     // Tapping anywhere outside this message closes the touch toolbar.
@@ -118,18 +119,23 @@ export function MessageItem({
                         </p>
                     ) : (
                         <>
-                            {message.attachment && <Attachment attachment={message.attachment} isMe={isMe} />}
+                            {hasAttachments && <Attachment attachments={message.attachments} isMe={isMe} />}
 
                             {isEditing ? (
-                                <EditMessageForm
-                                    initialText={message.text}
-                                    saving={isPending}
-                                    onSave={(text) => onSaveEdit(message.id, text)}
-                                    onCancel={onCancelEdit}
-                                />
+                                <div className={cn(hasAttachments && "mt-2")}>
+                                    <EditMessageForm
+                                        initialText={message.text}
+                                        saving={isPending}
+                                        onSave={(text) => onSaveEdit(message.id, text)}
+                                        onCancel={onCancelEdit}
+                                    />
+                                </div>
                             ) : (
                                 message.text && (
-                                    <p className="leading-relaxed tracking-tight text-[12px] md:text-[13px] whitespace-pre-wrap wrap-break-word">
+                                    <p className={cn(
+                                        "leading-relaxed tracking-tight text-[12px] md:text-[13px] whitespace-pre-wrap wrap-break-word",
+                                        hasAttachments && "mt-2"
+                                    )}>
                                         {message.text}
                                     </p>
                                 )

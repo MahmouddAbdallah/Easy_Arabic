@@ -1,7 +1,69 @@
 import type { ReactionMap } from "../lib/reactions";
 
+/** What an attachment is to the UI. `video` is a type of its own, not a generic file. */
+export type AttachmentType = "image" | "video" | "file";
+
+/** Cloudinary's own asset kind. Documents are stored as `raw`. */
+export type CloudinaryResourceType = "image" | "video" | "raw";
+
+/**
+ * One attachment as stored in Firestore (chats/{chatId}/messages/{messageId}.attachments) and as
+ * rendered by the UI. The file itself lives in Cloudinary; only this metadata is in Firestore.
+ */
 export interface MessageAttachment {
-    type: "image" | "file";
+    type: AttachmentType;
+    /**
+     * Permanent Cloudinary https URL. Only missing on old messages whose attachment was a
+     * temporary blob: URL that never worked for the other person.
+     */
+    url?: string;
+    /** Cloudinary public id: the handle used to delete the file. */
+    publicId?: string;
+    resourceType?: CloudinaryResourceType;
+    fileName?: string;
+    /** Size in bytes. */
+    fileSize?: number;
+    mimeType?: string;
+    width?: number;
+    height?: number;
+    /** Length in seconds (videos). */
+    duration?: number;
+}
+
+/**
+ * Everything the browser needs to upload ONE file straight to Cloudinary. Issued by
+ * POST /api/chat/attachments after the server validated the file; carries a signature, never the secret.
+ */
+export interface UploadTicket {
+    /** https://api.cloudinary.com/v1_1/<cloud>/<image|video|raw>/upload */
+    uploadUrl: string;
+    /** Form fields to send with the file, exactly as given (they are part of the signature). */
+    fields: Record<string, string>;
+    /** File name to use for the multipart `file` part. */
+    fileName: string;
+    type: AttachmentType;
+    resourceType: CloudinaryResourceType;
+}
+
+export type UploadTicketResult =
+    | { ok: true; ticket: UploadTicket }
+    | { ok: false; code: string; message: string };
+
+/** What Cloudinary reports back for a finished upload. Sent with the message so the server can verify it. */
+export interface UploadedAsset {
+    publicId: string;
+    resourceType: CloudinaryResourceType;
+    version: number;
+    format?: string;
+    bytes: number;
+    width?: number;
+    height?: number;
+    duration?: number;
+}
+
+/** The single-attachment shape written before Cloudinary: `fileSize` was a label like "12.3 KB". */
+export interface LegacyStoredAttachment {
+    type?: "image" | "file";
     url?: string;
     fileName?: string;
     fileSize?: string;
@@ -16,7 +78,8 @@ export interface MessageType {
     time: string;
     isMe: boolean;
     status?: "sent" | "delivered" | "read";
-    attachment?: MessageAttachment;
+    /** Empty for text-only messages. Old single `attachment` documents are mapped into this list. */
+    attachments: MessageAttachment[];
     edited: boolean;
     editedAt: Date | null;
     deleted: boolean;
@@ -36,7 +99,9 @@ export interface StoredMessage {
     /** ISO string, set once on send. Messages are ordered by this field. */
     time: string;
     status?: "sent" | "delivered" | "read";
-    attachment?: MessageAttachment;
+    attachments?: MessageAttachment[];
+    /** @deprecated Written before attachments moved to Cloudinary; still read for old messages. */
+    attachment?: LegacyStoredAttachment;
     createdAt?: unknown;
     edited?: boolean;
     editedAt?: unknown;

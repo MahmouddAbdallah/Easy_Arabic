@@ -4,21 +4,13 @@ import { useCallback, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { MESSAGES_API_URL } from "../lib/constants";
+import { getErrorMessage } from "../lib/getErrorMessage";
 import type { ReactionKey } from "../lib/reactions";
 
 type ActionPayload =
     | { action: "edit"; text: string }
     | { action: "delete" }
     | { action: "react"; reaction: ReactionKey | null };
-
-function getErrorMessage(error: unknown): string {
-    if (axios.isAxiosError(error)) {
-        const message = error.response?.data?.error?.message;
-        if (typeof message === "string" && message) return message;
-        if (!error.response) return "Network error. Please check your connection and try again.";
-    }
-    return "Something went wrong. Please try again.";
-}
 
 /**
  * Edit / delete / react calls for the messages of one chat.

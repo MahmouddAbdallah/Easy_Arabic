@@ -1,5 +1,6 @@
 import type { DocumentData } from "firebase/firestore";
 import type { MessageType } from "../types";
+import { getMessageAttachments } from "./attachments";
 import { normalizeReactions } from "./reactions";
 
 /** Accepts a Firestore Timestamp, an ISO string or a Date. Returns null for anything else. */
@@ -33,7 +34,8 @@ export function mapMessageDoc(id: string, data: DocumentData, currentUserId: str
         time: formatTime(data.time),
         isMe: data.senderId === currentUserId,
         status: data.status || "sent",
-        attachment: deleted ? undefined : data.attachment,
+        // Handles both the `attachments` list and the single `attachment` older messages have.
+        attachments: deleted ? [] : getMessageAttachments(data),
         edited: !deleted && data.edited === true,
         editedAt: toDate(data.editedAt),
         deleted,

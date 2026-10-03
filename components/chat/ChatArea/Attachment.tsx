@@ -1,43 +1,48 @@
-import { FileTextIcon } from 'lucide-react'
-import React from 'react'
+"use client";
+
+import React, { useMemo, useState } from "react";
+import { isMediaAttachment } from "../lib/attachments";
+import type { MessageAttachment } from "../types";
+import { FileCard } from "./Attachments/FileCard";
+import { MediaGrid } from "./Attachments/MediaGrid";
+import { MediaViewer } from "./Attachments/MediaViewer";
+
 export interface AttachmentItem {
-    attachment: {
-        type: "image" | "file";
-        url?: string;
-        fileName?: string;
-        fileSize?: string;
-    }
-    isMe: boolean
-}
-const Attachment: React.FC<AttachmentItem> = ({ attachment, isMe }) => {
-    return (
-        <div
-            className={`flex items-center gap-3 p-2.5 rounded-xl mb-2.5 border transition-colors ${isMe
-                ? "bg-black/10 border-white/15"
-                : "bg-background/40 border-border/30 hover:bg-background/60"
-                }`}
-        >
-            <div
-                className={`p-2 rounded-lg flex items-center justify-center shrink-0 ${isMe
-                    ? "bg-white/15 text-primary-foreground"
-                    : "bg-primary/10 text-primary"
-                    }`}
-            >
-                <FileTextIcon className="h-4 w-4" />
-            </div>
-            <div className="flex flex-col min-w-0 pr-1">
-                <span className="font-medium truncate text-[11px] leading-tight">
-                    {attachment?.fileName}
-                </span>
-                <span
-                    className={`text-[9px] mt-0.5 ${isMe ? "opacity-80" : "text-muted-foreground"
-                        }`}
-                >
-                    {attachment?.fileSize}
-                </span>
-            </div>
-        </div>
-    )
+    attachments: MessageAttachment[];
+    isMe: boolean;
 }
 
-export default Attachment
+/**
+ * Everything attached to one message: photos and videos as a responsive grid (tap to open the
+ * viewer, a single video plays inline) and documents as file cards.
+ */
+const Attachment: React.FC<AttachmentItem> = ({ attachments, isMe }) => {
+    const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+    const media = useMemo(() => attachments.filter(isMediaAttachment), [attachments]);
+    const files = useMemo(() => attachments.filter((attachment) => attachment.type === "file"), [attachments]);
+
+    if (attachments.length === 0) return null;
+
+    return (
+        // A fixed width (never wider than the bubble) keeps media from sizing the bubble by its pixels.
+        // Taps here belong to the attachments: they must not also toggle the bubble's touch toolbar.
+        <div className="flex w-70 max-w-full flex-col gap-1.5 md:w-80" onPointerUp={(event) => event.stopPropagation()}>
+            {media.length > 0 && <MediaGrid media={media} onOpen={setViewerIndex} />}
+
+            {files.map((file, index) => (
+                <FileCard key={file.publicId ?? file.url ?? index} attachment={file} isMe={isMe} />
+            ))}
+
+            {media.length > 0 && (
+                <MediaViewer
+                    media={media}
+                    index={viewerIndex}
+                    onIndexChange={setViewerIndex}
+                    onClose={() => setViewerIndex(null)}
+                />
+            )}
+        </div>
+    );
+};
+
+export default Attachment;

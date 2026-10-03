@@ -7,12 +7,13 @@
  */
 import { FieldPath, FieldValue, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { firebaseAdminDB } from "@/lib/config/firebase-admin";
+import { getMessageAttachments, hasAttachments } from "./attachments";
 import { DELETED_MESSAGE_PREVIEW, getMessagePreview } from "./constants";
 import type { ReactionKey } from "./reactions";
 import { getUnreadCount } from "./unread";
 import { markReadUpdates, unreadIncrementUpdates, updateChat } from "./unread.server";
 import { readUnreadTotal, writeUnreadTotal } from "./unreadTotal.server";
-import type { StoredMessage } from "../types";
+import type { MessageAttachment, StoredMessage } from "../types";
 
 export class ChatApiError extends Error {
     constructor(
@@ -90,7 +91,7 @@ export async function editMessage({ actorId, chatId, messageId, text }: BasePara
             throw new ChatApiError("MESSAGE_DELETED", "This message was deleted.", 409);
         }
         // A text-only message can't be emptied (that's what delete is for); a caption can.
-        if (!text && !message.attachment) {
+        if (!text && !hasAttachments(message)) {
             throw new ChatApiError("EMPTY_MESSAGE", "Message text cannot be empty.", 400);
         }
         // Nothing changed: don't flag it as edited.
@@ -108,13 +109,20 @@ export async function editMessage({ actorId, chatId, messageId, text }: BasePara
 
         // Keep the sidebar preview in sync (don't touch updatedAt: editing shouldn't reorder chats).
         if (isLatest) {
-            tx.update(chatRef, { lastMessage: getMessagePreview(text, message.attachment) });
+            tx.update(chatRef, { lastMessage: getMessagePreview(text, getMessageAttachments(message)) });
         }
     });
 }
 
-export async function deleteMessage({ actorId, chatId, messageId }: BaseParams) {
+/**
+ * Soft-deletes a message. Returns the attachments that were on it, so the caller can remove the
+ * files from Cloudinary once the message is gone (empty when it was already deleted).
+ */
+export async function deleteMessage({ actorId, chatId, messageId }: BaseParams): Promise<MessageAttachment[]> {
+    let removed: MessageAttachment[] = [];
+
     await firebaseAdminDB.runTransaction(async (tx) => {
+        removed = []; // a transaction can run more than once
         const { chatRef, messageRef, message } = await loadMessage(tx, actorId, chatId, messageId);
 
         assertOwner(message, actorId, "delete");
@@ -123,6 +131,7 @@ export async function deleteMessage({ actorId, chatId, messageId }: BaseParams) 
         if (message.deleted) return;
 
         const isLatest = await isLatestMessage(tx, chatRef, messageId);
+        removed = getMessageAttachments(message);
 
         // Soft delete: the document stays in the timeline, but the content is erased
         // (not merely hidden) so it can't be read back through the Firestore client.
@@ -130,7 +139,8 @@ export async function deleteMessage({ actorId, chatId, messageId }: BaseParams) 
             deleted: true,
             deletedAt: FieldValue.serverTimestamp(),
             text: "",
-            attachment: FieldValue.delete(),
+            attachments: FieldValue.delete(),
+            attachment: FieldValue.delete(), // the single-attachment field older messages use
             reactions: FieldValue.delete(),
         });
 
@@ -138,6 +148,8 @@ export async function deleteMessage({ actorId, chatId, messageId }: BaseParams) 
             tx.update(chatRef, { lastMessage: DELETED_MESSAGE_PREVIEW });
         }
     });
+
+    return removed;
 }
 
 /** Sets the actor's reaction to `reaction`, or removes it when `reaction` is null. Idempotent. */
