@@ -3,17 +3,24 @@ import { Sidebar } from "@/components/dashboard/Navbar/Sidebar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="min-h-screen bg-slate-50/50 dark:bg-zinc-950 lg:flex">
-            <div className="hidden lg:block">
-                <Sidebar />
-            </div>
+        <div className="min-h-dvh bg-muted/40 dark:bg-background lg:flex">
+            <a
+                href="#dashboard-content"
+                className="sr-only rounded-lg bg-card px-4 py-2 text-sm font-medium text-foreground shadow-lg ring-2 ring-brand focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50"
+            >
+                Skip to content
+            </a>
 
-            <div className="flex-1 flex flex-col min-h-screen">
+            {/* Hidden below `lg`; there the navbar opens the same sidebar as a drawer. */}
+            <Sidebar />
+
+            <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
                 <Navbar />
 
-                <main className="flex-1">
+                {/* The app's root layout already provides the <main> landmark. */}
+                <div id="dashboard-content" tabIndex={-1} className="flex-1 outline-none">
                     {children}
-                </main>
+                </div>
             </div>
         </div>
     );

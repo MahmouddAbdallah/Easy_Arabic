@@ -3,329 +3,354 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-    Users,
-    GraduationCap,
-    BookOpen,
-    MessageSquare,
-    PhoneCall,
-    ChevronDown,
-    Sparkles,
-    LayoutDashboard,
-    PanelLeftClose,
-    PanelLeftOpen,
-} from "lucide-react";
+import { ChevronDown, Globe, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { LogoIcon } from "@/components/icons";
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
-
-interface NavSubItem {
-    title: string;
-    href: string;
-}
-
-interface NavItem {
-    title: string;
-    href: string;
-    icon: React.ElementType;
-    badge?: string;
-    subItems?: NavSubItem[];
-}
-
-export const navigationItems: NavItem[] = [
-    {
-        title: "Families",
-        href: "/dashboard/families",
-        icon: Users,
-    },
-    {
-        title: "Teachers",
-        href: "/dashboard/teacher",
-        icon: GraduationCap,
-    },
-    {
-        title: "Lessons",
-        href: "/dashboard/lessons",
-        icon: BookOpen,
-        subItems: [
-            { title: "All Lessons", href: "/dashboard/lessons" },
-            { title: "Create Lesson", href: "/dashboard/lessons/new" },
-        ],
-    },
-    {
-        title: "Chat",
-        href: "/dashboard/chat",
-        icon: MessageSquare,
-        badge: "New",
-    },
-    {
-        title: "Contact",
-        href: "/dashboard/contact",
-        icon: PhoneCall,
-        subItems: [
-            { title: "Messages", href: "/dashboard/contact" },
-            { title: "Contact Page", href: "/dashboard/contact/contact-info" },
-        ],
-    },
-];
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getActiveSubHref, isItemActive, navigationItems, type NavItem } from "./navigation";
+import { useSidebarCollapsed } from "./useSidebarCollapsed";
+import { UNREAD_MESSAGES_COLLECTION, useUnreadCount } from "./useUnreadCount";
 
 interface SidebarProps {
+    /** `desktop`: sticky rail that can collapse. `drawer`: always expanded, fills its container. */
+    variant?: "desktop" | "drawer";
+    /** Called after any navigation, so a drawer can close itself. */
+    onNavigate?: () => void;
+    /** Extra control at the end of the header row (the drawer's close button). */
+    headerAction?: React.ReactNode;
     className?: string;
-    isCollapsed?: boolean;
-    setIsCollapsed?: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+/* ── Shared row styling ─────────────────────────────────────────────────── */
+
+const ROW =
+    "group/row relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-brand/50";
+const ROW_IDLE = "text-muted-foreground hover:bg-muted hover:text-foreground";
+const ROW_ACTIVE = "bg-brand-soft text-brand";
+/** Thin gold marker on the leading edge of the current page. */
+const ROW_MARKER =
+    "before:absolute before:inset-y-2 before:-start-3 before:w-[3px] before:rounded-e-full before:bg-gold before:content-['']";
+
+function rowClass(active: boolean, collapsed: boolean, extra?: string) {
+    return cn(ROW, active ? cn(ROW_ACTIVE, ROW_MARKER) : ROW_IDLE, collapsed && "justify-center px-0", extra);
+}
+
+/** Unread pill. In the collapsed rail it becomes a dot on the icon. */
+function Counter({ count, collapsed }: { count: number; collapsed: boolean }) {
+    if (count <= 0) return null;
+    const label = count > 99 ? "99+" : String(count);
+    if (collapsed) {
+        return (
+            <span
+                aria-hidden
+                className="absolute end-2.5 top-2 size-2 rounded-full bg-destructive ring-2 ring-card"
+            />
+        );
+    }
+    return (
+        <span
+            className="ms-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-xs font-semibold tabular-nums text-destructive-foreground"
+            aria-label={`${count} unread`}
+        >
+            {label}
+        </span>
+    );
+}
+
+/** Wraps a collapsed-rail control in a tooltip so its name is still discoverable. */
+function RailTooltip({
+    label,
+    enabled,
+    children,
+}: {
+    label: string;
+    enabled: boolean;
+    children: React.ReactElement<Record<string, unknown>>;
+}) {
+    if (!enabled) return children;
+    return (
+        <Tooltip>
+            <TooltipTrigger render={children} />
+            <TooltipContent side="right" sideOffset={10}>
+                {label}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
+/* ── Navigation items ───────────────────────────────────────────────────── */
+
+interface ItemProps {
+    item: NavItem;
+    pathname: string;
+    collapsed: boolean;
+    chatUnread: number;
+    open: boolean;
+    onToggle: () => void;
     onNavigate?: () => void;
 }
 
-export function Sidebar({
-    className,
-    isCollapsed: externalIsCollapsed,
-    setIsCollapsed: externalSetIsCollapsed,
-    onNavigate,
-}: SidebarProps) {
-    const pathname = usePathname();
+function NavLeaf({ item, pathname, collapsed, chatUnread, onNavigate }: Omit<ItemProps, "open" | "onToggle">) {
+    const active = isItemActive(item, pathname);
+    const Icon = item.icon;
+    const count = item.counter === "chat" ? chatUnread : 0;
 
-    const [internalIsCollapsed, setInternalIsCollapsed] = useState(false);
-    const isCollapsed = externalIsCollapsed ?? internalIsCollapsed;
-    const setIsCollapsed = externalSetIsCollapsed ?? setInternalIsCollapsed;
-
-    // Start with the group of the current page expanded so its sub-pages are visible.
-    const [openSubMenu, setOpenSubMenu] = useState<string | null>(
-        () => navigationItems.find((item) => item.subItems?.some((sub) => sub.href === pathname))?.title ?? null
-    );
-
-    const toggleSubMenu = (title: string) => {
-        if (isCollapsed) {
-            setIsCollapsed(false);
-            setOpenSubMenu(title);
-            return;
-        }
-        setOpenSubMenu((prev) => (prev === title ? null : title));
-    };
     return (
-        <TooltipProvider>
-            <aside
+        <RailTooltip label={item.title} enabled={collapsed}>
+            <Link
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={rowClass(active, collapsed)}
+            >
+                <Icon className="size-[18px] shrink-0" aria-hidden />
+                <span className={cn("truncate", collapsed && "sr-only")}>{item.title}</span>
+                <Counter count={count} collapsed={collapsed} />
+            </Link>
+        </RailTooltip>
+    );
+}
+
+function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omit<ItemProps, "chatUnread">) {
+    const activeSub = getActiveSubHref(item, pathname);
+    const active = activeSub !== null;
+    const Icon = item.icon;
+    const subs = item.subItems ?? [];
+    const panelId = `nav-group-${item.title.toLowerCase().replace(/\s+/g, "-")}`;
+
+    /* Collapsed rail: the group opens as a flyout menu next to the icon. */
+    if (collapsed) {
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger
+                    aria-label={item.title}
+                    className={rowClass(active, true, "cursor-pointer aria-expanded:bg-muted aria-expanded:text-foreground")}
+                >
+                    <Icon className="size-[18px] shrink-0" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right" align="start" sideOffset={10} className="w-52">
+                    <DropdownMenuGroup>
+                        <DropdownMenuLabel className="px-2 py-1.5">{item.title}</DropdownMenuLabel>
+                        {subs.map((sub) => (
+                            <DropdownMenuItem
+                                key={sub.href}
+                                render={<Link href={sub.href} onClick={onNavigate} />}
+                                className={cn(
+                                    "cursor-pointer px-2 py-2",
+                                    sub.href === activeSub && "bg-brand-soft font-medium text-brand"
+                                )}
+                            >
+                                {sub.title}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuGroup>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        );
+    }
+
+    /* While the group is open, its active child carries the highlight; the parent only
+       takes the highlight when the group is folded and the current page is hidden inside. */
+    const highlightParent = active && !open;
+
+    return (
+        <div>
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                aria-controls={panelId}
+                className={rowClass(highlightParent, false, cn("cursor-pointer", active && open && "text-foreground"))}
+            >
+                <Icon className={cn("size-[18px] shrink-0", active && open && "text-brand")} aria-hidden />
+                <span className="flex-1 truncate text-start">{item.title}</span>
+                <ChevronDown
+                    aria-hidden
+                    className={cn(
+                        "size-4 shrink-0 opacity-60 transition-transform duration-200 motion-reduce:transition-none",
+                        open && "rotate-180"
+                    )}
+                />
+            </button>
+
+            <div
+                id={panelId}
+                inert={!open}
                 className={cn(
-                    "sticky top-0 h-svh flex flex-col justify-between border-r border-border/40 bg-background/80 backdrop-blur-2xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] py-4 select-none shrink-0",
-                    isCollapsed ? "w-20 px-2.5" : " lg:w-72 w-full px-4",
+                    "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
+                    open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                )}
+            >
+                <ul className="ms-[1.375rem] min-h-0 space-y-0.5 overflow-hidden border-s border-border ps-3">
+                    <li aria-hidden className="h-1" />
+                    {subs.map((sub) => {
+                        const subActive = sub.href === activeSub;
+                        return (
+                            <li key={sub.href}>
+                                <Link
+                                    href={sub.href}
+                                    onClick={onNavigate}
+                                    aria-current={subActive ? "page" : undefined}
+                                    className={cn(
+                                        "flex h-9 items-center rounded-lg px-3 text-sm outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50",
+                                        subActive
+                                            ? "bg-brand-soft font-medium text-brand"
+                                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    )}
+                                >
+                                    <span className="truncate">{sub.title}</span>
+                                </Link>
+                            </li>
+                        );
+                    })}
+                    <li aria-hidden className="h-0.5" />
+                </ul>
+            </div>
+        </div>
+    );
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+
+export function Sidebar({ variant = "desktop", onNavigate, headerAction, className }: SidebarProps) {
+    const pathname = usePathname();
+    const [storedCollapsed, setStoredCollapsed] = useSidebarCollapsed();
+    const chatUnread = useUnreadCount(UNREAD_MESSAGES_COLLECTION);
+
+    const isDrawer = variant === "drawer";
+    const collapsed = !isDrawer && storedCollapsed;
+
+    // Width only animates once the user has toggled it, not while restoring the saved state on load.
+    const [animateWidth, setAnimateWidth] = useState(false);
+
+    /* A group follows the current page (open when it contains it) until the user toggles it by hand;
+       that choice then lasts for the current page only. */
+    const [overrides, setOverrides] = useState<Record<string, { path: string; open: boolean }>>({});
+    const isGroupOpen = (item: NavItem) => {
+        const override = overrides[item.title];
+        if (override && override.path === pathname) return override.open;
+        return getActiveSubHref(item, pathname) !== null;
+    };
+    const toggleGroup = (item: NavItem) =>
+        setOverrides((prev) => ({ ...prev, [item.title]: { path: pathname, open: !isGroupOpen(item) } }));
+
+    const toggleCollapsed = () => {
+        setAnimateWidth(true);
+        setStoredCollapsed(!storedCollapsed);
+    };
+
+    return (
+        <TooltipProvider delay={150}>
+            <aside
+                aria-label="Dashboard sidebar"
+                data-collapsed={collapsed}
+                className={cn(
+                    "flex-col bg-card text-card-foreground select-none",
+                    isDrawer
+                        ? "flex h-full w-full"
+                        : cn(
+                              "sticky top-0 hidden h-dvh shrink-0 border-e border-border lg:flex",
+                              collapsed ? "w-[4.5rem]" : "w-64",
+                              animateWidth && "transition-[width] duration-200 ease-out motion-reduce:transition-none"
+                          ),
                     className
                 )}
             >
-                <div className="space-y-6">
-                    {/* Header & Logo */}
-                    <div className="flex items-center justify-between h-10 px-2">
-                        <Link
-                            href="/dashboard"
-                            className={cn(
-                                "flex items-center gap-3 overflow-hidden transition-all duration-300",
-                                isCollapsed ? "justify-center w-full" : "w-auto"
-                            )}
-                        >
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-linear-to-tr from-primary via-primary/90 to-primary/70 text-primary-foreground shadow-md shadow-primary/20">
-                                <Sparkles className="h-5 w-5 animate-pulse" />
-                            </div>
-
-                            <div
-                                className={cn(
-                                    "flex flex-col whitespace-nowrap transition-all duration-300",
-                                    isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
-                                )}
-                            >
-                                <span className="font-bold text-sm tracking-tight text-foreground">
-                                    Easy Arabic
-                                </span>
-                                <span className="text-[10px] font-medium text-muted-foreground/80">
-                                    Management Hub
-                                </span>
-                            </div>
-                        </Link>
-
-                        {/* Toggle Button */}
-                        {!isCollapsed && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setIsCollapsed(true)}
-                                className="hidden lg:block h-8 w-8 text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 rounded-xl transition-all"
-                            >
-                                <PanelLeftClose className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </div>
-
-                    {/* Expand Toggle Button when collapsed */}
-                    {isCollapsed && (
-                        <div className="flex justify-center">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setIsCollapsed(false)}
-                                className="h-8 w-8 text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 rounded-xl transition-all"
-                            >
-                                <PanelLeftOpen className="h-4 w-4" />
-                            </Button>
-                        </div>
+                {/* Brand row. Same height as the navbar so the two borders line up. */}
+                <div
+                    className={cn(
+                        "flex h-16 shrink-0 items-center gap-2 border-b border-border",
+                        collapsed ? "justify-center px-2" : "px-4"
                     )}
-
-                    {/* Navigation Items */}
-                    <nav className="space-y-1.5">
-                        {navigationItems.map((item) => {
-                            const hasSubItems = Boolean(item.subItems?.length);
-                            const isActive =
-                                pathname === item.href ||
-                                (hasSubItems &&
-                                    item.subItems?.some((sub) => pathname === sub.href));
-                            const isSubOpen = openSubMenu === item.title;
-                            const Icon = item.icon;
-
-                            const LinkBody = (
-                                <div
-                                    className={cn(
-                                        "group relative flex items-center h-11 rounded-2xl px-3 text-sm font-medium transition-all duration-200 cursor-pointer",
-                                        isActive
-                                            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 font-semibold"
-                                            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                                    )}
-                                >
-                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                                        <Icon
-                                            className={cn(
-                                                "h-5 w-5 transition-transform duration-200 group-hover:scale-110",
-                                                isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                                            )}
-                                        />
-                                    </div>
-
-                                    <div
-                                        className={cn(
-                                            "flex flex-1 items-center justify-between ml-3 overflow-hidden whitespace-nowrap transition-all duration-300",
-                                            isCollapsed ? "opacity-0 w-0 ml-0" : "opacity-100 w-auto"
-                                        )}
-                                    >
-                                        <span className="truncate">{item.title}</span>
-
-                                        <div className="flex items-center gap-1.5">
-                                            {item.badge && (
-                                                <span
-                                                    className={cn(
-                                                        "rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-widest",
-                                                        isActive
-                                                            ? "bg-primary-foreground/20 text-primary-foreground"
-                                                            : "bg-primary/10 text-primary"
-                                                    )}
-                                                >
-                                                    {item.badge}
-                                                </span>
-                                            )}
-
-                                            {hasSubItems && (
-                                                <ChevronDown
-                                                    className={cn(
-                                                        "h-4 w-4 transition-transform duration-300 opacity-60",
-                                                        isSubOpen && "rotate-180"
-                                                    )}
-                                                />
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-
-                            return (
-                                <div key={item.title}>
-                                    {hasSubItems ? (
-                                        <div onClick={() => toggleSubMenu(item.title)}>
-                                            {isCollapsed ? (
-                                                <Tooltip>
-                                                    <TooltipTrigger >{LinkBody}</TooltipTrigger>
-                                                    <TooltipContent side="right" className="font-semibold">
-                                                        {item.title}
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            ) : (
-                                                LinkBody
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <Link href={item.href} onClick={onNavigate}>
-                                            {isCollapsed ? (
-                                                <Tooltip>
-                                                    <TooltipTrigger >{LinkBody}</TooltipTrigger>
-                                                    <TooltipContent side="right" className="font-semibold">
-                                                        {item.title}
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            ) : (
-                                                LinkBody
-                                            )}
-                                        </Link>
-                                    )}
-
-                                    {/* Submenu Smooth Collapse */}
-                                    {hasSubItems && !isCollapsed && (
-                                        <div
-                                            className={cn(
-                                                "grid transition-all duration-300 ease-in-out pl-4 ml-4 border-l border-border/50",
-                                                isSubOpen
-                                                    ? "grid-rows-[1fr] opacity-100 my-1.5"
-                                                    : "grid-rows-[0fr] opacity-0 my-0"
-                                            )}
-                                        >
-                                            <div className="overflow-hidden space-y-1">
-                                                {item.subItems?.map((sub) => {
-                                                    const isSubActive = pathname === sub.href;
-                                                    return (
-                                                        <Link
-                                                            key={sub.href}
-                                                            href={sub.href}
-                                                            onClick={onNavigate}
-                                                            className={cn(
-                                                                "flex items-center h-9 rounded-xl px-3 text-xs font-medium transition-all duration-150",
-                                                                isSubActive
-                                                                    ? "text-primary font-bold bg-primary/10"
-                                                                    : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
-                                                            )}
-                                                        >
-                                                            <span>{sub.title}</span>
-                                                        </Link>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </nav>
+                >
+                    <Link
+                        href="/dashboard"
+                        onClick={onNavigate}
+                        aria-label="Easy Arabic — dashboard home"
+                        className="flex min-w-0 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                    >
+                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft ring-1 ring-brand/15">
+                            <LogoIcon className="h-[18px] w-[22px] fill-brand stroke-brand" />
+                        </span>
+                        {!collapsed && (
+                            <span className="min-w-0 leading-tight">
+                                <span className="block truncate text-sm font-semibold tracking-tight">Easy Arabic</span>
+                                <span className="block truncate text-xs text-muted-foreground">Admin dashboard</span>
+                            </span>
+                        )}
+                    </Link>
+                    {headerAction && <div className="ms-auto shrink-0">{headerAction}</div>}
                 </div>
 
-                {/* Footer Status Card */}
-                <div className="mt-auto px-0.5">
-                    <div
-                        className={cn(
-                            "rounded-2xl border border-border/40 bg-linear-to-br from-accent/30 via-card to-background p-3 transition-all duration-300",
-                            isCollapsed && "p-2 text-center"
-                        )}
-                    >
-                        <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
-                            <div className="rounded-xl bg-primary/10 p-2 text-primary shrink-0">
-                                <LayoutDashboard className="h-4 w-4" />
-                            </div>
-                            <div
-                                className={cn(
-                                    "flex flex-col whitespace-nowrap transition-all duration-300",
-                                    isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
+                {/* Navigation. Scrolls on its own, so short screens never push the footer away. */}
+                <nav aria-label="Dashboard" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+                    {collapsed ? (
+                        <div aria-hidden className="mx-2 mb-3 h-px bg-border" />
+                    ) : (
+                        <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            Manage
+                        </p>
+                    )}
+                    <ul className="space-y-1">
+                        {navigationItems.map((item) => (
+                            <li key={item.title}>
+                                {item.subItems?.length ? (
+                                    <NavGroup
+                                        item={item}
+                                        pathname={pathname}
+                                        collapsed={collapsed}
+                                        open={isGroupOpen(item)}
+                                        onToggle={() => toggleGroup(item)}
+                                        onNavigate={onNavigate}
+                                    />
+                                ) : (
+                                    <NavLeaf
+                                        item={item}
+                                        pathname={pathname}
+                                        collapsed={collapsed}
+                                        chatUnread={chatUnread}
+                                        onNavigate={onNavigate}
+                                    />
                                 )}
+                            </li>
+                        ))}
+                    </ul>
+                </nav>
+
+                {/* Footer: way back to the public site, and the collapse control. */}
+                <div className="shrink-0 space-y-1 border-t border-border p-3">
+                    <RailTooltip label="Back to website" enabled={collapsed}>
+                        <Link href="/" onClick={onNavigate} className={rowClass(false, collapsed)}>
+                            <Globe className="size-[18px] shrink-0" aria-hidden />
+                            <span className={cn("truncate", collapsed && "sr-only")}>Back to website</span>
+                        </Link>
+                    </RailTooltip>
+
+                    {!isDrawer && (
+                        <RailTooltip label="Expand sidebar" enabled={collapsed}>
+                            <button
+                                type="button"
+                                onClick={toggleCollapsed}
+                                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                                className={rowClass(false, collapsed, "cursor-pointer")}
                             >
-                                <p className="text-xs font-semibold">Easy Arabic v2.0</p>
-                                <p className="text-[10px] text-muted-foreground">All systems active</p>
-                            </div>
-                        </div>
-                    </div>
+                                {collapsed ? (
+                                    <PanelLeftOpen className="size-[18px] shrink-0" aria-hidden />
+                                ) : (
+                                    <PanelLeftClose className="size-[18px] shrink-0" aria-hidden />
+                                )}
+                                {!collapsed && <span className="truncate">Collapse</span>}
+                            </button>
+                        </RailTooltip>
+                    )}
                 </div>
             </aside>
         </TooltipProvider>
