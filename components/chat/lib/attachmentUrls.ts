@@ -33,7 +33,8 @@ function parseDeliveryUrl(url: string | undefined): DeliveryParts | null {
  */
 function build(parts: DeliveryParts, transformations: string[], extension?: string): string {
     const id = parts.path.replace(/\.[A-Za-z0-9]{1,8}$/, "");
-    return `${parts.base}${transformations.join("/")}/${id}${extension ? `.${extension}` : ""}`;
+    const steps = transformations.length > 0 ? `${transformations.join("/")}/` : "";
+    return `${parts.base}${steps}${id}${extension ? `.${extension}` : ""}`;
 }
 
 export const isCloudinaryUrl = (url: string | undefined): boolean => parseDeliveryUrl(url) !== null;
@@ -92,4 +93,27 @@ export function getVideoSources(attachment: MessageAttachment): VideoSource[] {
     // No `type` on the fallback: a browser skips sources whose declared type it doesn't know,
     // and this one is the last chance to play anything at all.
     return [{ src: build(parts, ["vc_auto", "f_auto:video", "q_auto"]) }, { src: original }];
+}
+
+export interface AudioSource {
+    src: string;
+    type?: string;
+}
+
+/**
+ * Where a voice message plays from, best first: the recording as it was uploaded, then an MP3 copy
+ * that Cloudinary makes the first time it is asked for. The copy is the fallback for a browser that
+ * can't decode what the sender's browser recorded (WebM/Opus on an older Safari, say); it also has
+ * an exact length, which a raw browser recording does not.
+ */
+export function getAudioSources(attachment: MessageAttachment): AudioSource[] {
+    const original = attachment.url;
+    if (!original) return [];
+
+    const source: AudioSource = attachment.mimeType ? { src: original, type: attachment.mimeType } : { src: original };
+    const parts = parseDeliveryUrl(original);
+    // Audio is stored under Cloudinary's `video` kind; anything else has no MP3 to offer.
+    if (!parts || parts.resourceType !== "video") return [source];
+
+    return [source, { src: build(parts, [], "mp3"), type: "audio/mpeg" }];
 }

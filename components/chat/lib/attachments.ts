@@ -21,6 +21,8 @@ const MB = 1024 * 1024;
 export const MAX_ATTACHMENT_BYTES: Record<AttachmentType, number> = {
     image: 10 * MB,
     video: 50 * MB,
+    // A voice message is capped by its length (MAX_VOICE_SECONDS); this is the safety net behind it.
+    audio: 10 * MB,
     file: 10 * MB,
 };
 
@@ -30,6 +32,8 @@ export const MAX_FILE_NAME_LENGTH = 255;
 export const CLOUDINARY_RESOURCE_TYPE: Record<AttachmentType, CloudinaryResourceType> = {
     image: "image",
     video: "video",
+    // Cloudinary stores audio under the `video` asset kind.
+    audio: "video",
     file: "raw",
 };
 
@@ -115,6 +119,8 @@ export const ATTACHMENT_ACCEPT: Record<AttachmentType, string> = {
     // support (SVG, BMP...) are turned down with a clear message by validateAttachmentFile.
     image: "image/*",
     video: "video/*",
+    // Voice messages are recorded in the chat, never picked, so no chooser uses this.
+    audio: "audio/*",
     file: getFormatExtensions("file")
         .map((extension) => `.${extension}`)
         .join(","),
@@ -173,7 +179,12 @@ function kindOfMimeType(mimeType: string): AttachmentType {
     return "file";
 }
 
-const TYPE_LABELS: Record<AttachmentType, string> = { image: "Photos", video: "Videos", file: "Files" };
+const TYPE_LABELS: Record<AttachmentType, string> = {
+    image: "Photos",
+    video: "Videos",
+    audio: "Voice messages",
+    file: "Files",
+};
 
 /**
  * Is this file allowed as an attachment? Checks the type (allow-list), that the extension and the
@@ -244,6 +255,107 @@ export function formatDuration(seconds: number | undefined): string {
     return hours > 0 ? `${hours}:${two(minutes)}:${two(secs)}` : `${minutes}:${two(secs)}`;
 }
 
+/* -------------------------------------------------------------------------------------------------
+ * Voice messages
+ *
+ * A voice message is an `audio` attachment recorded in the browser (MediaRecorder). It is not part of
+ * FORMATS on purpose: .webm and .mp4 already mean *video* to the file chooser, so audio gets its own
+ * allow-list and its own validator, and only a request that says it is a voice message can use it.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Longest recording. At the recorder's bit rate this stays far below the size limit. */
+export const MAX_VOICE_SECONDS = 10 * 60;
+/** Shorter recordings are an accidental tap and are thrown away. */
+export const MIN_VOICE_SECONDS = 1;
+/** Bars in the waveform the recorder produces. */
+export const VOICE_WAVEFORM_BARS = 40;
+/** Most bars the server stores (headroom over VOICE_WAVEFORM_BARS). */
+export const MAX_WAVEFORM_BARS = 128;
+
+interface VoiceFormat {
+    /** Extensions Cloudinary may report for this kind of recording; the first is the one we upload as. */
+    extensions: readonly string[];
+    /** MIME types for it; the first is the canonical one. */
+    mimeTypes: readonly string[];
+}
+
+/** What browsers record: WebM/Opus (Chrome, Edge, Firefox, Android), Ogg/Opus (Firefox), MP4/AAC (Safari, iOS). */
+const VOICE_FORMATS: readonly VoiceFormat[] = [
+    { extensions: ["webm"], mimeTypes: ["audio/webm"] },
+    { extensions: ["ogg", "opus"], mimeTypes: ["audio/ogg", "audio/opus"] },
+    // Cloudinary may name an audio-only MP4/AAC recording "m4a", "mp4" or "aac" depending on how it probes it.
+    { extensions: ["m4a", "mp4", "aac"], mimeTypes: ["audio/mp4", "audio/x-m4a", "audio/m4a"] },
+];
+
+const VOICE_BY_EXTENSION = new Map<string, VoiceFormat>();
+const VOICE_BY_MIME_TYPE = new Map<string, VoiceFormat>();
+for (const format of VOICE_FORMATS) {
+    for (const extension of format.extensions) VOICE_BY_EXTENSION.set(extension, format);
+    for (const mimeType of format.mimeTypes) VOICE_BY_MIME_TYPE.set(mimeType, format);
+}
+
+/** The voice-message entry for a file extension (case-insensitive, no dot), if there is one. */
+export function lookupVoiceExtension(
+    extension: string
+): { type: "audio"; extension: string; mimeType: string } | null {
+    const format = VOICE_BY_EXTENSION.get(extension.toLowerCase());
+    return format ? { type: "audio", extension: extension.toLowerCase(), mimeType: format.mimeTypes[0] } : null;
+}
+
+/** Every extension of the recording family `extension` belongs to ("m4a" -> m4a, mp4): what Cloudinary's `allowed_formats` takes. */
+export function getVoiceFormatExtensions(extension: string): string[] {
+    return [...(VOICE_BY_EXTENSION.get(extension.toLowerCase())?.extensions ?? [])];
+}
+
+/**
+ * Is this recording acceptable as a voice message? Checks the audio format (the MIME type decides,
+ * and the extension must not contradict it), that it isn't empty, and the size limit.
+ */
+export function validateVoiceFile(file: { name: string; size: number; type?: string }): AttachmentValidation {
+    if (!Number.isFinite(file.size) || file.size <= 0) {
+        return { ok: false, code: "EMPTY_FILE", message: "This recording is empty." };
+    }
+
+    const claimed = (file.type ?? "").split(";")[0].trim().toLowerCase();
+    const extension = getFileExtension(sanitizeFileName(file.name));
+    const byMime = VOICE_BY_MIME_TYPE.get(claimed);
+    const byExtension = extension ? VOICE_BY_EXTENSION.get(extension) : undefined;
+
+    // A MIME type the browser states is trusted over the name; without one the extension has to do.
+    const trusted = !GENERIC_MIME_TYPES.has(claimed);
+    const format = trusted ? byMime : byExtension;
+    if (!format) {
+        return { ok: false, code: "UNSUPPORTED_TYPE", message: "This audio format isn't supported." };
+    }
+    if (trusted && byExtension && byExtension !== format) {
+        return { ok: false, code: "TYPE_MISMATCH", message: "The file extension doesn't match its type." };
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES.audio) {
+        return {
+            ok: false,
+            code: "FILE_TOO_LARGE",
+            message: `${TYPE_LABELS.audio} must be ${formatFileSize(MAX_ATTACHMENT_BYTES.audio)} or smaller.`,
+        };
+    }
+
+    return {
+        ok: true,
+        type: "audio",
+        resourceType: CLOUDINARY_RESOURCE_TYPE.audio,
+        mimeType: format.mimeTypes[0],
+        extension: byExtension ? extension : format.extensions[0],
+    };
+}
+
+/** Waveform bars from anywhere (the browser, Firestore, a request) -> whole numbers 0-100, bounded in count. */
+export function sanitizeWaveform(value: unknown): number[] | undefined {
+    if (!Array.isArray(value) || value.length === 0) return undefined;
+    return value
+        .slice(0, MAX_WAVEFORM_BARS)
+        .map((bar) => (typeof bar === "number" && Number.isFinite(bar) ? Math.min(100, Math.max(0, Math.round(bar))) : 0));
+}
+
 /** Old messages stored the size as a label ("12.3 KB"); turn it back into bytes so every size is a number. */
 function parseLegacyFileSize(label: string): number | undefined {
     const match = /^\s*([\d.]+)\s*(B|KB|MB|GB)\s*$/i.exec(label);
@@ -272,7 +384,8 @@ export function normalizeAttachment(raw: unknown): MessageAttachment | null {
     if (!raw || typeof raw !== "object") return null;
     const source = raw as Record<string, unknown>;
 
-    const type: AttachmentType = source.type === "image" || source.type === "video" ? source.type : "file";
+    const type: AttachmentType =
+        source.type === "image" || source.type === "video" || source.type === "audio" ? source.type : "file";
     const url = text(source.url);
     const resourceType =
         source.resourceType === "image" || source.resourceType === "video" || source.resourceType === "raw"
@@ -290,6 +403,7 @@ export function normalizeAttachment(raw: unknown): MessageAttachment | null {
         width: positiveNumber(source.width),
         height: positiveNumber(source.height),
         duration: positiveNumber(source.duration),
+        waveform: type === "audio" ? sanitizeWaveform(source.waveform) : undefined,
     });
 }
 
@@ -308,6 +422,10 @@ export const hasAttachments = (data: { attachments?: unknown; attachment?: unkno
 
 export const isMediaAttachment = (attachment: Pick<MessageAttachment, "type">): boolean =>
     attachment.type === "image" || attachment.type === "video";
+
+/** A recorded voice message (shown with the audio player, not the photo/video grid or the file cards). */
+export const isVoiceAttachment = (attachment: Pick<MessageAttachment, "type">): boolean =>
+    attachment.type === "audio";
 
 /** Cloudinary asset kind of a stored attachment. */
 export function getAttachmentResourceType(attachment: Pick<MessageAttachment, "type" | "resourceType">): CloudinaryResourceType {

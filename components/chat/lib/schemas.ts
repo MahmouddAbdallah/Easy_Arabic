@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "./attachments";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_WAVEFORM_BARS } from "./attachments";
 import { MAX_MESSAGE_LENGTH } from "./constants";
 import { REACTION_KEYS } from "./reactions";
 
@@ -33,6 +33,13 @@ export const SendAttachmentSchema = z.object({
     height: z.number().int().positive().max(100_000).optional(),
     /** Seconds. */
     duration: z.number().positive().max(24 * 60 * 60).optional(),
+    /**
+     * "voice": a voice message recorded in the chat. It is checked against the audio allow-list
+     * instead of the photo/video/document one, and is stored as an `audio` attachment.
+     */
+    kind: z.literal("voice").optional(),
+    /** Voice messages only: loudness over time, one 0-100 value per bar (the player draws it). */
+    waveform: z.array(z.number().int().min(0).max(100)).min(1).max(MAX_WAVEFORM_BARS).optional(),
 });
 
 const SendMessageSchema = z.object({
@@ -104,6 +111,8 @@ export const SignUploadsRequestSchema = z.object({
                 name: z.string().min(1).max(1024),
                 size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
                 mimeType: z.string().max(255).default(""),
+                /** "voice" when the file is a recording made in the chat: it gets the audio checks. */
+                kind: z.literal("voice").optional(),
             })
         )
         .min(1, "Choose at least one file")

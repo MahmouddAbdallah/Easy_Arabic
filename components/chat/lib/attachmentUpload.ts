@@ -249,6 +249,23 @@ export function toAttachmentPayload(fileName: string, asset: UploadedAsset): Sen
 }
 
 /**
+ * A finished voice-message upload as it goes into the "send message" request. The length and the
+ * waveform come from the recorder: a browser recording carries no reliable duration of its own.
+ */
+export function toVoicePayload(
+    fileName: string,
+    asset: UploadedAsset,
+    recording: { duration: number; waveform: number[] }
+): SendAttachmentInput {
+    return compact<SendAttachmentInput>({
+        ...toAttachmentPayload(fileName, asset),
+        kind: "voice",
+        duration: recording.duration,
+        waveform: recording.waveform,
+    });
+}
+
+/**
  * Tells the server to delete an upload that won't be sent. Fire and forget: `keepalive` lets it
  * finish even when the chat is closing, and a failure only leaves one orphaned file behind.
  */

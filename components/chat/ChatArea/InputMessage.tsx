@@ -12,11 +12,13 @@ import { useChat } from "../ChatProvider";
 import { useAppContext } from "@/components/AppContext";
 import { useTypingIndicator } from "../hooks/useTyping";
 import { useAttachmentUploads } from "../hooks/useAttachmentUploads";
+import { useVoiceMessage } from "../hooks/useVoiceMessage";
 import { useFileDrop } from "../hooks/useFileDrop";
 import { COMPOSER_TOAST_POSITION, MESSAGES_API_URL } from "../lib/constants";
 import { getErrorMessage } from "../lib/getErrorMessage";
 import { AttachMenu } from "./Attachments/AttachMenu";
 import { PendingTray } from "./Attachments/PendingTray";
+import { VoiceComposer } from "./Voice/VoiceComposer";
 
 interface MessageFormValues {
     text: string;
@@ -33,7 +35,9 @@ const InputMessage = () => {
 
     const attachments = useAttachmentUploads({ chatId, receiverId });
     const { addFiles } = attachments;
-    const isDraggingFiles = useFileDrop(addFiles, Boolean(receiverId) && !loading);
+    const voice = useVoiceMessage({ chatId, receiverId });
+    // Files can't be dropped on a voice message that is being recorded or sent.
+    const isDraggingFiles = useFileDrop(addFiles, Boolean(receiverId) && !loading && !voice.isActive);
 
     const { register, handleSubmit, control, reset } = useForm<MessageFormValues>({
         defaultValues: {
@@ -118,75 +122,82 @@ const InputMessage = () => {
                     onRetry={attachments.retry}
                 />
 
-                <div className="flex items-center gap-1 md:gap-2 bg-muted/30 border border-border/40 rounded-2xl p-1.5 shadow-sm focus-within:ring-1 focus-within:ring-primary/40 focus-within:bg-background/80 transition-all">
-                    <AttachMenu disabled={loading || !receiverId} onFiles={addFiles} />
+                {voice.isActive ? (
+                    <VoiceComposer voice={voice} />
+                ) : (
+                    <div className="flex items-center gap-1 md:gap-2 bg-muted/30 border border-border/40 rounded-2xl p-1.5 shadow-sm focus-within:ring-1 focus-within:ring-primary/40 focus-within:bg-background/80 transition-all">
+                        <AttachMenu disabled={loading || !receiverId} onFiles={addFiles} />
 
-                    <Input
-                        {...register("text")}
-                        placeholder={attachments.items.length > 0 ? "Add a caption..." : "Type a message..."}
-                        disabled={loading}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
+                        <Input
+                            {...register("text")}
+                            placeholder={attachments.items.length > 0 ? "Add a caption..." : "Type a message..."}
+                            disabled={loading}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    submitForm();
+                                }
+                            }}
+                            // Pasted screenshots / copied images become attachments instead of being dropped.
+                            onPaste={(e) => {
+                                const files = Array.from(e.clipboardData.files);
+                                if (files.length === 0) return;
                                 e.preventDefault();
-                                submitForm();
-                            }
-                        }}
-                        // Pasted screenshots / copied images become attachments instead of being dropped.
-                        onPaste={(e) => {
-                            const files = Array.from(e.clipboardData.files);
-                            if (files.length === 0) return;
-                            e.preventDefault();
-                            addFiles(files);
-                        }}
-                        className="border-none bg-transparent shadow-none focus-visible:ring-0 text-xs placeholder:text-muted-foreground/50 h-9 min-w-0 flex-1"
-                    />
+                                addFiles(files);
+                            }}
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 text-xs placeholder:text-muted-foreground/50 h-9 min-w-0 flex-1"
+                        />
 
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Emoji"
-                        className="size-11 md:size-8 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
-                    >
-                        <SmileIcon className="h-4 w-4" />
-                    </Button>
-
-                    {loading ? (
-                        <Button
-                            disabled
-                            size="icon"
-                            aria-label="Sending"
-                            className="size-11 md:size-8 bg-primary/80 rounded-xl shrink-0"
-                        >
-                            <Loader2Icon className="h-4 w-4 animate-spin text-primary-foreground" />
-                        </Button>
-                    ) : hasContent ? (
-                        <Button
-                            type="submit"
-                            size="icon"
-                            disabled={sendBlocked}
-                            aria-label="Send"
-                            title={attachments.isBusy ? "Waiting for uploads to finish" : attachments.hasFailed ? "Retry or remove failed files" : "Send"}
-                            className="size-11 md:size-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shrink-0 shadow-sm shadow-primary/30 transition-all"
-                        >
-                            {attachments.isBusy ? (
-                                <Loader2Icon className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <SendHorizontalIcon className="h-4 w-4" />
-                            )}
-                        </Button>
-                    ) : (
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            aria-label="Voice message"
+                            aria-label="Emoji"
                             className="size-11 md:size-8 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
                         >
-                            <Mic2Icon className="h-4 w-4" />
+                            <SmileIcon className="h-4 w-4" />
                         </Button>
-                    )}
-                </div>
+
+                        {loading ? (
+                            <Button
+                                disabled
+                                size="icon"
+                                aria-label="Sending"
+                                className="size-11 md:size-8 bg-primary/80 rounded-xl shrink-0"
+                            >
+                                <Loader2Icon className="h-4 w-4 animate-spin text-primary-foreground" />
+                            </Button>
+                        ) : hasContent ? (
+                            <Button
+                                type="submit"
+                                size="icon"
+                                disabled={sendBlocked}
+                                aria-label="Send"
+                                title={attachments.isBusy ? "Waiting for uploads to finish" : attachments.hasFailed ? "Retry or remove failed files" : "Send"}
+                                className="size-11 md:size-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shrink-0 shadow-sm shadow-primary/30 transition-all"
+                            >
+                                {attachments.isBusy ? (
+                                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <SendHorizontalIcon className="h-4 w-4" />
+                                )}
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={voice.start}
+                                disabled={!receiverId}
+                                aria-label="Record voice message"
+                                title="Record voice message"
+                                className="size-11 md:size-8 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
+                            >
+                                <Mic2Icon className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                )}
             </form>
 
             {isDraggingFiles &&

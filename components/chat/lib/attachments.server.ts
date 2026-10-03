@@ -11,6 +11,10 @@
  *     Cloudinary's own, never one supplied by the client.
  *  3. Files that are removed before sending, or belong to a deleted message, are destroyed.
  *
+ * Voice messages take the very same road. They differ in two places only: the file is checked against
+ * the audio allow-list (a request has to say `kind: "voice"` for that), and the stored attachment is
+ * an `audio` one that also carries its duration and waveform. Cloudinary keeps audio under `video`.
+ *
  * Environment (server only): CLOUDINARY_URL, or CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY +
  * CLOUDINARY_API_SECRET. NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME (already used by next-cloudinary) is
  * accepted as the cloud name. The secret is only ever used here to sign and to call the Admin API.
@@ -21,12 +25,17 @@ import {
     CLOUDINARY_RESOURCE_TYPE,
     MAX_ATTACHMENTS_PER_MESSAGE,
     MAX_ATTACHMENT_BYTES,
+    MAX_VOICE_SECONDS,
     compact,
     getFileExtension,
     getFormatExtensions,
+    getVoiceFormatExtensions,
     lookupExtension,
+    lookupVoiceExtension,
     sanitizeFileName,
+    sanitizeWaveform,
     validateAttachmentFile,
+    validateVoiceFile,
 } from "./attachments";
 import { ChatApiError } from "./messageOperations.server";
 import type { SendAttachmentInput } from "./schemas";
@@ -128,6 +137,8 @@ export interface UploadFileRequest {
     name: string;
     size: number;
     mimeType: string;
+    /** "voice": a recording made in the chat, checked as audio. */
+    kind?: "voice";
 }
 
 /** Validates each file and signs one upload for every file that passes. Same order as `files`. */
@@ -141,14 +152,22 @@ export function createUploadTickets(
     const timestamp = String(Math.round(Date.now() / 1000));
 
     return files.map((file): UploadTicketResult => {
-        const check = validateAttachmentFile({ name: file.name, size: file.size, type: file.mimeType });
+        const isVoice = file.kind === "voice";
+        const description = { name: file.name, size: file.size, type: file.mimeType };
+        const check = isVoice ? validateVoiceFile(description) : validateAttachmentFile(description);
         if (!check.ok) return { ok: false, code: check.code, message: check.message };
 
         const isRaw = check.resourceType === "raw";
         // Everything in `params` is part of the signature, so the browser can't change any of it.
         const params = {
-            // Documents must match the extension that was approved; images/videos any of their allowed formats.
-            allowed_formats: isRaw ? check.extension : getFormatExtensions(check.type).join(","),
+            // Documents must match the extension that was approved; images/videos any of their allowed
+            // formats; a recording only the formats of its own family (Cloudinary may name an audio-only
+            // MP4 "m4a" or "mp4").
+            allowed_formats: isRaw
+                ? check.extension
+                : isVoice
+                  ? getVoiceFormatExtensions(check.extension).join(",")
+                  : getFormatExtensions(check.type).join(","),
             public_id: `${prefix}${randomBytes(16).toString("hex")}${isRaw ? `.${check.extension}` : ""}`,
             tags: UPLOAD_TAG,
             timestamp,
@@ -233,6 +252,9 @@ async function lookupAssets(
     return lookup;
 }
 
+/** A voice message may run this much past MAX_VOICE_SECONDS before it is turned down. */
+const VOICE_LENGTH_SLACK_SECONDS = 5;
+
 const invalidAttachment = (label: string) =>
     new ChatApiError(
         "INVALID_ATTACHMENT",
@@ -267,6 +289,8 @@ export async function resolveAttachments(
         const label = sanitizeFileName(input.fileName);
         const idPart = input.publicId.startsWith(prefix) ? input.publicId.slice(prefix.length) : "";
         if (!UPLOAD_ID.test(idPart) || seen.has(input.publicId)) throw invalidAttachment(label);
+        // Audio lives under Cloudinary's `video` kind; a "voice message" in any other kind is not one.
+        if (input.kind === "voice" && input.resourceType !== CLOUDINARY_RESOURCE_TYPE.audio) throw invalidAttachment(label);
         seen.add(input.publicId);
         return { input, label, idPart };
     });
@@ -289,10 +313,12 @@ export async function resolveAttachments(
         }
 
         // The type comes from what the file really is (Cloudinary's record when we have it), never from a claim.
+        // A voice message is looked up in the audio allow-list, everything else in the regular one.
+        const isVoice = input.kind === "voice";
         const extension = (
             input.resourceType === "raw" ? getFileExtension(idPart) : (asset?.format ?? input.format ?? "")
         ).toLowerCase();
-        const format = lookupExtension(extension);
+        const format = isVoice ? lookupVoiceExtension(extension) : lookupExtension(extension);
         if (!format || CLOUDINARY_RESOURCE_TYPE[format.type] !== input.resourceType) {
             await discard(asset, input);
             throw new ChatApiError("UNSUPPORTED_FILE_TYPE", `"${label}": this file type isn't supported.`, 415);
@@ -304,6 +330,16 @@ export async function resolveAttachments(
             throw new ChatApiError("FILE_TOO_LARGE", `"${label}" is too large to send.`, 413);
         }
 
+        // The recorder stops at MAX_VOICE_SECONDS; a few seconds of slack cover timer rounding.
+        if (isVoice && input.duration !== undefined && input.duration > MAX_VOICE_SECONDS + VOICE_LENGTH_SLACK_SECONDS) {
+            await discard(asset, input);
+            throw new ChatApiError(
+                "VOICE_TOO_LONG",
+                `Voice messages can be up to ${MAX_VOICE_SECONDS / 60} minutes long.`,
+                400
+            );
+        }
+
         resolved.push(
             compact<MessageAttachment>({
                 type: format.type,
@@ -313,10 +349,12 @@ export async function resolveAttachments(
                 fileName: label,
                 fileSize: bytes,
                 mimeType: format.mimeType,
-                width: asset?.width ?? input.width,
-                height: asset?.height ?? input.height,
+                width: isVoice ? undefined : (asset?.width ?? input.width),
+                height: isVoice ? undefined : (asset?.height ?? input.height),
                 // Not part of Cloudinary's asset record; only used to label the player.
                 duration: input.duration,
+                // What the player draws. Re-sanitised here: it comes straight from the client.
+                waveform: isVoice ? sanitizeWaveform(input.waveform) : undefined,
             })
         );
     }

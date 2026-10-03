@@ -1,9 +1,12 @@
 import type { ReactionMap } from "../lib/reactions";
 
-/** What an attachment is to the UI. `video` is a type of its own, not a generic file. */
-export type AttachmentType = "image" | "video" | "file";
+/**
+ * What an attachment is to the UI. `video` is a type of its own, not a generic file, and `audio` is a
+ * voice message recorded in the chat (it can't be picked from the file chooser).
+ */
+export type AttachmentType = "image" | "video" | "audio" | "file";
 
-/** Cloudinary's own asset kind. Documents are stored as `raw`. */
+/** Cloudinary's own asset kind. Documents are stored as `raw`; audio is stored as `video` (Cloudinary has no audio kind). */
 export type CloudinaryResourceType = "image" | "video" | "raw";
 
 /**
@@ -26,8 +29,13 @@ export interface MessageAttachment {
     mimeType?: string;
     width?: number;
     height?: number;
-    /** Length in seconds (videos). */
+    /** Length in seconds (videos and voice messages). */
     duration?: number;
+    /**
+     * Voice messages only: how loud the recording was over time, one 0-100 value per bar, so the
+     * player can draw its waveform without downloading or decoding the audio.
+     */
+    waveform?: number[];
 }
 
 /**
