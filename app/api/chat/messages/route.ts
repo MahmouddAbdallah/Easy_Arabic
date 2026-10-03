@@ -9,6 +9,7 @@ import { getChatId } from "@/components/chat/lib/chatId";
 import { ChatApiError, deleteMessage, editMessage, markChatRead, reactToMessage, } from "@/components/chat/lib/messageOperations.server";
 import { newUnreadCounts, unreadIncrementUpdates, updateChat, } from "@/components/chat/lib/unread.server";
 import { readUnreadTotal, writeUnreadTotal } from "@/components/chat/lib/unreadTotal.server";
+import { sendNotification } from "@/components/notification/lib/sendNotification";
 
 function errorResponse(code: string, message: string, status: number, details?: unknown) {
     return NextResponse.json(
@@ -83,6 +84,15 @@ async function sendMessage(senderId: string, { receiverId, text, attachment }: S
             ["updatedAt", FieldValue.serverTimestamp()],
             ...unreadIncrementUpdates(chatSnap.get("unreadCount"), participants, receiverId),
         ]);
+        await sendNotification({
+            userId: receiverId,
+            type: "chat_message",
+            title: "Message",
+            body: text,
+            link: `/chat?receiverId=${senderId}`,
+            data: { chatId: "123" },
+            tag: 'new account'
+        });
     });
 }
 
@@ -154,7 +164,6 @@ export async function PATCH(req: NextRequest) {
                 await markChatRead({ actorId, chatId: request.chatId });
                 break;
         }
-
         return NextResponse.json({ success: true }, { status: 200 });
     } catch (error) {
         if (error instanceof ChatApiError) {
