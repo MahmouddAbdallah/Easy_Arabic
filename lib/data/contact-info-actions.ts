@@ -158,6 +158,8 @@ export async function updateContactSocial(input: ContactSocialValues): Promise<C
                 instagramUrl: emptyToNull(data.instagramUrl),
                 linkedinUrl: emptyToNull(data.linkedinUrl),
                 xUrl: emptyToNull(data.xUrl),
+                whatsappUrl: emptyToNull(data.whatsappUrl),
+                showSocialSection: data.showSocialSection,
                 updatedAt: touch(),
             });
         },
@@ -174,6 +176,7 @@ export async function updateContactHours(input: ContactHoursValues): Promise<Con
             await tx.orm.public.ContactInfo.where({ id: CONTACT_INFO_ID }).update({
                 timezone: data.timezone,
                 businessHoursNote: data.businessHoursNote,
+                showHoursSection: data.showHoursSection,
                 updatedAt: touch(),
             });
             for (const day of data.hours) {
@@ -206,6 +209,11 @@ export async function updateContactFaqs(input: ContactFaqsValues): Promise<Conta
         contactFaqsSchema,
         input,
         async (tx, data) => {
+            await tx.orm.public.ContactInfo.where({ id: CONTACT_INFO_ID }).update({
+                showFaqsSection: data.showFaqsSection,
+                updatedAt: touch(),
+            });
+
             const existing = await tx.orm.public.ContactFaq.all();
             const existingIds = new Set(existing.map((f) => f.id));
             const keptIds = new Set(data.faqs.map((f) => f.id).filter((id): id is string => !!id && existingIds.has(id)));

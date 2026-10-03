@@ -8,8 +8,12 @@ import SocialMediaCard from './SocialMediaCard';
 type Props = { info: ContactInfoFields; faqs: FaqRecord[] };
 
 export default function ContactConcierge({ info, faqs }: Props) {
-  const published = faqs.filter((faq) => faq.isPublished);
-  const hasSidebar = !!(info.whatsappNumber || info.facebookUrl || info.instagramUrl || info.linkedinUrl || info.xUrl);
+  const published = info.showFaqsSection ? faqs.filter((faq) => faq.isPublished) : [];
+
+  // Mirrors what SocialMediaCard renders: social links (Social section) and the WhatsApp chat card (Channels section).
+  const hasSocialLinks = info.showSocialSection && !!(info.facebookUrl || info.instagramUrl || info.linkedinUrl || info.xUrl || info.whatsappUrl);
+  const hasWhatsappCard = info.showChannelsSection && !!info.whatsappNumber;
+  const hasSidebar = hasSocialLinks || hasWhatsappCard;
 
   // Nothing to show: no FAQs and no social/WhatsApp.
   if (!published.length && !hasSidebar) return null;
@@ -19,7 +23,7 @@ export default function ContactConcierge({ info, faqs }: Props) {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-200 h-125 bg-primary/5 blur-[180px] rounded-full pointer-events-none -z-10" />
 
       <div className="container max-w-7xl px-4 md:px-6 mx-auto">
-        {published.length > 0 && (
+        {published.length > 0 && info.showContentSection && (
           <div className="text-center max-w-3xl mx-auto space-y-4 mb-12 md:mb-16">
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground text-balance">{info.faqTitle}</h2>
             <p className="text-muted-foreground text-base sm:text-lg">{info.faqDescription}</p>

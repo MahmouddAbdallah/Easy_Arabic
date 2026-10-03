@@ -3,12 +3,12 @@
 import { Input } from '@/components/ui/input';
 import { contactSocialSchema, type ContactSocialValues } from '@/lib/contact/validation';
 import { updateContactSocial } from '@/lib/data/contact-info-actions';
-import { Field, FieldGroup, SectionForm } from './FormParts';
+import { Field, FieldGroup, SectionForm, VisibilityToggle } from './FormParts';
 import { useSectionForm } from './useSectionForm';
 
 export default function SocialSection({ defaultValues }: { defaultValues: ContactSocialValues }) {
     const { form, submit, isSaving, isDirty } = useSectionForm({ schema: contactSocialSchema, defaultValues, action: updateContactSocial });
-    const { register, formState: { errors }, reset } = form;
+    const { register, control, formState: { errors }, reset } = form;
 
     return (
         <SectionForm
@@ -19,6 +19,8 @@ export default function SocialSection({ defaultValues }: { defaultValues: Contac
             onSubmit={submit}
             onReset={() => reset(defaultValues)}
         >
+            <VisibilityToggle control={control} name="showSocialSection" hides="all social profile links, including WhatsApp" disabled={isSaving} />
+
             <FieldGroup title="Profiles">
                 <Field label="Facebook" htmlFor="facebookUrl" optional error={errors.facebookUrl?.message} hint="https://www.facebook.com/yourpage">
                     <Input id="facebookUrl" type="url" inputMode="url" disabled={isSaving} {...register('facebookUrl')} />
@@ -31,6 +33,9 @@ export default function SocialSection({ defaultValues }: { defaultValues: Contac
                 </Field>
                 <Field label="X / Twitter" htmlFor="xUrl" optional error={errors.xUrl?.message} hint="https://x.com/yourhandle">
                     <Input id="xUrl" type="url" inputMode="url" disabled={isSaving} {...register('xUrl')} />
+                </Field>
+                <Field label="WhatsApp" htmlFor="whatsappUrl" optional error={errors.whatsappUrl?.message} hint="https://wa.me/201000000000">
+                    <Input id="whatsappUrl" type="url" inputMode="url" disabled={isSaving} {...register('whatsappUrl')} />
                 </Field>
             </FieldGroup>
         </SectionForm>

@@ -90,7 +90,7 @@ export default function ContactInfoEditor({ content }: { content: ContactPageCon
                 </TabsContent>
                 <TabsContent value="faqs" keepMounted>
                     {/* Re-keyed by row ids so a save (which creates rows) remounts with the real ids. */}
-                    <FaqsSection key={faqs.map((f) => f.id).join('|')} defaultValues={toFaqsValues(faqs)} />
+                    <FaqsSection key={faqs.map((f) => f.id).join('|')} defaultValues={toFaqsValues(info, faqs)} />
                 </TabsContent>
             </Tabs>
         </div>

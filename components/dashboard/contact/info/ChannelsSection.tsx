@@ -4,12 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { contactChannelsSchema, type ContactChannelsValues } from '@/lib/contact/validation';
 import { updateContactChannels } from '@/lib/data/contact-info-actions';
-import { Field, FieldGroup, SectionForm } from './FormParts';
+import { Field, FieldGroup, SectionForm, VisibilityToggle } from './FormParts';
 import { useSectionForm } from './useSectionForm';
 
 export default function ChannelsSection({ defaultValues }: { defaultValues: ContactChannelsValues }) {
     const { form, submit, isSaving, isDirty } = useSectionForm({ schema: contactChannelsSchema, defaultValues, action: updateContactChannels });
-    const { register, formState: { errors }, reset } = form;
+    const { register, control, formState: { errors }, reset } = form;
 
     return (
         <SectionForm
@@ -20,6 +20,8 @@ export default function ChannelsSection({ defaultValues }: { defaultValues: Cont
             onSubmit={submit}
             onReset={() => reset(defaultValues)}
         >
+            <VisibilityToggle control={control} name="showChannelsSection" hides="the phone and email cards, the billing email and the WhatsApp chat card" disabled={isSaving} />
+
             <FieldGroup title="Phone" description="Shown in the hero. Visitors can tap it to call.">
                 <Field label="Label" htmlFor="phoneLabel" error={errors.phoneLabel?.message}>
                     <Input id="phoneLabel" disabled={isSaving} {...register('phoneLabel')} />

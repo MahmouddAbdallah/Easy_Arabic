@@ -1,11 +1,21 @@
 import { Share2, ArrowUpRight, MessageCircle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FacebookIcon, InstagramIcon, LinkedinIcon, TwitterXIcon } from '../icons';
+import { FacebookIcon, InstagramIcon, LinkedinIcon, TwitterXIcon, WhatsappIcon } from '../icons';
 import { handleFromUrl, whatsappHref } from '@/lib/contact/helpers';
 import type { ContactInfoFields } from '@/lib/contact/types';
 
 type Props = { info: ContactInfoFields };
+
+/** wa.me/201000000000 → "+201000000000"; other WhatsApp links (business / invite links) fall back to the generic handle. */
+const whatsappLabel = (url: string) => {
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop();
+    return last && /^\d{7,15}$/.test(last) ? `+${last}` : handleFromUrl(url);
+  } catch {
+    return url;
+  }
+};
 
 export default function SocialMediaCard({ info }: Props) {
   const socialLinks = [
@@ -13,9 +23,11 @@ export default function SocialMediaCard({ info }: Props) {
     { name: 'Instagram', href: info.instagramUrl, icon: InstagramIcon, color: 'hover:text-[#E4405F] hover:bg-[#E4405F]/10' },
     { name: 'Facebook', href: info.facebookUrl, icon: FacebookIcon, color: 'hover:text-[#1877F2] hover:bg-[#1877F2]/10' },
     { name: 'X / Twitter', href: info.xUrl, icon: TwitterXIcon, color: 'hover:text-foreground hover:bg-foreground/10' },
-  ].filter((link): link is typeof link & { href: string } => !!link.href);
+    { name: 'WhatsApp', href: info.whatsappUrl, icon: WhatsappIcon, color: 'hover:text-[#25D366] hover:bg-[#25D366]/10', label: whatsappLabel },
+  ].filter((link): link is typeof link & { href: string } => info.showSocialSection && !!link.href);
 
-  const hasWhatsapp = !!info.whatsappNumber;
+  // The chat card is configured in the Channels section, so that section's switch controls it.
+  const hasWhatsapp = info.showChannelsSection && !!info.whatsappNumber;
 
   if (!socialLinks.length && !hasWhatsapp) return null;
 
@@ -35,7 +47,7 @@ export default function SocialMediaCard({ info }: Props) {
 
           <CardContent className="p-0">
             <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
-              {socialLinks.map(({ name, href, icon: Icon, color }) => (
+              {socialLinks.map(({ name, href, icon: Icon, color, label }) => (
                 <a
                   key={name}
                   href={href}
@@ -47,7 +59,7 @@ export default function SocialMediaCard({ info }: Props) {
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-current transition-colors" />
                     <div className="truncate">
                       <p className="text-xs font-bold text-foreground truncate">{name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{handleFromUrl(href)}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{(label ?? handleFromUrl)(href)}</p>
                     </div>
                   </div>
                   <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all shrink-0" />

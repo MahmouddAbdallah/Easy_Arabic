@@ -9,56 +9,80 @@ type Props = { info: ContactInfoFields; hours: BusinessHourRecord[] };
 export default function ContactDetails({ info, hours }: Props) {
   const addressLines = formatAddressLines(info);
 
+  const showLocation = info.showLocationSection;
+  const showHours = info.showHoursSection;
+  // The billing email is a Channels field (even though it sits under the map), so that section's switch controls it.
+  const showBilling = info.showChannelsSection && !!info.billingEmail;
+
+  if (!showLocation && !showHours && !showBilling) return null;
+
+  // A lone card is centred instead of leaving an empty column beside it.
+  const hasLeft = showLocation || showBilling;
+  const leftSpan = showHours ? 'lg:col-span-7' : 'lg:col-span-8 lg:col-start-3';
+  const rightSpan = hasLeft ? 'lg:col-span-5' : 'lg:col-span-6 lg:col-start-4';
+
+  const billingRow = showBilling && (
+    <div className="px-6 py-4 flex items-center gap-3 text-sm">
+      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+      <span className="text-muted-foreground">Billing &amp; payments:</span>
+      <a href={`mailto:${info.billingEmail}`} className="font-semibold text-foreground hover:text-primary break-all">
+        {info.billingEmail}
+      </a>
+    </div>
+  );
+
   return (
     <section className="relative w-full py-16 md:py-24 bg-background border-b border-border/40">
       <div className="container max-w-7xl px-4 md:px-6 mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          <div className="lg:col-span-7 rounded-[28px] border border-border/80 bg-card/40 backdrop-blur-2xl shadow-xl overflow-hidden flex flex-col">
-            <div className="p-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                  <MapPin className="h-5 w-5" />
+          {showLocation && (
+            <div className={`${leftSpan} rounded-[28px] border border-border/80 bg-card/40 backdrop-blur-2xl shadow-xl overflow-hidden flex flex-col`}>
+              <div className="p-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">{info.officeName}</h3>
+                    <address className="not-italic text-sm text-muted-foreground leading-relaxed mt-1">
+                      {addressLines.map((line) => (
+                        <span key={line} className="block">{line}</span>
+                      ))}
+                    </address>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">{info.officeName}</h3>
-                  <address className="not-italic text-sm text-muted-foreground leading-relaxed mt-1">
-                    {addressLines.map((line) => (
-                      <span key={line} className="block">{line}</span>
-                    ))}
-                  </address>
-                </div>
-              </div>
 
-              <a href={mapDirectionsUrl(info.latitude, info.longitude)} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                <Button variant="outline" size="sm" className="rounded-xl border-border/80 w-full sm:w-auto">
-                  <span>Get directions</span>
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Button>
-              </a>
-            </div>
-
-            <iframe
-              title={`Map showing ${info.officeName}`}
-              src={mapEmbedUrl(info.latitude, info.longitude)}
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              className="w-full flex-1 min-h-72 border-t border-border/50 bg-muted"
-            />
-
-            {info.billingEmail && (
-              <div className="px-6 py-4 border-t border-border/50 flex items-center gap-3 text-sm">
-                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">Billing &amp; payments:</span>
-                <a href={`mailto:${info.billingEmail}`} className="font-semibold text-foreground hover:text-primary break-all">
-                  {info.billingEmail}
+                <a href={mapDirectionsUrl(info.latitude, info.longitude)} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                  <Button variant="outline" size="sm" className="rounded-xl border-border/80 w-full sm:w-auto">
+                    <span>Get directions</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Button>
                 </a>
               </div>
-            )}
-          </div>
 
-          <div className="lg:col-span-5">
-            <BusinessHoursCard hours={hours} timezone={info.timezone} note={info.businessHoursNote} />
-          </div>
+              <iframe
+                title={`Map showing ${info.officeName}`}
+                src={mapEmbedUrl(info.latitude, info.longitude)}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="w-full flex-1 min-h-72 border-t border-border/50 bg-muted"
+              />
+
+              {billingRow && <div className="border-t border-border/50">{billingRow}</div>}
+            </div>
+          )}
+
+          {!showLocation && billingRow && (
+            <div className={`${leftSpan} lg:self-start rounded-[28px] border border-border/80 bg-card/40 backdrop-blur-2xl shadow-xl`}>
+              {billingRow}
+            </div>
+          )}
+
+          {showHours && (
+            <div className={rightSpan}>
+              <BusinessHoursCard hours={hours} timezone={info.timezone} note={info.businessHoursNote} />
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -57,6 +57,15 @@ export type ContactInfoRecord = {
     instagramUrl: string | null;
     linkedinUrl: string | null;
     xUrl: string | null;
+    whatsappUrl: string | null;
+
+    /** One flag per dashboard section: false hides that section on the public /contact page. */
+    showContentSection: boolean;
+    showChannelsSection: boolean;
+    showLocationSection: boolean;
+    showHoursSection: boolean;
+    showSocialSection: boolean;
+    showFaqsSection: boolean;
 
     updatedAt: string;
 };

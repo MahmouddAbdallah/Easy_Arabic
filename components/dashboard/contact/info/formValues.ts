@@ -23,6 +23,7 @@ export const toContentValues = (i: ContactInfoFields): ContactContentValues => (
     formSuccessMessage: i.formSuccessMessage,
     faqTitle: i.faqTitle,
     faqDescription: i.faqDescription,
+    showContentSection: i.showContentSection,
 });
 
 export const toChannelsValues = (i: ContactInfoFields): ContactChannelsValues => ({
@@ -38,6 +39,7 @@ export const toChannelsValues = (i: ContactInfoFields): ContactChannelsValues =>
     whatsappDescription: i.whatsappDescription,
     whatsappButtonLabel: i.whatsappButtonLabel,
     whatsappPrefilledMessage: i.whatsappPrefilledMessage,
+    showChannelsSection: i.showChannelsSection,
 });
 
 export const toLocationValues = (i: ContactInfoFields): ContactLocationValues => ({
@@ -50,6 +52,7 @@ export const toLocationValues = (i: ContactInfoFields): ContactLocationValues =>
     country: i.country,
     latitude: i.latitude,
     longitude: i.longitude,
+    showLocationSection: i.showLocationSection,
 });
 
 export const toHoursValues = (i: ContactInfoFields, hours: BusinessHourRecord[]): ContactHoursValues => ({
@@ -61,6 +64,7 @@ export const toHoursValues = (i: ContactInfoFields, hours: BusinessHourRecord[])
         opensAt: h.opensAt ?? '',
         closesAt: h.closesAt ?? '',
     })),
+    showHoursSection: i.showHoursSection,
 });
 
 export const toSocialValues = (i: ContactInfoFields): ContactSocialValues => ({
@@ -68,8 +72,11 @@ export const toSocialValues = (i: ContactInfoFields): ContactSocialValues => ({
     instagramUrl: i.instagramUrl ?? '',
     linkedinUrl: i.linkedinUrl ?? '',
     xUrl: i.xUrl ?? '',
+    whatsappUrl: i.whatsappUrl ?? '',
+    showSocialSection: i.showSocialSection,
 });
 
-export const toFaqsValues = (faqs: FaqRecord[]): ContactFaqsValues => ({
+export const toFaqsValues = (i: ContactInfoFields, faqs: FaqRecord[]): ContactFaqsValues => ({
     faqs: faqs.map((f) => ({ id: f.id, question: f.question, answer: f.answer, isPublished: f.isPublished })),
+    showFaqsSection: i.showFaqsSection,
 });

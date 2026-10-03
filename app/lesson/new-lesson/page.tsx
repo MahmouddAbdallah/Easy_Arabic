@@ -12,7 +12,7 @@ export default function AddLessonPage() {
             <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
             <div className="relative w-full max-w-2xl mx-auto space-y-4">
                 <div className="flex items-center justify-between px-1">
-                    <Link href="/lessons">
+                    <Link href="/lesson">
                         <Button
                             variant="ghost"
                             size="sm"

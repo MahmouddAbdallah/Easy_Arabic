@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { contactFaqsSchema, MAX_FAQS, type ContactFaqsValues } from '@/lib/contact/validation';
 import { updateContactFaqs } from '@/lib/data/contact-info-actions';
-import { Field, SectionForm } from './FormParts';
+import { Field, SectionForm, VisibilityToggle } from './FormParts';
 import { useSectionForm } from './useSectionForm';
 
 export default function FaqsSection({ defaultValues }: { defaultValues: ContactFaqsValues }) {
@@ -27,6 +27,8 @@ export default function FaqsSection({ defaultValues }: { defaultValues: ContactF
             onSubmit={submit}
             onReset={() => reset(defaultValues)}
         >
+            <VisibilityToggle control={control} name="showFaqsSection" hides="the FAQ accordion" disabled={isSaving} />
+
             {fields.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 py-10 text-center">
                     <HelpCircle className="h-6 w-6 text-muted-foreground" />

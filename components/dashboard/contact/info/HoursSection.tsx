@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DAY_NAMES } from '@/lib/contact/helpers';
 import { contactHoursSchema, type ContactHoursValues } from '@/lib/contact/validation';
 import { updateContactHours } from '@/lib/data/contact-info-actions';
-import { Field, FieldGroup, SectionForm } from './FormParts';
+import { Field, FieldGroup, SectionForm, VisibilityToggle } from './FormParts';
 import { useSectionForm } from './useSectionForm';
 
 export default function HoursSection({ defaultValues }: { defaultValues: ContactHoursValues }) {
@@ -23,6 +23,8 @@ export default function HoursSection({ defaultValues }: { defaultValues: Contact
             onSubmit={submit}
             onReset={() => reset(defaultValues)}
         >
+            <VisibilityToggle control={control} name="showHoursSection" hides="the business hours card" disabled={isSaving} />
+
             <FieldGroup title="Settings">
                 <Field label="Time zone" htmlFor="timezone" error={errors.timezone?.message} hint="IANA name, e.g. Africa/Cairo or America/New_York.">
                     <Input id="timezone" list="timezone-options" autoComplete="off" disabled={isSaving} {...register('timezone')} />

@@ -60,7 +60,7 @@ const ChatHeader = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger
-                            className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
                         >
 
                             <PhoneIcon className="h-4 w-4" />
@@ -69,7 +69,7 @@ const ChatHeader = () => {
                     </Tooltip>
 
                     <Tooltip>
-                        <TooltipTrigger className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                        <TooltipTrigger className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
                             <VideoIcon className="h-4 w-4" />
                         </TooltipTrigger>
                         <TooltipContent>Video Call</TooltipContent>

@@ -85,6 +85,8 @@ export const contactContentSchema = z.object({
 
     faqTitle: required("FAQ title", 120),
     faqDescription: required("FAQ description", 300),
+
+    showContentSection: z.boolean(),
 });
 
 /** Phone, emails and WhatsApp. */
@@ -109,6 +111,8 @@ export const contactChannelsSchema = z.object({
     whatsappDescription: required("WhatsApp description", 200),
     whatsappButtonLabel: required("Button label", 40),
     whatsappPrefilledMessage: required("Pre-filled message", 200),
+
+    showChannelsSection: z.boolean(),
 });
 
 /** Office address and map pin. */
@@ -128,6 +132,8 @@ export const contactLocationSchema = z.object({
         .number("Enter a valid longitude")
         .min(-180, "Longitude must be between -180 and 180")
         .max(180, "Longitude must be between -180 and 180"),
+
+    showLocationSection: z.boolean(),
 });
 
 export const businessHourSchema = z
@@ -162,6 +168,8 @@ export const contactHoursSchema = z.object({
         .array(businessHourSchema)
         .length(7, "All seven days are required")
         .refine((days) => new Set(days.map((d) => d.dayOfWeek)).size === 7, "Each weekday must appear once"),
+
+    showHoursSection: z.boolean(),
 });
 
 /** Social profile links. */
@@ -170,6 +178,9 @@ export const contactSocialSchema = z.object({
     instagramUrl: optionalUrl("Instagram", ["instagram.com"]),
     linkedinUrl: optionalUrl("LinkedIn", ["linkedin.com"]),
     xUrl: optionalUrl("X / Twitter", ["x.com", "twitter.com"]),
+    whatsappUrl: optionalUrl("WhatsApp", ["wa.me", "whatsapp.com"]),
+
+    showSocialSection: z.boolean(),
 });
 
 export const MAX_FAQS = 20;
@@ -184,6 +195,8 @@ export const faqItemSchema = z.object({
 
 export const contactFaqsSchema = z.object({
     faqs: z.array(faqItemSchema).max(MAX_FAQS, `You can add up to ${MAX_FAQS} questions`),
+
+    showFaqsSection: z.boolean(),
 });
 
 export type ContactContentValues = z.infer<typeof contactContentSchema>;

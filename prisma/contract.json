@@ -738,6 +738,48 @@
                   "kind": "scalar"
                 }
               },
+              "showChannelsSection": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "showContentSection": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "showFaqsSection": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "showHoursSection": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "showLocationSection": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "showSocialSection": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "stateRegion": {
                 "nullable": true,
                 "type": {
@@ -824,6 +866,13 @@
               },
               "whatsappTitle": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "whatsappUrl": {
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -921,6 +970,24 @@
                 "responseTime": {
                   "column": "responseTime"
                 },
+                "showChannelsSection": {
+                  "column": "showChannelsSection"
+                },
+                "showContentSection": {
+                  "column": "showContentSection"
+                },
+                "showFaqsSection": {
+                  "column": "showFaqsSection"
+                },
+                "showHoursSection": {
+                  "column": "showHoursSection"
+                },
+                "showLocationSection": {
+                  "column": "showLocationSection"
+                },
+                "showSocialSection": {
+                  "column": "showSocialSection"
+                },
                 "stateRegion": {
                   "column": "stateRegion"
                 },
@@ -959,6 +1026,9 @@
                 },
                 "whatsappTitle": {
                   "column": "whatsappTitle"
+                },
+                "whatsappUrl": {
+                  "column": "whatsappUrl"
                 },
                 "xUrl": {
                   "column": "xUrl"
@@ -2052,6 +2122,60 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "showChannelsSection": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "showContentSection": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "showFaqsSection": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "showHoursSection": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "showLocationSection": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "showSocialSection": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "stateRegion": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -2120,6 +2244,11 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "whatsappUrl": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "xUrl": {
                   "codecId": "pg/text@1",
@@ -2713,7 +2842,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "960d32526b66aa263f5ee501ddfc5bc315d9423ec89094833e96e1e15ea01f1a"
+    "storageHash": "771d155c0bf2b76d1ce8a0923a43f3e2a0feffb95d31e8829a8ad69ae74c9712"
   },
   "execution": {
     "executionHash": "19085eaa27c3932cd2acd9ea1c32d91a9162c7295a53a708c3dfeec8b461eeae",

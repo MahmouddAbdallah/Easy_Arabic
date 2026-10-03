@@ -63,6 +63,14 @@ export const DEFAULT_CONTACT_INFO: ContactInfoFields = {
     instagramUrl: "https://www.instagram.com/easyarabic",
     linkedinUrl: "https://www.linkedin.com/company/easyarabic",
     xUrl: "https://x.com/easyarabic",
+    whatsappUrl: "https://wa.me/201000000000",
+
+    showContentSection: true,
+    showChannelsSection: true,
+    showLocationSection: true,
+    showHoursSection: true,
+    showSocialSection: true,
+    showFaqsSection: true,
 };
 
 /** Sat–Thu 09:00–21:00 (Cairo), Friday closed. Index = dayOfWeek (0 = Sunday). */

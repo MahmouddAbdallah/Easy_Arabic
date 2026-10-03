@@ -5,12 +5,12 @@ import { Input } from '@/components/ui/input';
 import { mapEmbedUrl } from '@/lib/contact/helpers';
 import { contactLocationSchema, type ContactLocationValues } from '@/lib/contact/validation';
 import { updateContactLocation } from '@/lib/data/contact-info-actions';
-import { Field, FieldGroup, SectionForm } from './FormParts';
+import { Field, FieldGroup, SectionForm, VisibilityToggle } from './FormParts';
 import { useSectionForm } from './useSectionForm';
 
 export default function LocationSection({ defaultValues }: { defaultValues: ContactLocationValues }) {
     const { form, submit, isSaving, isDirty } = useSectionForm({ schema: contactLocationSchema, defaultValues, action: updateContactLocation });
-    const { register, watch, formState: { errors }, reset } = form;
+    const { register, control, watch, formState: { errors }, reset } = form;
 
     const lat = watch('latitude');
     const lng = watch('longitude');
@@ -25,6 +25,8 @@ export default function LocationSection({ defaultValues }: { defaultValues: Cont
             onSubmit={submit}
             onReset={() => reset(defaultValues)}
         >
+            <VisibilityToggle control={control} name="showLocationSection" hides="the office address, map and directions button" disabled={isSaving} />
+
             <FieldGroup title="Address">
                 <Field label="Office name" htmlFor="officeName" error={errors.officeName?.message} className="sm:col-span-2">
                     <Input id="officeName" disabled={isSaving} {...register('officeName')} />

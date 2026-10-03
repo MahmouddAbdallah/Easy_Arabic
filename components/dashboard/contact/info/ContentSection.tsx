@@ -4,12 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { contactContentSchema, type ContactContentValues } from '@/lib/contact/validation';
 import { updateContactContent } from '@/lib/data/contact-info-actions';
-import { Field, FieldGroup, SectionForm } from './FormParts';
+import { Field, FieldGroup, SectionForm, VisibilityToggle } from './FormParts';
 import { useSectionForm } from './useSectionForm';
 
 export default function ContentSection({ defaultValues }: { defaultValues: ContactContentValues }) {
     const { form, submit, isSaving, isDirty } = useSectionForm({ schema: contactContentSchema, defaultValues, action: updateContactContent });
-    const { register, formState: { errors }, reset } = form;
+    const { register, control, formState: { errors }, reset } = form;
 
     return (
         <SectionForm
@@ -20,6 +20,8 @@ export default function ContentSection({ defaultValues }: { defaultValues: Conta
             onSubmit={submit}
             onReset={() => reset(defaultValues)}
         >
+            <VisibilityToggle control={control} name="showContentSection" hides="the hero headline and description, the highlights strip, the contact form and the FAQ heading" disabled={isSaving} />
+
             <FieldGroup title="Hero" description="The first thing visitors see.">
                 <Field label="Status badge" htmlFor="heroBadgeText" error={errors.heroBadgeText?.message} hint="Small pill above the headline." className="sm:col-span-2">
                     <Input id="heroBadgeText" disabled={isSaving} {...register('heroBadgeText')} />

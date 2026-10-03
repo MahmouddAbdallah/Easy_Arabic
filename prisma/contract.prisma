@@ -219,6 +219,16 @@ model ContactInfo {
   instagramUrl            String?
   linkedinUrl             String?
   xUrl                    String?
+  whatsappUrl             String?           // https://wa.me/… (or whatsapp.com) profile / chat link
+
+  // Section visibility on the public /contact page, one flag per dashboard
+  // section (true = shown, false = hidden). Defaults to shown.
+  showContentSection      Boolean           @default(true)
+  showChannelsSection     Boolean           @default(true)
+  showLocationSection     Boolean           @default(true)
+  showHoursSection        Boolean           @default(true)
+  showSocialSection       Boolean           @default(true)
+  showFaqsSection         Boolean           @default(true)
 
   updatedAt               TimestamptzString @default(now())
 

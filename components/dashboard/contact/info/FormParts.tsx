@@ -1,8 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form';
 import { Loader2, RotateCcw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +53,49 @@ export function FieldGroup({ title, description, children }: { title: string; de
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
         </fieldset>
+    );
+}
+
+/**
+ * "Show this section on the Contact page" switch, placed at the top of every
+ * section form. It is part of the form, so it saves with the section's own
+ * Save button. `hides` says what disappears from /contact when it is off.
+ */
+export function VisibilityToggle<T extends FieldValues>({
+    control,
+    name,
+    hides,
+    disabled,
+}: {
+    control: Control<T>;
+    name: Path<T>;
+    hides: string;
+    disabled?: boolean;
+}) {
+    const id = `visibility-${name}`;
+    return (
+        <Controller
+            control={control}
+            name={name}
+            render={({ field }) => (
+                <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 p-4">
+                    <Checkbox
+                        id={id}
+                        className="mt-0.5"
+                        checked={field.value === true}
+                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                        disabled={disabled}
+                    />
+                    <div className="min-w-0 space-y-0.5">
+                        <label htmlFor={id} className="text-sm font-semibold text-foreground">
+                            Show this section on the Contact page
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">{field.value === true ? 'Visible' : 'Hidden'}</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground">Turn off to hide: {hides}.</p>
+                    </div>
+                </div>
+            )}
+        />
     );
 }
 
