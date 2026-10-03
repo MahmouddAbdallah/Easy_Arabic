@@ -3,7 +3,9 @@
  *
  * `sendNotification` is the one function the rest of the project calls to push a notification.
  * Callers describe WHO and WHAT; token lookup, FCM payloads, batching and cleanup of dead
- * device tokens all happen in here.
+ * device tokens all happen in here. Notifications addressed to users (`userId` / `userIds`) are
+ * also stored in Firestore for the in-app list (see inbox.server.ts) — that copy is written even
+ * when a user has no registered device, so the list never depends on push permission.
  *
  *   // to every device of one user
  *   await sendNotification({
@@ -35,6 +37,8 @@ import {
     type NotificationType,
     type PushUrgency,
 } from './contract';
+import { chunk } from './chunk';
+import { saveToInbox } from './inbox.server';
 import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
 import { deleteTokens, getTokensForUsers } from './tokens.server';
 
@@ -86,7 +90,9 @@ export type NotificationErrorCode =
     /** Reading device tokens from the database failed. */
     | 'TOKEN_LOOKUP_FAILED'
     /** FCM rejected or could not deliver to at least one device. */
-    | 'DELIVERY_FAILED';
+    | 'DELIVERY_FAILED'
+    /** The in-app (Firestore) copy could not be saved. The push itself may still have gone out. */
+    | 'INBOX_FAILED';
 
 export interface SendNotificationResult {
     /**
@@ -103,6 +109,8 @@ export interface SendNotificationResult {
     failed: number;
     /** Dead device tokens FCM reported and we deleted from the database. */
     removedTokens: number;
+    /** In-app copies saved — one per user recipient. Token-addressed sends have no user, so 0. */
+    stored: number;
     error?: { code: NotificationErrorCode; message: string };
 }
 
@@ -121,17 +129,11 @@ const DEAD_TOKEN_ERROR_CODES = new Set([
 ]);
 
 function result(partial: Partial<SendNotificationResult> = {}): SendNotificationResult {
-    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, ...partial };
+    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, ...partial };
 }
 
 function failure(code: NotificationErrorCode, message: string, partial: Partial<SendNotificationResult> = {}) {
     return result({ ...partial, success: false, error: { code, message } });
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-    return chunks;
 }
 
 /**
@@ -144,12 +146,15 @@ async function loadMessaging(): Promise<Messaging> {
     return adminMessaging;
 }
 
+/** The users the notification is addressed to (empty when it targets raw device tokens). */
+function recipientUserIds(input: ValidatedNotificationInput): string[] {
+    return [...new Set(input.userIds ?? (input.userId ? [input.userId] : []))];
+}
+
 async function resolveTokens(input: ValidatedNotificationInput): Promise<string[]> {
     if (input.token) return [input.token];
     if (input.tokens) return [...new Set(input.tokens)];
-
-    const userIds = input.userIds ?? (input.userId ? [input.userId] : []);
-    return getTokensForUsers([...new Set(userIds)]);
+    return getTokensForUsers(recipientUserIds(input));
 }
 
 function buildPayload(input: ValidatedNotificationInput): NotificationPayload {
@@ -217,26 +222,9 @@ async function deliver(
     return outcome;
 }
 
-async function run(rawInput: SendNotificationInput): Promise<SendNotificationResult> {
-    // 1. Validate
-    const parsed = sendNotificationSchema.safeParse(rawInput);
-    if (!parsed.success) {
-        const message = formatValidationIssues(parsed.error);
-        console.error(`[notification] Invalid sendNotification() input — ${message}`);
-        return failure('INVALID_INPUT', message);
-    }
-    const input = parsed.data;
-
-    // 2. Build the payload once; every device receives the same one.
-    const payload = buildPayload(input);
-    const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
-    if (payloadBytes > MAX_PAYLOAD_BYTES) {
-        const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
-        console.error(`[notification] ${message}`);
-        return failure('INVALID_INPUT', message);
-    }
-
-    // 3. Resolve who to send to
+/** Push delivery: resolve device tokens, send through FCM, forget dead tokens. */
+async function sendPush(input: ValidatedNotificationInput, payload: NotificationPayload): Promise<SendNotificationResult> {
+    // 1. Resolve who to send to
     let tokens: string[];
     try {
         tokens = await resolveTokens(input);
@@ -246,7 +234,7 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     }
     if (tokens.length === 0) return result(); // nobody has notifications enabled — not an error
 
-    // 4. Send
+    // 2. Send
     let messaging: Messaging;
     try {
         messaging = await loadMessaging();
@@ -261,7 +249,7 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
         ttlSeconds: input.ttlSeconds ?? config.ttlSeconds,
     });
 
-    // 5. Housekeeping: forget tokens FCM says are dead (best-effort, never fails the send)
+    // 3. Housekeeping: forget tokens FCM says are dead (best-effort, never fails the send)
     let removedTokens = 0;
     if (outcome.deadTokens.length > 0) {
         try {
@@ -279,6 +267,45 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
         return failure('DELIVERY_FAILED', `${outcome.failed} of ${tokens.length} deliveries failed (${codes}).`, summary);
     }
     return result(summary);
+}
+
+/** The in-app copy for the notification list. Independent of push, so it never throws. */
+async function saveInAppCopies(input: ValidatedNotificationInput, payload: NotificationPayload) {
+    try {
+        return { stored: await saveToInbox(recipientUserIds(input), payload), ok: true };
+    } catch (error) {
+        console.error('[notification] Could not save the in-app notification:', error);
+        return { stored: 0, ok: false };
+    }
+}
+
+async function run(rawInput: SendNotificationInput): Promise<SendNotificationResult> {
+    // 1. Validate
+    const parsed = sendNotificationSchema.safeParse(rawInput);
+    if (!parsed.success) {
+        const message = formatValidationIssues(parsed.error);
+        console.error(`[notification] Invalid sendNotification() input — ${message}`);
+        return failure('INVALID_INPUT', message);
+    }
+    const input = parsed.data;
+
+    // 2. Build the payload once; every device (and the in-app copy) gets the same content.
+    const payload = buildPayload(input);
+    const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    if (payloadBytes > MAX_PAYLOAD_BYTES) {
+        const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
+        console.error(`[notification] ${message}`);
+        return failure('INVALID_INPUT', message);
+    }
+
+    // 3. Push and in-app copy are independent: neither waits for, or fails because of, the other.
+    const [push, inApp] = await Promise.all([sendPush(input, payload), saveInAppCopies(input, payload)]);
+
+    const outcome = { ...push, stored: inApp.stored };
+    if (!inApp.ok && push.success) {
+        return failure('INBOX_FAILED', 'The notification was sent but could not be saved to the in-app list.', outcome);
+    }
+    return outcome;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

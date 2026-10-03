@@ -22,8 +22,8 @@ const MESSAGE = { RECEIVED: 'NOTIFICATION_RECEIVED', CLICK: 'NOTIFICATION_CLICK'
 const PAYLOAD_KEY = 'payload';
 const PAYLOAD_VERSION = 1;
 
-/** Shown when a notification doesn't specify its own icon. Swap for a 192×192 PNG if you have one. */
-const DEFAULT_ICON = '/favicon.svg';
+/** Shown when a notification doesn't specify its own icon (system notifications need PNG/JPEG — SVG is not supported). */
+const DEFAULT_ICON = '/icons/notification-icon.png';
 
 /** How long to wait for a page to confirm it handled a message before falling back. */
 const PAGE_REPLY_TIMEOUT_MS = 1000;

@@ -5,15 +5,10 @@
  * notification code (sendNotification, the fcm-token API route) never touches the ORM directly.
  */
 import { db } from '@/prisma/db';
+import { chunk } from './chunk';
 
 /** Keeps `IN (...)` lists comfortably small. */
 const IN_CLAUSE_CHUNK = 500;
-
-function chunk<T>(items: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-    return chunks;
-}
 
 /** Every registered device token for the given users (de-duplicated). */
 export async function getTokensForUsers(userIds: string[]): Promise<string[]> {

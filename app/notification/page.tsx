@@ -1,12 +1,6 @@
 import NotificationBody from '@/components/notification/NotificationBody'
-import { NotificationProvider } from '@/components/notification/NotificationProvider'
 
-const page = () => {
-    return (
-        <NotificationProvider>
-            <NotificationBody />
-        </NotificationProvider>
-    )
+/** Test page for the in-app notification list. The list itself lives in components/notification. */
+export default function NotificationPage() {
+    return <NotificationBody />
 }
-
-export default page

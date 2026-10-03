@@ -53,6 +53,22 @@ export const sendNotificationSchema = z
 
 export type ValidatedNotificationInput = z.output<typeof sendNotificationSchema>;
 
+/**
+ * Body of PATCH /api/notification/read: mark some notifications, or every unread one, as read.
+ * The client only needs the inferred type (`import type`), so zod never reaches the browser bundle.
+ */
+export const MAX_MARK_READ_IDS = 100;
+
+// Firestore document ids: no slashes, nothing that could escape the collection path.
+const documentId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/, 'Invalid notification id');
+
+export const markReadSchema = z.union([
+    z.strictObject({ ids: z.array(documentId).min(1).max(MAX_MARK_READ_IDS) }),
+    z.strictObject({ all: z.literal(true) }),
+]);
+
+export type MarkReadInput = z.infer<typeof markReadSchema>;
+
 /** "title: title is required; link: link must be ..." — readable in logs and API responses. */
 export function formatValidationIssues(error: z.ZodError): string {
     return error.issues

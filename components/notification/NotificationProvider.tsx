@@ -5,14 +5,9 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
 import { Button } from '../ui/button';
-import { NotificationItem } from './NotificationItem';
+import { NotificationToast } from './NotificationToast';
 import { isPushSupported, removeDeviceToken, syncDeviceToken } from './lib/client';
-import {
-    SW_MESSAGE,
-    isSafeInternalLink,
-    parseServiceWorkerMessage,
-    type NotificationPayload,
-} from './lib/contract';
+import { SW_MESSAGE, isSafeInternalLink, parseServiceWorkerMessage, type NotificationPayload, } from './lib/contract';
 
 const IN_APP_TOAST_MS = 6000;
 
@@ -29,7 +24,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 function showInAppNotification(payload: NotificationPayload, open: (link?: string) => void) {
     toast.custom(
         (t) => (
-            <NotificationItem
+            <NotificationToast
                 payload={payload}
                 visible={t.visible}
                 onOpen={() => {
@@ -43,13 +38,14 @@ function showInAppNotification(payload: NotificationPayload, open: (link?: strin
     );
 }
 
-export function NotificationProvider({
-    children,
-    showEnableButton = true,
-}: {
-    children: React.ReactNode;
-    showEnableButton?: boolean;
-}) {
+/**
+ * Push notifications for the whole app: registers this device's FCM token and shows incoming push
+ * notifications as in-app toasts while the app is open (the service worker shows them as system
+ * notifications otherwise). Renders no UI of its own — place <NotificationPermissionButton /> where
+ * the user should be able to enable notifications. The in-app notification LIST is unrelated: see
+ * NotificationBody.
+ */
+export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { user } = useAppContext();
     const userId = user?.id;
@@ -145,35 +141,30 @@ export function NotificationProvider({
         [support, permission, isRegistered, userId, enableNotifications, unregisterDevice]
     );
 
-    return (
-        <NotificationContext.Provider value={value}>
-            {showEnableButton ? (
-                <div className="flex flex-col gap-4">
-                    <NotificationPermissionButton />
-                    {children}
-                </div>
-            ) : (
-                children
-            )}
-        </NotificationContext.Provider>
-    );
+    return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
 
 /** The "Enable Notifications" button. Must be rendered inside <NotificationProvider>. */
-export function NotificationPermissionButton() {
+export function NotificationPermissionButton({ className }: { className?: string }) {
     const { isSupported, permission, enableNotifications } = useNotification();
+
+    const label =
+        isSupported === false
+            ? 'Notifications Not Supported'
+            : {
+                default: 'Enable Notifications',
+                granted: 'Notifications Enabled',
+                denied: 'Notifications Blocked',
+            }[permission];
 
     return (
         <Button
             type="button"
             onClick={() => void enableNotifications()}
-            disabled={isSupported !== true || permission === 'granted'}
-            className="px-4 py-2 bg-blue-600! text-white rounded disabled:bg-gray-400"
+            disabled={isSupported !== true || permission !== 'default'}
+            className={className}
         >
-            {isSupported === false && 'Notifications Not Supported'}
-            {isSupported !== false && permission === 'default' && 'Enable Notifications'}
-            {isSupported !== false && permission === 'granted' && 'Notifications Enabled'}
-            {isSupported !== false && permission === 'denied' && 'Notifications Denied'}
+            {label}
         </Button>
     );
 }

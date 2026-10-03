@@ -2,26 +2,7 @@ import { deleteUserToken, registerUserToken } from "@/components/notification/li
 import { firstValidationMessage, fcmTokenSchema } from "@/lib/validation";
 import { authorization } from "@/lib/verifyAuth";
 import { NextRequest, NextResponse } from "next/server";
-
-const forbidden = () =>
-    NextResponse.json(
-        { success: false, error: { code: "FORBIDDEN", message: "Forbidden" } },
-        { status: 403 }
-    );
-
-const validationError = (message: string) =>
-    NextResponse.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message } },
-        { status: 400 }
-    );
-
-const serverError = (error: unknown) => {
-    console.error(error);
-    return NextResponse.json(
-        { success: false, error: { code: "SERVER_ERROR", message: "Error in server" } },
-        { status: 500 }
-    );
-};
+import { forbidden, serverError, validationError } from "../_lib/responses";
 
 /** Registers the calling browser's FCM token for the signed-in user (idempotent). */
 export async function POST(req: NextRequest) {

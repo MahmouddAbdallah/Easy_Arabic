@@ -6,6 +6,7 @@ import { onDisconnect, onValue, ref, set } from 'firebase/database'
 import { serverTimestamp } from 'firebase/firestore'
 import { usePathname } from 'next/navigation'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { NotificationProvider } from './notification/NotificationProvider'
 
 interface AppContextValue {
     user: userType | null | undefined
@@ -38,17 +39,20 @@ const AppProvider = ({ children, userData }: { children: ReactNode; userData?: u
     }, [user?.id])
 
     return (
+
         <ProviderAppContext.Provider
             value={{ user, setUser }}
         >
-            <div>
-                {!AUTH_PAGES.some((page) => pathname.includes(page)) &&
-                    !pathname.includes('chat') &&
-                    !pathname.includes('dashboard') &&
-                    <Navbar />
-                }
-                {children}
-            </div>
+            <NotificationProvider>
+                <div>
+                    {!AUTH_PAGES.some((page) => pathname.includes(page)) &&
+                        !pathname.includes('chat') &&
+                        !pathname.includes('dashboard') &&
+                        <Navbar />
+                    }
+                    {children}
+                </div>
+            </NotificationProvider>
         </ProviderAppContext.Provider>
     )
 }

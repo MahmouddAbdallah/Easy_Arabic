@@ -1,6 +1,6 @@
 /**
  * Notification contract — shared by the server (`sendNotification`), the client
- * (`NotificationProvider`) and the service worker (`public/firebase-messaging-sw.js`).
+ * (`NotificationProvider`, `NotificationBody`) and the service worker (`public/firebase-messaging-sw.js`).
  *
  * This file has NO server or browser imports, so it is safe to import from anywhere.
  * The service worker is plain JS and cannot import it: if you change the wire format
@@ -22,7 +22,7 @@
  *   3. Call sendNotification({ type: 'your_type', ... }).
  */
 
-export const NOTIFICATION_TYPES = ['general', 'chat_message', 'lesson'] as const;
+export const NOTIFICATION_TYPES = ['general', 'chat_message', 'lesson', 'sign_in', 'create_account'] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /** Web Push urgency header (RFC 8030). 'high' wakes sleeping devices sooner. */
@@ -41,10 +41,36 @@ export const NOTIFICATION_TYPE_CONFIG: Record<NotificationType, NotificationType
     general: { urgency: 'normal', ttlSeconds: ONE_DAY },
     chat_message: { urgency: 'high', ttlSeconds: ONE_DAY },
     lesson: { urgency: 'normal', ttlSeconds: ONE_DAY },
+    create_account: { urgency: 'high', ttlSeconds: ONE_DAY },
+    sign_in: { urgency: 'low', ttlSeconds: ONE_DAY }
 };
 
 /** Where the browser registers its FCM token (see app/api/notification/fcm-token). */
 export const FCM_TOKEN_ENDPOINT = '/api/notification/fcm-token';
+
+// ─── In-app notification list (separate from push) ────────────────────────────
+// Every user-addressed sendNotification() also stores one document per recipient in this Firestore
+// collection (lib/inbox.server.ts). NotificationBody reads them back in real time, so the list
+// works whether or not the user ever granted push permission.
+
+export const NOTIFICATION_COLLECTION = 'Notification';
+
+/** Marks notifications as read (see app/api/notification/read). */
+export const NOTIFICATION_READ_ENDPOINT = '/api/notification/read';
+
+/** A stored notification as the list shows it. */
+export interface InAppNotification {
+    /** Firestore document id. */
+    id: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    /** Same-origin path to open on click. */
+    link?: string;
+    isRead: boolean;
+    /** Epoch milliseconds. */
+    createdAt: number;
+}
 
 /** The single FCM `data` key that carries the JSON-encoded NotificationPayload. */
 export const NOTIFICATION_PAYLOAD_KEY = 'payload';
