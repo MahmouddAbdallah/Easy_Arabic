@@ -71,6 +71,14 @@ export function ContactDetailsDialog({ open, onOpenChange, contact, onReply, onD
                                     <Copy />
                                 </Button>
                             </DialogDescription>
+                            {contact.phone?.trim() && (
+                                <a
+                                    href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+                                    className="mt-0.5 block truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                >
+                                    {contact.phone}
+                                </a>
+                            )}
                             <p suppressHydrationWarning className="mt-0.5 text-xs text-muted-foreground">
                                 {formatFullDate(contact.createdAt)}
                             </p>

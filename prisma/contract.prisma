@@ -138,6 +138,7 @@ model Contact {
   id        String            @id @default(uuid())
   email     String
   name      String
+  phone     String?
   subject   String?
   message   String
   isRead    Boolean           @default(false)
@@ -146,4 +147,105 @@ model Contact {
 
   @@index([isRead])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Public Contact page content (edited at /dashboard/contact/contact-info).
+// Not to be confused with `Contact`, which stores inbound form submissions.
+// ---------------------------------------------------------------------------
+
+// Singleton: exactly one row, always id = 'default' (enforced by the check
+// below). Every column is one concrete piece of information shown on /contact.
+model ContactInfo {
+  id                      String            @id
+
+  // Hero
+  heroBadgeText           String
+  heroHeadline            String
+  heroDescription         String
+
+  // Phone
+  phoneLabel              String
+  phoneNumber             String
+  phoneNote               String
+
+  // Support email
+  supportEmailLabel       String
+  supportEmail            String
+  supportEmailNote        String
+
+  // Billing email (hidden on the page when empty)
+  billingEmail            String?
+
+  // WhatsApp (the whole callout is hidden when `whatsappNumber` is empty)
+  whatsappNumber          String?           // digits only, with country code
+  whatsappTitle           String
+  whatsappDescription     String
+  whatsappButtonLabel     String
+  whatsappPrefilledMessage String
+
+  // Office address + map pin
+  officeName              String
+  addressLine1            String
+  addressLine2            String?
+  city                    String
+  stateRegion             String?
+  postalCode              String?
+  country                 String
+  latitude                Float
+  longitude               Float
+
+  // Business hours settings (the per-day rows live in ContactBusinessHour)
+  timezone                String            // IANA zone, e.g. "Africa/Cairo"
+  businessHoursNote       String
+
+  // Support promises shown in the highlights strip
+  responseTime            String
+  supportLanguages        String
+  trialLessonText         String
+
+  // Contact form copy
+  formTitle               String
+  formDescription         String
+  formSuccessTitle        String
+  formSuccessMessage      String
+
+  // FAQ section header (the questions live in ContactFaq)
+  faqTitle                String
+  faqDescription          String
+
+  // Social profiles (a link is hidden when empty)
+  facebookUrl             String?
+  instagramUrl            String?
+  linkedinUrl             String?
+  xUrl                    String?
+
+  updatedAt               TimestamptzString @default(now())
+
+  @@check(expression: "id = 'default'", name: "contact_info_singleton")
+}
+
+// One row per weekday. dayOfWeek: 0 = Sunday … 6 = Saturday.
+// opensAt / closesAt are 24h "HH:MM" and only meaningful while isOpen = true.
+model ContactBusinessHour {
+  id        String            @id @default(uuid())
+  dayOfWeek Int               @unique
+  isOpen    Boolean           @default(true)
+  opensAt   String?
+  closesAt  String?
+  updatedAt TimestamptzString @default(now())
+
+  @@check(expression: "\"dayOfWeek\" BETWEEN 0 AND 6", name: "contact_business_hour_day_range")
+}
+
+model ContactFaq {
+  id          String            @id @default(uuid())
+  question    String
+  answer      String
+  sortOrder   Int               @default(0)
+  isPublished Boolean           @default(true)
+  createdAt   TimestamptzString @default(now())
+  updatedAt   TimestamptzString @default(now())
+
+  @@index([sortOrder])
 }

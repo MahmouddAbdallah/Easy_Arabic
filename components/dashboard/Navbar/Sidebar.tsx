@@ -67,6 +67,10 @@ export const navigationItems: NavItem[] = [
         title: "Contact",
         href: "/dashboard/contact",
         icon: PhoneCall,
+        subItems: [
+            { title: "Messages", href: "/dashboard/contact" },
+            { title: "Contact Page", href: "/dashboard/contact/contact-info" },
+        ],
     },
 ];
 
@@ -89,7 +93,10 @@ export function Sidebar({
     const isCollapsed = externalIsCollapsed ?? internalIsCollapsed;
     const setIsCollapsed = externalSetIsCollapsed ?? setInternalIsCollapsed;
 
-    const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+    // Start with the group of the current page expanded so its sub-pages are visible.
+    const [openSubMenu, setOpenSubMenu] = useState<string | null>(
+        () => navigationItems.find((item) => item.subItems?.some((sub) => sub.href === pathname))?.title ?? null
+    );
 
     const toggleSubMenu = (title: string) => {
         if (isCollapsed) {
