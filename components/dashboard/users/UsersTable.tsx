@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Mail, Phone, Calendar, ShieldCheck, Eye, UserX, EditIcon } from 'lucide-react'
@@ -49,12 +48,10 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
     return (
         <div className="space-y-4">
 
-            {/* 🔍 Search & Filter Toolbar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3.5 rounded-2xl border border-border/80 shadow-sm">
                 <KeywordSearch placeholder="Search by name, email, or phone..." />
             </div>
 
-            {/* 📊 Main Table Card */}
             <div className="rounded-2xl border border-border/80 bg-card/95 backdrop-blur-sm shadow-sm overflow-hidden">
                 <Table>
                     <TableHeader className="bg-muted/50">
@@ -81,7 +78,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                         ) : (
                             (users ? users : data).map((user) => (
                                 <TableRow key={user.id} className="transition-colors hover:bg-muted/40">
-                                    {/* Name & Avatar */}
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10 border border-border/60">
@@ -100,7 +96,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                                         </div>
                                     </TableCell>
 
-                                    {/* Email & Phone */}
                                     <TableCell>
                                         <div className="space-y-1 text-xs">
                                             <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -114,7 +109,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                                         </div>
                                     </TableCell>
 
-                                    {/* Role */}
                                     <TableCell>
                                         <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/5 text-primary font-medium text-xs px-2.5 py-0.5 capitalize">
                                             <ShieldCheck className="w-3 h-3" />
@@ -122,7 +116,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                                         </Badge>
                                     </TableCell>
 
-                                    {/* Status */}
                                     <TableCell>
                                         <Badge
                                             variant="secondary"
@@ -138,7 +131,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                                         </Badge>
                                     </TableCell>
 
-                                    {/* Joined Date */}
                                     <TableCell className="text-xs text-muted-foreground">
                                         <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5 opacity-70" />
@@ -153,7 +145,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                                         </div>
                                     </TableCell>
 
-                                    {/* Action Dropdown Menu */}
                                     <TableCell className="text-right">
                                         {isEditDialogOpen &&
                                             <EditUserDialog
@@ -163,16 +154,12 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                                             />
                                         }
                                         <DropdownMenu>
-                                            {/* إضافة asChild هنا يحل مشكلة button inside button */}
-                                            <DropdownMenuTrigger >
-                                                <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted">
-                                                    <span className="sr-only">Open menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
+                                            <DropdownMenuTrigger className="flex justify-center items-center cursor-pointer  rounded-md h-8 w-8 p-0 hover:bg-muted" >
+                                                <span className="sr-only">Open menu</span>
+                                                <MoreHorizontal className="h-4 w-4" />
                                             </DropdownMenuTrigger>
 
                                             <DropdownMenuContent align="end" className="w-40">
-                                                {/* استبدال DropdownMenuLabel بـ div تلافياً لمشكلة MenuGroupContext */}
                                                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
                                                     Actions
                                                 </div>
@@ -199,7 +186,6 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                     </TableBody>
                 </Table>
 
-                {/* 📄 Pagination Footer */}
                 <PaginationPage
                     pageSize={10}
                     count={count}
