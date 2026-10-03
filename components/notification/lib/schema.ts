@@ -69,6 +69,20 @@ export const markReadSchema = z.union([
 
 export type MarkReadInput = z.infer<typeof markReadSchema>;
 
+/**
+ * Body of POST /api/notification/context: this tab (`sessionId`) is now showing `link` — an internal
+ * path with its query, e.g. "/chat?receiverId=abc" — or, with `null`, is no longer visible.
+ */
+export const activeContextSchema = z.strictObject({
+    sessionId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, 'Invalid session id'),
+    link: z
+        .string()
+        .refine(isSafeInternalLink, 'link must be an internal path starting with a single "/"')
+        .nullable(),
+});
+
+export type ActiveContextInput = z.infer<typeof activeContextSchema>;
+
 /** "title: title is required; link: link must be ..." — readable in logs and API responses. */
 export function formatValidationIssues(error: z.ZodError): string {
     return error.issues

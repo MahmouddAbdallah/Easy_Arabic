@@ -11,6 +11,7 @@
  *     • no page visible  → the service worker shows a system notification
  *     • page visible     → the service worker hands it to the page, which shows an in-app toast
  *   click on a system notification → the service worker focuses / opens the app at `link`
+ *   a user already viewing `link` is skipped before any of this happens (see ACTIVE_CONTEXT_* below)
  *
  * The message is *data-only* on purpose: FCM's own "notification" messages are rendered by
  * the Firebase SDK and give us no control over clicks or de-duplication (and double-render if
@@ -57,6 +58,27 @@ export const NOTIFICATION_COLLECTION = 'Notification';
 
 /** Marks notifications as read (see app/api/notification/read). */
 export const NOTIFICATION_READ_ENDPOINT = '/api/notification/read';
+
+/**
+ * unreadNotificationCount (collection) └── {userId} (document) -> { count: number }
+ *
+ * How many of the user's stored notifications are unread. Kept in step with the `Notification`
+ * collection by lib/inbox.server.ts (every create / mark-as-read updates both in one transaction),
+ * so a badge can listen to this single document instead of counting the list. The document does not
+ * exist until the user's first notification — read a missing document as 0.
+ */
+export const UNREAD_COUNT_COLLECTION = 'unreadNotificationCount';
+
+// ─── What the user is looking at right now ────────────────────────────────────
+// A notification whose `link` is the page a user is already viewing tells them nothing new, so
+// sendNotification() skips such users entirely (no push, no stored copy). Only the server can make
+// that call, so every visible tab reports its location to this endpoint (see lib/client.ts) and
+// refreshes it while it stays visible. A report that stops arriving (closed tab, lost connection)
+// expires on its own after ACTIVE_CONTEXT_TTL_MS — the TTL must outlast a few missed heartbeats.
+
+export const ACTIVE_CONTEXT_ENDPOINT = '/api/notification/context';
+export const ACTIVE_CONTEXT_HEARTBEAT_MS = 30_000;
+export const ACTIVE_CONTEXT_TTL_MS = 90_000;
 
 /** A stored notification as the list shows it. */
 export interface InAppNotification {

@@ -7,6 +7,11 @@
  * also stored in Firestore for the in-app list (see inbox.server.ts) — that copy is written even
  * when a user has no registered device, so the list never depends on push permission.
  *
+ * A user who is looking at the page the notification links to (same `link`, see
+ * activeContext.server.ts) is skipped entirely — no push, no stored copy, nothing counted as unread —
+ * because the notification would only repeat what is already on their screen. Without a `link`, or
+ * when addressed to raw device tokens, nothing is skipped.
+ *
  *   // to every device of one user
  *   await sendNotification({
  *       userId: receiver.id,
@@ -37,6 +42,7 @@ import {
     type NotificationType,
     type PushUrgency,
 } from './contract';
+import { usersViewing } from './activeContext.server';
 import { chunk } from './chunk';
 import { saveToInbox } from './inbox.server';
 import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
@@ -111,6 +117,8 @@ export interface SendNotificationResult {
     removedTokens: number;
     /** In-app copies saved — one per user recipient. Token-addressed sends have no user, so 0. */
     stored: number;
+    /** Users skipped (nothing pushed or stored) because they were already viewing the notification's `link`. */
+    suppressed: number;
     error?: { code: NotificationErrorCode; message: string };
 }
 
@@ -129,7 +137,7 @@ const DEAD_TOKEN_ERROR_CODES = new Set([
 ]);
 
 function result(partial: Partial<SendNotificationResult> = {}): SendNotificationResult {
-    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, ...partial };
+    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, suppressed: 0, ...partial };
 }
 
 function failure(code: NotificationErrorCode, message: string, partial: Partial<SendNotificationResult> = {}) {
@@ -151,10 +159,26 @@ function recipientUserIds(input: ValidatedNotificationInput): string[] {
     return [...new Set(input.userIds ?? (input.userId ? [input.userId] : []))];
 }
 
-async function resolveTokens(input: ValidatedNotificationInput): Promise<string[]> {
+/**
+ * Drops the users who are already looking at the page the notification links to. If the lookup
+ * fails nobody is dropped: a duplicate notification is better than a lost one.
+ */
+async function withoutViewers(input: ValidatedNotificationInput, userIds: string[]): Promise<string[]> {
+    if (!input.link || userIds.length === 0) return userIds;
+
+    try {
+        const viewers = await usersViewing(userIds, input.link);
+        return userIds.filter((userId) => !viewers.has(userId));
+    } catch (error) {
+        console.error('[notification] Could not check what the recipients are viewing:', error);
+        return userIds;
+    }
+}
+
+async function resolveTokens(input: ValidatedNotificationInput, userIds: string[]): Promise<string[]> {
     if (input.token) return [input.token];
     if (input.tokens) return [...new Set(input.tokens)];
-    return getTokensForUsers(recipientUserIds(input));
+    return getTokensForUsers(userIds);
 }
 
 function buildPayload(input: ValidatedNotificationInput): NotificationPayload {
@@ -223,11 +247,15 @@ async function deliver(
 }
 
 /** Push delivery: resolve device tokens, send through FCM, forget dead tokens. */
-async function sendPush(input: ValidatedNotificationInput, payload: NotificationPayload): Promise<SendNotificationResult> {
+async function sendPush(
+    input: ValidatedNotificationInput,
+    userIds: string[],
+    payload: NotificationPayload
+): Promise<SendNotificationResult> {
     // 1. Resolve who to send to
     let tokens: string[];
     try {
-        tokens = await resolveTokens(input);
+        tokens = await resolveTokens(input, userIds);
     } catch (error) {
         console.error('[notification] Could not load device tokens:', error);
         return failure('TOKEN_LOOKUP_FAILED', 'Could not load the recipients\' devices.');
@@ -270,9 +298,9 @@ async function sendPush(input: ValidatedNotificationInput, payload: Notification
 }
 
 /** The in-app copy for the notification list. Independent of push, so it never throws. */
-async function saveInAppCopies(input: ValidatedNotificationInput, payload: NotificationPayload) {
+async function saveInAppCopies(userIds: string[], payload: NotificationPayload) {
     try {
-        return { stored: await saveToInbox(recipientUserIds(input), payload), ok: true };
+        return { stored: await saveToInbox(userIds, payload), ok: true };
     } catch (error) {
         console.error('[notification] Could not save the in-app notification:', error);
         return { stored: 0, ok: false };
@@ -298,10 +326,16 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
         return failure('INVALID_INPUT', message);
     }
 
-    // 3. Push and in-app copy are independent: neither waits for, or fails because of, the other.
-    const [push, inApp] = await Promise.all([sendPush(input, payload), saveInAppCopies(input, payload)]);
+    // 3. Leave out the users who are already looking at what the notification is about.
+    const addressed = recipientUserIds(input);
+    const userIds = await withoutViewers(input, addressed);
+    const suppressed = addressed.length - userIds.length;
+    if (addressed.length > 0 && userIds.length === 0) return result({ suppressed });
 
-    const outcome = { ...push, stored: inApp.stored };
+    // 4. Push and in-app copy are independent: neither waits for, or fails because of, the other.
+    const [push, inApp] = await Promise.all([sendPush(input, userIds, payload), saveInAppCopies(userIds, payload)]);
+
+    const outcome = { ...push, stored: inApp.stored, suppressed };
     if (!inApp.ok && push.success) {
         return failure('INBOX_FAILED', 'The notification was sent but could not be saved to the in-app list.', outcome);
     }

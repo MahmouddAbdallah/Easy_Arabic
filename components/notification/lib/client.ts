@@ -2,14 +2,14 @@
  * CLIENT ONLY — browser APIs and the Firebase web SDK. Never import this from server code.
  *
  * Everything the browser needs to be a notification target: feature detection, obtaining this
- * browser's FCM token, and keeping that token registered with the server. Receiving and showing
- * notifications is the service worker's job (public/firebase-messaging-sw.js) plus the
- * NotificationProvider; neither needs Firebase's `onMessage`.
+ * browser's FCM token, keeping that token registered with the server, and telling the server which
+ * page this tab is showing. Receiving and showing notifications is the service worker's job
+ * (public/firebase-messaging-sw.js) plus the NotificationProvider; neither needs Firebase's `onMessage`.
  */
 import axios from 'axios';
 import { deleteToken, getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { firebaseClientApp } from '@/lib/config/firebase-client';
-import { FCM_TOKEN_ENDPOINT } from './contract';
+import { ACTIVE_CONTEXT_ENDPOINT, ACTIVE_CONTEXT_HEARTBEAT_MS, FCM_TOKEN_ENDPOINT } from './contract';
 
 /** sessionStorage marker "userId:token" — lets a tab skip re-registering a device it already registered. */
 const SYNC_MARKER_KEY = 'notification:registered-device';
@@ -113,4 +113,57 @@ export async function removeDeviceToken(): Promise<void> {
     } finally {
         writeSyncMarker(null);
     }
+}
+
+// ─── What this tab is showing ─────────────────────────────────────────────────
+
+let tabId: string | undefined;
+
+/** Identifies this browser tab to the server; stays the same while the tab lives. */
+function getTabId(): string {
+    // crypto.randomUUID only exists in secure contexts (https / localhost).
+    return (tabId ??= globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
+}
+
+/**
+ * Best-effort: if a report never arrives the server simply stops trusting the previous one after its
+ * TTL. `keepalive` lets the "no longer visible" report outlive a page that is closing.
+ */
+function reportActiveContext(link: string | null): void {
+    fetch(ACTIVE_CONTEXT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: getTabId(), link }),
+        keepalive: true,
+    }).catch(() => {
+        /* ignore */
+    });
+}
+
+/**
+ * Tells the server this tab is showing `location` ("/path?query") for as long as the tab is visible:
+ * once now, again on every heartbeat, and a "not visible" report when the tab is hidden or closed.
+ * Call the returned function to stop. Changing location is just stopping and tracking the new one —
+ * the new report replaces this tab's previous one on the server.
+ */
+export function trackActiveContext(location: string): () => void {
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+    const sync = () => {
+        clearInterval(heartbeat);
+        if (document.visibilityState === 'visible') {
+            reportActiveContext(location);
+            heartbeat = setInterval(() => reportActiveContext(location), ACTIVE_CONTEXT_HEARTBEAT_MS);
+        } else {
+            reportActiveContext(null);
+        }
+    };
+
+    sync();
+    document.addEventListener('visibilitychange', sync);
+
+    return () => {
+        clearInterval(heartbeat);
+        document.removeEventListener('visibilitychange', sync);
+    };
 }

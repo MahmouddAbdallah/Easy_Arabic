@@ -1,10 +1,11 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
 import { Button } from '../ui/button';
+import { ActiveContextReporter } from './ActiveContextReporter';
 import { NotificationToast } from './NotificationToast';
 import { isPushSupported, removeDeviceToken, syncDeviceToken } from './lib/client';
 import { SW_MESSAGE, isSafeInternalLink, parseServiceWorkerMessage, type NotificationPayload, } from './lib/contract';
@@ -41,9 +42,10 @@ function showInAppNotification(payload: NotificationPayload, open: (link?: strin
 /**
  * Push notifications for the whole app: registers this device's FCM token and shows incoming push
  * notifications as in-app toasts while the app is open (the service worker shows them as system
- * notifications otherwise). Renders no UI of its own — place <NotificationPermissionButton /> where
- * the user should be able to enable notifications. The in-app notification LIST is unrelated: see
- * NotificationBody.
+ * notifications otherwise). It also reports which page this tab is showing, so notifications about a
+ * page the user is already on are never sent (see ActiveContextReporter). Renders no UI of its own —
+ * place <NotificationPermissionButton /> where the user should be able to enable notifications. The
+ * in-app notification LIST is unrelated: see NotificationBody.
  */
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -141,7 +143,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         [support, permission, isRegistered, userId, enableNotifications, unregisterDevice]
     );
 
-    return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
+    return (
+        <NotificationContext.Provider value={value}>
+            <Suspense fallback={null}>
+                <ActiveContextReporter userId={userId} />
+            </Suspense>
+            {children}
+        </NotificationContext.Provider>
+    );
 }
 
 /** The "Enable Notifications" button. Must be rendered inside <NotificationProvider>. */
