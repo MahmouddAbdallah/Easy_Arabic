@@ -18,7 +18,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = getApps.length ? getApp() : initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const firebaseClientApp = app;
 export const auth = getAuth(app);
 export const firebaseClientDB = getFirestore(app);

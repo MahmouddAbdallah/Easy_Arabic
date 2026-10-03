@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
 import { Button } from '../ui/button';
-import { NotificationBody } from './NotificationBody';
+import { NotificationItem } from './NotificationItem';
 import { isPushSupported, removeDeviceToken, syncDeviceToken } from './lib/client';
 import {
     SW_MESSAGE,
@@ -17,28 +17,19 @@ import {
 const IN_APP_TOAST_MS = 6000;
 
 interface NotificationContextType {
-    /**
-     * false where web push can't work (e.g. iOS Safari outside an installed web app);
-     * null for the first moment while the browser is still being checked.
-     */
     isSupported: boolean | null;
-    /** The browser's notification permission ('default' until the user answers the prompt). */
     permission: NotificationPermission;
-    /** true once this device's token is saved on the server for the signed-in user. */
     isRegistered: boolean;
-    /** Ask for permission (call from a click) and register this device. Resolves to success. */
     enableNotifications: () => Promise<boolean>;
-    /** Stop notifications on this device. Call it BEFORE signing the user out. */
     unregisterDevice: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-/** Shows a notification that arrived while the app is open as a toast. */
 function showInAppNotification(payload: NotificationPayload, open: (link?: string) => void) {
     toast.custom(
         (t) => (
-            <NotificationBody
+            <NotificationItem
                 payload={payload}
                 visible={t.visible}
                 onOpen={() => {
@@ -48,22 +39,10 @@ function showInAppNotification(payload: NotificationPayload, open: (link?: strin
                 onDismiss={() => toast.dismiss(t.id)}
             />
         ),
-        // Same id → a repeated/updated notification replaces its toast instead of stacking another.
         { id: payload.tag ?? payload.id, duration: IN_APP_TOAST_MS }
     );
 }
 
-/**
- * Owns everything browser-side about notifications:
- *  - tracks permission and keeps this device's FCM token registered for the signed-in user
- *  - shows notifications that arrive while the app is open (the service worker forwards them)
- *  - navigates when a system notification is clicked
- *
- * Mount it ONCE. For notifications to work on every page, mount it in the root layout with
- * `showEnableButton={false}` (inside <AppProvider>, which it needs for the signed-in user) and
- * put <NotificationPermissionButton /> wherever users should be able to switch notifications on.
- * `showEnableButton` defaults to true, which is what the /notification page relies on.
- */
 export function NotificationProvider({
     children,
     showEnableButton = true,
@@ -79,7 +58,6 @@ export function NotificationProvider({
     const [support, setSupport] = useState<boolean | null>(null); // null = still checking
     const [isRegistered, setIsRegistered] = useState(false);
 
-    // Browser capabilities and current permission (only knowable on the client).
     useEffect(() => {
         let active = true;
         if ('Notification' in window) setPermission(Notification.permission);
@@ -98,10 +76,8 @@ export function NotificationProvider({
         [router]
     );
 
-    // The single listener for everything the service worker tells this page.
     useEffect(() => {
         if (!('serviceWorker' in navigator)) return;
-
         const onMessage = (event: MessageEvent) => {
             const message = parseServiceWorkerMessage(event.data);
             if (!message) return;
@@ -111,8 +87,6 @@ export function NotificationProvider({
             } else {
                 showInAppNotification(message.payload, openLink);
             }
-            // Tell the service worker this page handled it, so it doesn't also fall back to a
-            // system notification or open a second window.
             event.ports[0]?.postMessage({ handled: true });
         };
 
@@ -120,8 +94,6 @@ export function NotificationProvider({
         return () => navigator.serviceWorker.removeEventListener('message', onMessage);
     }, [openLink]);
 
-    // Permission already granted (earlier visit, other account…): (re)register this device for the
-    // signed-in user. No-ops when this tab already did it for this user + token.
     useEffect(() => {
         if (!userId || permission !== 'granted' || support !== true) return;
 
