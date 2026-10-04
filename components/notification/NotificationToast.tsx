@@ -1,9 +1,36 @@
 'use client';
 
 import { X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { markNotificationHandled } from './lib/client/api';
 import type { NotificationPayload } from './lib/contract';
 import { TYPE_ICONS } from './typeIcons';
+
+const IN_APP_TOAST_MS = 6000;
+
+/**
+ * Shows an incoming push as an in-app toast. Clicking it handles the notification — its stored copy is no
+ * longer needed — and then calls `open` with the notification's link; the × only closes the toast.
+ * A tagged notification replaces the toast of the same tag instead of stacking.
+ */
+export function showNotificationToast(payload: NotificationPayload, open: (link?: string) => void) {
+    toast.custom(
+        (t) => (
+            <NotificationToast
+                payload={payload}
+                visible={t.visible}
+                onOpen={() => {
+                    toast.dismiss(t.id);
+                    if (payload.key) markNotificationHandled(payload.key);
+                    open(payload.link);
+                }}
+                onDismiss={() => toast.dismiss(t.id)}
+            />
+        ),
+        { id: payload.tag ?? payload.id, duration: IN_APP_TOAST_MS }
+    );
+}
 
 interface NotificationToastProps {
     payload: NotificationPayload;

@@ -99,6 +99,21 @@ export const addFamilyToTeacherSchema = z.object({
         ),
 });
 
+export const addTeachersToFamilySchema = z.object({
+    familyId: z
+        .string("Family ID must be a string")
+        .trim()
+        .uuid("Invalid Family ID format"),
+
+    teachersIds: z
+        .array(
+            z.string("Teacher ID must be a string")
+                .trim()
+                .uuid("Invalid Teacher ID format")
+        )
+        .min(1, "Select at least one teacher"),
+});
+
 export const signInSchema = z.object({
     email: emailSchema,
     password: loginPasswordSchema,

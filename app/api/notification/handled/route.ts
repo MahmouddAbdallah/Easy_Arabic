@@ -1,9 +1,7 @@
-import { resolveNotification } from "@/components/notification/lib/inbox.server";
 import { handledSchema } from "@/components/notification/lib/schema";
-import { firstValidationMessage } from "@/lib/validation";
-import { authorization } from "@/lib/verifyAuth";
-import { NextRequest, NextResponse } from "next/server";
-import { forbidden, serverError, validationError } from "../_lib/responses";
+import { resolveNotification } from "@/components/notification/lib/server/inbox";
+import { NextResponse } from "next/server";
+import { authedJsonRoute } from "../_lib/route";
 
 /**
  * The signed-in user clicked a delivered notification (`{ key }` — NotificationPayload.key), so its
@@ -16,18 +14,8 @@ import { forbidden, serverError, validationError } from "../_lib/responses";
  * POST rather than DELETE so the browser can also send it with `fetch(..., { keepalive: true })`
  * while the click navigates away.
  */
-export async function POST(req: NextRequest) {
-    try {
-        const { user } = await authorization();
-        if (!user) return forbidden();
+export const POST = authedJsonRoute(handledSchema, async (user, { key }) => {
+    const resolved = await resolveNotification(user.id, key);
 
-        const validation = handledSchema.safeParse(await req.json().catch(() => null));
-        if (!validation.success) return validationError(firstValidationMessage(validation.error));
-
-        const resolved = await resolveNotification(user.id, validation.data.key);
-
-        return NextResponse.json({ success: true, resolved }, { status: 200 });
-    } catch (error) {
-        return serverError(error);
-    }
-}
+    return NextResponse.json({ success: true, resolved }, { status: 200 });
+});

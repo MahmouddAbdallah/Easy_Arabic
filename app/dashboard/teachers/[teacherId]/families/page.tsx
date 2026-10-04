@@ -1,13 +1,13 @@
-import TeacherFamiliesList from '@/components/dashboard/teachers/TeacherFamiliesList';
+import TeacherFamilyList from '@/components/dashboard/teacher-family/TeacherFamilyList';
+import { toLinks } from '@/components/dashboard/teacher-family/config';
 import { getFamiliesOfTeacher } from '@/lib/data/users';
-
 
 const page = async ({ params }: {
     params: Promise<{ teacherId: string }>,
 }) => {
     const { teacherId } = await params;
 
-    const { data } = await getFamiliesOfTeacher({
+    const { data } = await getFamiliesOfTeacher<string>({
         filter: {
             where: [
                 {
@@ -15,16 +15,22 @@ const page = async ({ params }: {
                     value: teacherId
                 }
             ],
-            select: ['id'],
+            select: ['id', 'createdAt'],
             include: {
                 value: 'family',
                 select: ['id', 'name', 'email', 'phone', 'status']
-            }
+            },
+            orderBy: { createdAt: 'desc' }
         }
     });
 
     return (
-        <TeacherFamiliesList students={data} />
+        <TeacherFamilyList
+            key={teacherId}
+            side="teacher"
+            ownerId={teacherId}
+            initialLinks={toLinks('teacher', data)}
+        />
     )
 }
 

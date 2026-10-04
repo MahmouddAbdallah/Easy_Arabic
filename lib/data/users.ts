@@ -10,6 +10,7 @@ const FORBIDDEN = { success: false as const, error: { code: "FORBIDDEN", message
 
 const getUsersUnguarded = prismaArgs<'User'>('User');
 const getFamiliesOfTeacherUnguarded = prismaArgs<'TeacherFamily'>('TeacherFamily');
+const getTeachersOfFamilyUnguarded = prismaArgs<'TeacherFamily'>('TeacherFamily');
 
 export const getUsers: typeof getUsersUnguarded = async (args) => {
     const { error } = await authorization(["admin", "teacher"]);
@@ -21,6 +22,14 @@ export const getFamiliesOfTeacher: typeof getFamiliesOfTeacherUnguarded = async 
     const { error } = await authorization(["admin", "teacher"]);
     if (error) return FORBIDDEN;
     return getFamiliesOfTeacherUnguarded(args);
+};
+
+// Mirror of getFamiliesOfTeacher for the family side: the same TeacherFamily rows,
+// queried by `familyId` (and usually including the `teacher` relation).
+export const getTeachersOfFamily: typeof getTeachersOfFamilyUnguarded = async (args) => {
+    const { error } = await authorization(["admin", "teacher"]);
+    if (error) return FORBIDDEN;
+    return getTeachersOfFamilyUnguarded(args);
 };
 
 // Columns a caller may ask getUser for. `password` (and anything else not

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { trackActiveContext } from './lib/client';
+import { trackActiveContext } from './lib/client/presence';
 
 /**
  * Keeps the server told which page ("/path?query") the signed-in user's tab is showing, so that

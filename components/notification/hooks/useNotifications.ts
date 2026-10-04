@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import {
     collection,
@@ -17,9 +16,9 @@ import {
     type QuerySnapshot,
 } from 'firebase/firestore';
 import { firebaseClientDB } from '@/lib/config/firebase-client';
+import { markRead } from '../lib/client/api';
 import {
     NOTIFICATION_COLLECTION,
-    NOTIFICATION_READ_ENDPOINT,
     NOTIFICATION_TYPES,
     isSafeInternalLink,
     type InAppNotification,
@@ -179,7 +178,7 @@ export function useNotifications(userId: string | undefined, pageSize = DEFAULT_
         async (body: MarkReadInput, ids: string[]) => {
             setRead(ids, true);
             try {
-                await axios.patch(NOTIFICATION_READ_ENDPOINT, body);
+                await markRead(body);
             } catch (error) {
                 console.error('[notification] Could not mark notifications as read:', error);
                 setRead(ids, false);

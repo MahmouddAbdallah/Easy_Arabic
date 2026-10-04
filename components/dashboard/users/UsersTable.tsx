@@ -1,182 +1,164 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Mail, Phone, Calendar, ShieldCheck, Eye, UserX, EditIcon } from 'lucide-react'
-import KeywordSearch from './KeywordSearch'
-import EditUserDialog from './EditUserDialog'
+import React, { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { CalendarIcon, EditIcon, EyeIcon, MailIcon, MoreHorizontalIcon, PhoneIcon, UserXIcon } from 'lucide-react'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, } from '@/components/ui/dropdown-menu'
+import PaginationPage from '@/components/PaginationPage'
 import { useUserStore } from '@/stores/admin/users'
 import { userType } from '@/types/userTypes'
-import PaginationPage from '@/components/PaginationPage'
-import { usePathname, useRouter } from 'next/navigation'
+import EditUserDialog from './EditUserDialog'
+import KeywordSearch from './KeywordSearch'
+import { UserStatusBadge, getInitials } from './userDisplay'
 
-export type Role = 'family' | 'teacher' | 'admin' | string;
-export type Status = 'active' | 'inactive' | 'pending' | string;
-
+export type Role = 'family' | 'teacher' | 'admin' | string
+export type Status = 'active' | 'inactive' | 'pending' | string
 
 interface UsersTableProps {
     data: userType[]
+    /** Total rows matching the current search, across all pages. */
     count?: number
+    /** Which directory this is: sets copy and where a row's profile link goes. */
+    role: 'family' | 'teacher'
+    pageSize?: number
 }
 
-const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const { push } = useRouter();
-    const pathname = usePathname();
+const COPY = {
+    family: { base: '/dashboard/families', singular: 'family', plural: 'families' },
+    teacher: { base: '/dashboard/teachers', singular: 'teacher', plural: 'teachers' },
+} as const
 
+// UTC keeps the server- and client-rendered text identical whatever the viewer's timezone.
+const formatJoined = (date: Date | string) =>
+    new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+
+const UsersTable: React.FC<UsersTableProps> = ({ data, count, role, pageSize = 10 }) => {
+    const { base, plural } = COPY[role]
+    const keyword = useSearchParams().get('keyword')?.trim()
+    const [editingUser, setEditingUser] = useState<userType | null>(null)
+
+    // EditUserDialog saves through this store. The server's rows are shown straight away
+    // (no empty first paint) and the store only overlays edits made since they loaded.
     const setUsers = useUserStore((state) => state.setUsers)
-    const users = useUserStore((state) => state.users)
+    const storedUsers = useUserStore((state) => state.users)
     useEffect(() => {
         setUsers(data)
     }, [setUsers, data])
 
-    const getInitials = (name: string) => {
-        if (!name) return 'U'
-        return name
-            .trim()
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2)
-    }
-
+    const rows = useMemo(() => {
+        const stored = new Map(storedUsers.map((user) => [user.id, user]))
+        return data.map((user) => stored.get(user.id) ?? user)
+    }, [data, storedUsers])
 
     return (
         <div className="space-y-4">
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3.5 rounded-2xl border border-border/80 shadow-sm">
-                <KeywordSearch placeholder="Search by name, email, or phone..." />
+            <div className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-sm">
+                <KeywordSearch placeholder="Search by name, email, or phone…" />
             </div>
 
-            <div className="rounded-2xl border border-border/80 bg-card/95 backdrop-blur-sm shadow-sm overflow-hidden">
+            <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow className="hover:bg-transparent">
-                            <TableHead className="w-70">User</TableHead>
-                            <TableHead>Contact Info</TableHead>
-                            <TableHead>Role</TableHead>
+                            <TableHead className="pl-4 sm:pl-6">Name</TableHead>
+                            <TableHead className="hidden md:table-cell">Contact</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Joined Date</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="hidden lg:table-cell">Joined</TableHead>
+                            <TableHead className="pr-4 text-right sm:pr-6">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {(users ? users : data).length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
-                                    <div className="flex flex-col items-center justify-center gap-2">
-                                        <UserX className="w-8 h-8 text-muted-foreground/50" />
-                                        <p className="text-sm font-medium">No users found</p>
-                                        <p className="text-xs text-muted-foreground">Try adjusting your search or filters</p>
+                        {rows.length === 0 ? (
+                            <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={5} className="h-48">
+                                    <div className="flex flex-col items-center justify-center gap-2 text-center">
+                                        <div className="rounded-full bg-muted p-3 text-muted-foreground">
+                                            <UserXIcon className="size-5" />
+                                        </div>
+                                        <p className="text-sm font-medium text-foreground">
+                                            {keyword ? `No ${plural} match “${keyword}”` : `No ${plural} yet`}
+                                        </p>
+                                        {keyword && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Try a different name, email or phone number.
+                                            </p>
+                                        )}
                                     </div>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            (users ? users : data).map((user) => (
+                            rows.map((user) => (
                                 <TableRow key={user.id} className="transition-colors hover:bg-muted/40">
-                                    <TableCell className="font-medium">
+                                    <TableCell className="pl-4 sm:pl-6">
                                         <div className="flex items-center gap-3">
-                                            <Avatar className="h-10 w-10 border border-border/60">
-                                                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                                                    {getInitials(user?.name)}
+                                            <Avatar className="size-10 border border-border/60">
+                                                <AvatarFallback className="bg-brand-soft text-xs font-semibold text-brand">
+                                                    {getInitials(user.name)}
                                                 </AvatarFallback>
                                             </Avatar>
-                                            <div className="space-y-0.5">
-                                                <p className="font-semibold text-foreground text-sm line-clamp-1">
+                                            <div className="min-w-0">
+                                                <Link
+                                                    href={`${base}/${user.id}`}
+                                                    className="block max-w-56 truncate rounded text-sm font-semibold text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+                                                >
                                                     {user.name}
-                                                </p>
-                                                <p className="text-[10px] text-muted-foreground font-mono tracking-tight">
-                                                    ID: {user.id.slice(0, 8)}...
+                                                </Link>
+                                                {/* Contact has its own column from md up. */}
+                                                <p className="max-w-56 truncate text-xs text-muted-foreground md:hidden">
+                                                    {user.email}
                                                 </p>
                                             </div>
                                         </div>
                                     </TableCell>
 
-                                    <TableCell>
-                                        <div className="space-y-1 text-xs">
-                                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                                                <Mail className="w-3.5 h-3.5 text-primary/70 shrink-0" />
-                                                <span className="truncate max-w-45">{user.email}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                                                <Phone className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                                    <TableCell className="hidden md:table-cell">
+                                        <div className="space-y-1 text-xs text-muted-foreground">
+                                            <p className="flex items-center gap-1.5">
+                                                <MailIcon className="size-3.5 shrink-0 text-brand/70" />
+                                                <span className="max-w-56 truncate">{user.email}</span>
+                                            </p>
+                                            <p className="flex items-center gap-1.5">
+                                                <PhoneIcon className="size-3.5 shrink-0 text-brand/70" />
                                                 <span className="font-mono">{user.phone}</span>
-                                            </div>
+                                            </p>
                                         </div>
                                     </TableCell>
 
                                     <TableCell>
-                                        <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/5 text-primary font-medium text-xs px-2.5 py-0.5 capitalize">
-                                            <ShieldCheck className="w-3 h-3" />
-                                            {user.role}
-                                        </Badge>
+                                        <UserStatusBadge status={user.status} />
                                     </TableCell>
 
-                                    <TableCell>
-                                        <Badge
-                                            variant="secondary"
-                                            className={
-                                                user.status === 'active'
-                                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                                            }
-                                        >
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${user.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'
-                                                }`} />
-                                            <span className="capitalize">{user.status}</span>
-                                        </Badge>
+                                    <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
+                                        <span className="flex items-center gap-1.5">
+                                            <CalendarIcon className="size-3.5 opacity-70" />
+                                            {user.createdAt ? formatJoined(user.createdAt) : 'N/A'}
+                                        </span>
                                     </TableCell>
 
-                                    <TableCell className="text-xs text-muted-foreground">
-                                        <div className="flex items-center gap-1.5">
-                                            <Calendar className="w-3.5 h-3.5 opacity-70" />
-                                            {user.createdAt
-                                                ? new Date(user.createdAt).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric'
-                                                })
-                                                : 'N/A'
-                                            }
-                                        </div>
-                                    </TableCell>
-
-                                    <TableCell className="text-right">
-                                        {isEditDialogOpen &&
-                                            <EditUserDialog
-                                                user={user}
-                                                open={isEditDialogOpen}
-                                                onOpenChange={setIsEditDialogOpen}
-                                            />
-                                        }
+                                    <TableCell className="pr-4 text-right sm:pr-6">
                                         <DropdownMenu>
-                                            <DropdownMenuTrigger className="flex justify-center items-center cursor-pointer  rounded-md h-8 w-8 p-0 hover:bg-muted" >
+                                            <DropdownMenuTrigger
+                                                aria-label={`Actions for ${user.name}`}
+                                                className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand/40"
+                                            >
                                                 <span className="sr-only">Open menu</span>
-                                                <MoreHorizontal className="h-4 w-4" />
+
+                                                <MoreHorizontalIcon className="size-4" />
                                             </DropdownMenuTrigger>
 
-                                            <DropdownMenuContent align="end" className="w-40">
+                                            <DropdownMenuContent align="end" className="w-44">
                                                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
                                                     Actions
-                                                </div>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => push(`${pathname}/${user.id}`)}
-                                                    className="cursor-pointer gap-2">
-                                                    <Eye className="w-4 h-4 text-muted-foreground" /> View Profile
+                                                </div>                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem render={<Link href={`${base}/${user.id}`} />} className="cursor-pointer gap-2">
+                                                    <EyeIcon className="text-muted-foreground" /> View profile
                                                 </DropdownMenuItem>
-
-                                                <DropdownMenuItem
-                                                    className="cursor-pointer gap-2"
-                                                    onClick={() => setIsEditDialogOpen(true)}
-                                                >
-                                                    <EditIcon className="w-4 h-4 text-muted-foreground" /> Edit User
+                                                <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => setEditingUser(user)}>
+                                                    <EditIcon className="text-muted-foreground" /> Edit user
                                                 </DropdownMenuItem>
-
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
@@ -186,12 +168,20 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count }) => {
                     </TableBody>
                 </Table>
 
-                <PaginationPage
-                    pageSize={10}
-                    count={count}
-                    totalRecords={users?.length}
-                    variant='table' />
+                <PaginationPage pageSize={pageSize} count={count} variant="table" />
             </div>
+
+            {/* One dialog for the whole table, keyed so its form starts from the right user. */}
+            {editingUser && (
+                <EditUserDialog
+                    key={editingUser.id}
+                    user={editingUser}
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) setEditingUser(null)
+                    }}
+                />
+            )}
         </div>
     )
 }

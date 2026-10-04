@@ -98,10 +98,10 @@ export function TeacherLessonsSkeleton() {
     )
 }
 
-/** Enrolled families card (teacher/[id]/students). */
-export function TeacherFamiliesSkeleton() {
+/** Assignments card: teacher/[id]/families and family/[id]/teachers. */
+export function TeacherFamiliesSkeleton({ label = 'families' }: { label?: 'families' | 'teachers' }) {
     return (
-        <Card className="gap-0 overflow-hidden border-border/60 py-0" role="status" aria-label="Loading students">
+        <Card className="gap-0 overflow-hidden border-border/60 py-0" role="status" aria-label={`Loading ${label}`}>
             <div className="flex flex-col gap-4 border-b border-border/40 p-4 sm:p-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                     <Skeleton className="size-10 shrink-0 rounded-xl" />
@@ -132,15 +132,15 @@ export function TeacherFamiliesSkeleton() {
                     </div>
                 ))}
             </div>
-            <Status label="Loading students…" />
+            <Status label={`Loading ${label}…`} />
         </Card>
     )
 }
 
-/** Teachers directory (teacher/page.tsx): header, toolbar, table. */
-export function TeachersDirectorySkeleton() {
+/** Directory page (teachers/page.tsx and families/page.tsx): header, toolbar, table. */
+export function TeachersDirectorySkeleton({ label = 'teachers' }: { label?: 'teachers' | 'families' }) {
     return (
-        <div className="space-y-6" role="status" aria-label="Loading teachers">
+        <div className="space-y-6" role="status" aria-label={`Loading ${label}`}>
             <div className="flex flex-col gap-4 border-b border-border/60 pb-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                     <Skeleton className="size-11 shrink-0 rounded-xl" />
@@ -178,7 +178,7 @@ export function TeachersDirectorySkeleton() {
                     ))}
                 </div>
             </Card>
-            <Status label="Loading teachers…" />
+            <Status label={`Loading ${label}…`} />
         </div>
     )
 }

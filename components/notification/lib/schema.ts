@@ -74,7 +74,7 @@ export type MarkReadInput = z.infer<typeof markReadSchema>;
 
 /**
  * Body of POST /api/notification/handled: the user clicked the delivered notification whose identity
- * is `key` (NotificationPayload.key — a sha256 hex string, see lib/identity.server.ts).
+ * is `key` (NotificationPayload.key — a sha256 hex string, see lib/server/identity.ts).
  */
 export const handledSchema = z.strictObject({
     key: z.string().regex(/^[a-f0-9]{64}$/, 'Invalid notification key'),

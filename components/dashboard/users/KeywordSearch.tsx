@@ -11,7 +11,7 @@ const KeywordSearch = ({ placeholder }: { placeholder: string }) => {
     const searchParams = useSearchParams();
 
 
-    const [keyword, setKeyword] = useState(searchParams.get('query') || '');
+    const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
     const [isTyping, setIsTyping] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,9 +33,10 @@ const KeywordSearch = ({ placeholder }: { placeholder: string }) => {
             } else {
                 params.delete('keyword');
             }
+            params.delete('page');
             router.push(`?${params.toString()}`, { scroll: false });
             setIsTyping(false);
-        }, 1500);
+        }, 500);
 
         return () => clearTimeout(delayDebounceFn);
     }, [keyword, router, searchParams]);
@@ -50,12 +51,15 @@ const KeywordSearch = ({ placeholder }: { placeholder: string }) => {
             )}
             <Input
                 placeholder={placeholder}
+                aria-label={placeholder}
                 value={keyword}
                 onChange={handleChange}
                 className="pl-9 h-9 text-xs bg-background/50 focus:bg-background transition-colors"
             />
             {keyword && (
                 <button
+                    type="button"
+                    aria-label="Clear search"
                     onClick={() => {
                         setKeyword('');
                         setIsTyping(true);

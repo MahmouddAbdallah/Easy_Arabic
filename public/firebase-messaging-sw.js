@@ -85,7 +85,7 @@ function readPayload(event) {
     let raw;
     try {
         raw = event.data.json();
-    } catch (_) {
+    } catch {
         return null;
     }
     if (!raw || typeof raw !== 'object') return null;
@@ -96,7 +96,7 @@ function readPayload(event) {
         try {
             const payload = JSON.parse(encoded);
             if (isPayload(payload)) return payload;
-        } catch (_) {
+        } catch {
             /* fall through */
         }
     }
@@ -145,7 +145,7 @@ async function openApp(path) {
     if (target) {
         try {
             await target.focus();
-        } catch (_) {
+        } catch {
             /* focusing can be refused; carry on */
         }
         if (toAppPath(target.url) === path) return; // already there
@@ -158,7 +158,7 @@ async function openApp(path) {
             try {
                 await target.navigate(absolute(path));
                 return;
-            } catch (_) {
+            } catch {
                 /* not controlled by this worker — open a window instead */
             }
         }
@@ -209,7 +209,7 @@ function askPage(client, message) {
 
         try {
             client.postMessage(message, [channel.port2]);
-        } catch (_) {
+        } catch {
             clearTimeout(timer);
             resolve(false);
         }
@@ -222,7 +222,7 @@ function toAppPath(link) {
         const url = new URL(link || '/', self.location.origin);
         if (url.origin !== self.location.origin) return '/';
         return url.pathname + url.search;
-    } catch (_) {
+    } catch {
         return '/';
     }
 }

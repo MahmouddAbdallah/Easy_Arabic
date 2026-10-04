@@ -1,21 +1,28 @@
 /**
- * SERVER ONLY — uses firebase-admin and the database. Never import this from a client component.
+ * SERVER ONLY — uses firebase-admin and the database. The `server-only` import makes the build fail if
+ * a client component ever reaches it.
  *
  * `sendNotification` is the one function the rest of the project calls to push a notification.
- * Callers describe WHO and WHAT; token lookup, FCM payloads, batching and cleanup of dead
- * device tokens all happen in here. Notifications addressed to users (`userId` / `userIds`) are
- * also stored in Firestore for the in-app list (see inbox.server.ts) — that copy is written even
- * when a user has no registered device, so the list never depends on push permission. Pass
- * `persist: false` for a notification that should only be delivered and never stored.
+ * Callers describe WHO and WHAT; this file validates and orchestrates, and the pieces it composes each
+ * do one job (all under ./server):
+ *
+ *   presence.ts  — is the recipient already looking at the notification's page? (suppression)
+ *   inbox.ts     — the stored copy for the in-app list + unread counter (identity.ts decides "same one")
+ *   devices.ts   — which FCM tokens belong to the recipients
+ *   push.ts      — FCM delivery and cleanup of dead tokens
+ *
+ * Notifications addressed to users (`userId` / `userIds`) are also stored in Firestore for the in-app
+ * list — that copy is written even when a user has no registered device, so the list never depends on
+ * push permission. Pass `persist: false` for a notification that should only be delivered and never stored.
  *
  * The stored copy follows a lifecycle (contract.ts): sending the same logical notification again
- * (same `tag`, or what its type treats as the same — see identity.server.ts) updates the stored copy
+ * (same `tag`, or what its type treats as the same — see identity.ts) updates the stored copy
  * instead of adding another, and the copy is deleted when the user clicks the delivered notification.
  *
- * A user who is looking at the page the notification links to (same `link`, see
- * activeContext.server.ts) is skipped entirely — no push, no stored copy, nothing counted as unread —
- * because the notification would only repeat what is already on their screen. Without a `link`, or
- * when addressed to raw device tokens, nothing is skipped.
+ * A user who is looking at the page the notification links to (same `link`, see presence.ts) is
+ * skipped entirely — no push, no stored copy, nothing counted as unread — because the notification
+ * would only repeat what is already on their screen. Without a `link`, or when addressed to raw
+ * device tokens, nothing is skipped.
  *
  *   // to every device of one user
  *   await sendNotification({
@@ -40,22 +47,22 @@
  *
  * Keep notification text free of anything sensitive — lock screens show it to bystanders.
  */
+import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { Messaging } from 'firebase-admin/messaging';
 import {
-    NOTIFICATION_PAYLOAD_KEY,
     NOTIFICATION_PAYLOAD_VERSION,
     NOTIFICATION_TYPE_CONFIG,
     type NotificationPayload,
     type NotificationType,
     type PushUrgency,
 } from './contract';
-import { usersViewing } from './activeContext.server';
-import { chunk } from './chunk';
-import { notificationKey } from './identity.server';
-import { saveToInbox } from './inbox.server';
+import { getTokensForUsers } from './server/devices';
+import { notificationKey } from './server/identity';
+import { saveToInbox } from './server/inbox';
+import { usersViewing } from './server/presence';
+import { loadMessaging, pushToDevices } from './server/push';
 import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
-import { deleteTokens, getTokensForUsers } from './tokens.server';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -88,7 +95,7 @@ export interface NotificationContent {
      * notification, the tag is also its identity in the stored list: sending it again updates the
      * stored copy (new title/body/link/data) rather than creating another. Use one tag per logical
      * notification, e.g. `chat:${sender.id}`. Without a tag the type decides: a chat_message is
-     * identified by its `link`, anything else only matches an exact repeat (see identity.server.ts).
+     * identified by its `link`, anything else only matches an exact repeat (see server/identity.ts).
      */
     tag?: string;
     /** Internal path or https URL. */
@@ -150,17 +157,8 @@ export interface SendNotificationResult {
 
 // ─── Internals ────────────────────────────────────────────────────────────────
 
-/** FCM accepts at most 500 recipients per multicast call. */
-const FCM_MULTICAST_LIMIT = 500;
-
 /** FCM data messages are capped at 4096 bytes including its own envelope; stay safely under. */
 const MAX_PAYLOAD_BYTES = 3500;
-
-/** FCM error codes that mean "this token will never work again" — safe to delete. */
-const DEAD_TOKEN_ERROR_CODES = new Set([
-    'messaging/registration-token-not-registered',
-    'messaging/invalid-registration-token',
-]);
 
 function result(partial: Partial<SendNotificationResult> = {}): SendNotificationResult {
     return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, updated: 0, suppressed: 0, ...partial };
@@ -168,16 +166,6 @@ function result(partial: Partial<SendNotificationResult> = {}): SendNotification
 
 function failure(code: NotificationErrorCode, message: string, partial: Partial<SendNotificationResult> = {}) {
     return result({ ...partial, success: false, error: { code, message } });
-}
-
-/**
- * firebase-admin initialises (and throws on bad credentials) as soon as it is imported, so it is
- * loaded lazily: a misconfigured environment must not break every route that merely imports
- * this module, only the call that actually tries to send.
- */
-async function loadMessaging(): Promise<Messaging> {
-    const { adminMessaging } = await import('@/lib/config/firebase-admin');
-    return adminMessaging;
 }
 
 /** The users the notification is addressed to (empty when it targets raw device tokens). */
@@ -223,58 +211,12 @@ function buildPayload(input: ValidatedNotificationInput, key?: string): Notifica
     if (input.tag) payload.tag = input.tag;
     if (key) payload.key = key;
     if (input.data) {
-        payload.data = Object.fromEntries(Object.entries(input.data).map(([key, value]) => [key, String(value)]));
+        payload.data = Object.fromEntries(Object.entries(input.data).map(([name, value]) => [name, String(value)]));
     }
     return payload;
 }
 
-interface DeliveryOutcome {
-    sent: number;
-    failed: number;
-    deadTokens: string[];
-    errorCodes: Set<string>;
-}
-
-/**
- * The only place that talks to FCM. Data-only message: the service worker decides how to display
- * it (see contract.ts). NOTE: token-based multicast is marked deprecated in firebase-admin 14 in
- * favour of Firebase Installation IDs (`fids`); when the app migrates, only this function changes.
- */
-async function deliver(
-    messaging: Messaging,
-    tokens: string[],
-    payload: NotificationPayload,
-    delivery: { urgency: PushUrgency; ttlSeconds: number }
-): Promise<DeliveryOutcome> {
-    const outcome: DeliveryOutcome = { sent: 0, failed: 0, deadTokens: [], errorCodes: new Set() };
-    const data = { [NOTIFICATION_PAYLOAD_KEY]: JSON.stringify(payload) };
-    const webpush = { headers: { TTL: String(delivery.ttlSeconds), Urgency: delivery.urgency } };
-
-    for (const batch of chunk(tokens, FCM_MULTICAST_LIMIT)) {
-        try {
-            const response = await messaging.sendEachForMulticast({ tokens: batch, data, webpush });
-
-            response.responses.forEach((r, index) => {
-                if (r.success) {
-                    outcome.sent += 1;
-                } else if (r.error && DEAD_TOKEN_ERROR_CODES.has(r.error.code)) {
-                    outcome.deadTokens.push(batch[index]);
-                } else {
-                    outcome.failed += 1;
-                    outcome.errorCodes.add(r.error?.code ?? 'unknown');
-                }
-            });
-        } catch (error) {
-            // The whole call failed (network, credentials, FCM outage): none of this batch was sent.
-            outcome.failed += batch.length;
-            outcome.errorCodes.add((error as { code?: string })?.code ?? 'unknown');
-        }
-    }
-
-    return outcome;
-}
-
-/** Push delivery: resolve device tokens, send through FCM, forget dead tokens. */
+/** Push delivery: resolve device tokens, send through FCM (server/push.ts), forget dead tokens. */
 async function sendPush(
     input: ValidatedNotificationInput,
     userIds: string[],
@@ -300,25 +242,14 @@ async function sendPush(
     }
 
     const config = NOTIFICATION_TYPE_CONFIG[input.type];
-    const outcome = await deliver(messaging, tokens, payload, {
+    const outcome = await pushToDevices(messaging, tokens, payload, {
         urgency: input.urgency ?? config.urgency,
         ttlSeconds: input.ttlSeconds ?? config.ttlSeconds,
     });
 
-    // 3. Housekeeping: forget tokens FCM says are dead (best-effort, never fails the send)
-    let removedTokens = 0;
-    if (outcome.deadTokens.length > 0) {
-        try {
-            await deleteTokens(outcome.deadTokens);
-            removedTokens = outcome.deadTokens.length;
-        } catch (error) {
-            console.error('[notification] Could not remove dead device tokens:', error);
-        }
-    }
-
-    const summary = { targeted: tokens.length, sent: outcome.sent, failed: outcome.failed, removedTokens };
+    const summary = { targeted: tokens.length, sent: outcome.sent, failed: outcome.failed, removedTokens: outcome.removedTokens };
     if (outcome.failed > 0) {
-        const codes = [...outcome.errorCodes].join(', ');
+        const codes = outcome.errorCodes.join(', ');
         console.error(`[notification] ${outcome.failed}/${tokens.length} deliveries failed (${codes})`);
         return failure('DELIVERY_FAILED', `${outcome.failed} of ${tokens.length} deliveries failed (${codes}).`, summary);
     }

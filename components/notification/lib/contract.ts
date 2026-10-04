@@ -35,7 +35,7 @@ export interface NotificationTypeConfig {
     ttlSeconds: number;
     /**
      * What makes two notifications of this type "the same one" when the caller gave no `tag`
-     * (see lib/identity.server.ts): 'link' — the same `link` (one conversation, one notification, whatever
+     * (see lib/server/identity.ts): 'link' — the same `link` (one conversation, one notification, whatever
      * its latest text), or 'content' — only an exact repeat.
      */
     identity: 'link' | 'content';
@@ -57,14 +57,14 @@ export const FCM_TOKEN_ENDPOINT = '/api/notification/fcm-token';
 
 // ─── In-app notification list (separate from push) ────────────────────────────
 // A user-addressed sendNotification() also stores one document per recipient in this Firestore
-// collection (lib/inbox.server.ts) — unless the caller passes `persist: false`. NotificationBody reads
+// collection (lib/server/inbox.ts) — unless the caller passes `persist: false`. NotificationBody reads
 // them back in real time, so the list works whether or not the user ever granted push permission.
 //
 // ── Lifecycle of a stored notification ──
 //   sent                                   → stored, unread (a copy is stored even if the user has no device)
 //   sent again, same logical notification  → the stored document is UPDATED in place (new content, back on
 //                                            top, unread again) — never duplicated. What "same" means is
-//                                            decided in lib/identity.server.ts.
+//                                            decided in lib/server/identity.ts.
 //   delivered, user ignores or dismisses   → stays stored, unread: it is still unhandled
 //   delivered, user clicks it              → the stored document is DELETED: it was handled and has no
 //                                            reason to linger (see NOTIFICATION_HANDLED_ENDPOINT)
@@ -86,7 +86,7 @@ export const NOTIFICATION_HANDLED_ENDPOINT = '/api/notification/handled';
  * unreadNotificationCount (collection) └── {userId} (document) -> { count: number }
  *
  * How many of the user's stored notifications are unread. Kept in step with the `Notification`
- * collection by lib/inbox.server.ts (every create / mark-as-read updates both in one transaction),
+ * collection by lib/server/inbox.ts (every create / mark-as-read updates both in one transaction),
  * so a badge can listen to this single document instead of counting the list. The document does not
  * exist until the user's first notification — read a missing document as 0.
  */
@@ -95,13 +95,19 @@ export const UNREAD_COUNT_COLLECTION = 'unreadNotificationCount';
 // ─── What the user is looking at right now ────────────────────────────────────
 // A notification whose `link` is the page a user is already viewing tells them nothing new, so
 // sendNotification() skips such users entirely (no push, no stored copy). Only the server can make
-// that call, so every visible tab reports its location to this endpoint (see lib/client.ts) and
+// that call, so every visible tab reports its location to this endpoint (see lib/client/presence.ts) and
 // refreshes it while it stays visible. A report that stops arriving (closed tab, lost connection)
 // expires on its own after ACTIVE_CONTEXT_TTL_MS — the TTL must outlast a few missed heartbeats.
+//
+// These two numbers are the load knob of the whole feature: every visible tab costs one request (and one
+// Firestore write) per heartbeat. The TTL is also how long a notification about the page of a tab that died
+// without saying goodbye (crash, lost connection) is held back, so raise the heartbeat and the TTL together
+// and only as far as that wait is acceptable. A missed heartbeat itself fails safe: the user just gets a
+// notification about the page they are on.
 
 export const ACTIVE_CONTEXT_ENDPOINT = '/api/notification/context';
-export const ACTIVE_CONTEXT_HEARTBEAT_MS = 30_000;
-export const ACTIVE_CONTEXT_TTL_MS = 90_000;
+export const ACTIVE_CONTEXT_HEARTBEAT_MS = 60_000;
+export const ACTIVE_CONTEXT_TTL_MS = 150_000;
 
 /** A stored notification as the list shows it. */
 export interface InAppNotification {
@@ -146,7 +152,7 @@ export interface NotificationPayload {
     /** Free-form extra data for the app (all values are strings). */
     data?: Record<string, string>;
     /**
-     * Identity of the stored copy of this notification (lib/identity.server.ts). Only present when a
+     * Identity of the stored copy of this notification (lib/server/identity.ts). Only present when a
      * copy was stored; sent back to NOTIFICATION_HANDLED_ENDPOINT when the user clicks the notification.
      */
     key?: string;

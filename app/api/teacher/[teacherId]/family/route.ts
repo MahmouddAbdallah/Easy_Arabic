@@ -2,18 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { firstValidationMessage, addFamilyToTeacherSchema } from "@/lib/validation";
 import { db } from "@/prisma/db";
 import { authorization } from "@/lib/verifyAuth";
-
-function fail(status: number, code: string, message: string) {
-    return NextResponse.json(
-        { success: false, error: { code, message } },
-        { status }
-    );
-}
-
-function isUniqueViolation(err: unknown): boolean {
-    const e = err as { code?: string; cause?: { code?: string } } | null;
-    return e?.code === "23505" || e?.cause?.code === "23505";
-}
+import { apiError as fail, isUniqueViolation } from "@/lib/apiResponse";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
     try {
@@ -48,12 +37,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
             return fail(404, "TEACHER_NOT_FOUND", "Teacher not found");
         }
 
-        const families: { id: string; email: string; name: string }[] = [];
+        const families: { id: string; email: string; name: string; phone: string; status: string }[] = [];
 
         for (const id of familiesIds) {
             const family = await db.orm.public.User
                 .where({ id })
-                .select("id", "email", "name", "role")
+                .select("id", "email", "name", "phone", "status", "role")
                 .first();
 
             if (!family || family.role !== "family") {
@@ -72,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
                 );
             }
 
-            families.push({ id: family.id, email: family.email, name: family.name });
+            families.push({ id: family.id, email: family.email, name: family.name, phone: family.phone, status: family.status });
         }
 
         const teacherFamilies = [];
@@ -83,10 +72,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
                     teacherId,
                 });
                 teacherFamilies.push({
-                    id: teacherFamily.id, family: {
+                    id: teacherFamily.id,
+                    createdAt: teacherFamily.createdAt,
+                    family: {
                         id: family.id,
-                        name: family.name, email: family.email
-                    }
+                        name: family.name,
+                        email: family.email,
+                        phone: family.phone,
+                        status: family.status,
+                    },
                 });
             }
         } catch (err) {
