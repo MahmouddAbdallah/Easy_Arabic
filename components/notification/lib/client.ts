@@ -9,7 +9,12 @@
 import axios from 'axios';
 import { deleteToken, getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { firebaseClientApp } from '@/lib/config/firebase-client';
-import { ACTIVE_CONTEXT_ENDPOINT, ACTIVE_CONTEXT_HEARTBEAT_MS, FCM_TOKEN_ENDPOINT } from './contract';
+import {
+    ACTIVE_CONTEXT_ENDPOINT,
+    ACTIVE_CONTEXT_HEARTBEAT_MS,
+    FCM_TOKEN_ENDPOINT,
+    NOTIFICATION_HANDLED_ENDPOINT,
+} from './contract';
 
 /** sessionStorage marker "userId:token" — lets a tab skip re-registering a device it already registered. */
 const SYNC_MARKER_KEY = 'notification:registered-device';
@@ -113,6 +118,24 @@ export async function removeDeviceToken(): Promise<void> {
     } finally {
         writeSyncMarker(null);
     }
+}
+
+// ─── Clicked notifications ────────────────────────────────────────────────────
+
+/**
+ * Tells the server the user clicked the delivered notification `key` (NotificationPayload.key), so its
+ * stored copy is deleted. Best-effort: if the request fails the notification simply stays in the list as
+ * unread, which is the safe outcome. `keepalive` lets it finish even if the click navigates away.
+ */
+export function markNotificationHandled(key: string): void {
+    fetch(NOTIFICATION_HANDLED_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+        keepalive: true,
+    }).catch(() => {
+        /* ignore */
+    });
 }
 
 // ─── What this tab is showing ─────────────────────────────────────────────────

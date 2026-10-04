@@ -119,7 +119,6 @@ const LessonForm: React.FC<LessonFormProps> = ({
             <CardContent className="py-5 sm:py-6">
                 <FormProvider {...method}>
                     <form onSubmit={onSubmit} className="space-y-5">
-
                         <SelectFamilies />
                         <div className="space-y-1.5">
                             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -294,15 +293,11 @@ const LessonForm: React.FC<LessonFormProps> = ({
                                         }}
                                         render={({ field }) => (
                                             <Popover>
-                                                <PopoverTrigger className={'w-full'}>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className={`w-full h-9 justify-start text-left font-normal text-xs bg-background border-border/70 rounded-md px-3 ${!field.value && "text-muted-foreground"}`}
-                                                    >
-                                                        <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                    </Button>
+                                                <PopoverTrigger
+                                                    className={`w-full h-9 flex border items-center justify-start text-left font-normal text-xs bg-background border-border/70 rounded-md px-3 ${!field.value && "text-muted-foreground"}`}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                                                 </PopoverTrigger>
                                                 <PopoverContent className="w-auto p-0 rounded-md border-border/80" align="start">
                                                     <Calendar

@@ -12,7 +12,9 @@ import {
     query,
     startAfter,
     where,
+    type DocumentChange,
     type QueryDocumentSnapshot,
+    type QuerySnapshot,
 } from 'firebase/firestore';
 import { firebaseClientDB } from '@/lib/config/firebase-client';
 import {
@@ -49,12 +51,28 @@ function upsert(current: NotificationsById, items: InAppNotification[]): Notific
 }
 
 /**
+ * A "removed" change in the live window means one of two things: the notification was deleted (the user
+ * clicked it — see contract.ts), or newer ones pushed it out of the window while it still exists. Only
+ * the first must disappear from the list.
+ *
+ * A window that is not full cannot have pushed anything out, so the notification was deleted. In a full
+ * window, a pushed-out notification is older than everything left in it (the window holds the newest
+ * ones), whereas a deleted one is newer than the older notification that slid in to take its place.
+ */
+function wasDeleted(change: DocumentChange, snapshot: QuerySnapshot, pageSize: number): boolean {
+    const oldestShown = snapshot.docs.at(-1);
+    if (snapshot.size < pageSize || !oldestShown) return true;
+    return toNotification(change.doc).createdAt > toNotification(oldestShown).createdAt;
+}
+
+/**
  * The signed-in user's in-app notifications (Firestore collection `Notification`), newest first.
  * Reads Firestore only — it does not depend on push permission or on NotificationProvider.
  *
  * Reads are kept to what is needed:
- *  - ONE real-time listener on the newest `pageSize` notifications: new arrivals and read-state
- *    changes show up instantly, and nothing is re-read when the user pages.
+ *  - ONE real-time listener on the newest `pageSize` notifications: new arrivals, updates to a
+ *    notification that was sent again, read-state changes and deletions (a clicked notification is
+ *    deleted) show up instantly, and nothing is re-read when the user pages.
  *  - "Load more" fetches the next older page once, with a cursor (no listener per page).
  *  - Notifications that slide out of the live window as new ones arrive stay in the list.
  *
@@ -91,13 +109,16 @@ export function useNotifications(userId: string | undefined, pageSize = DEFAULT_
         const unsubscribe = onSnapshot(
             query(newestFirst, limit(pageSize)),
             (snapshot) => {
-                // A notification leaving the window (pushed out by a newer one) is reported as
-                // "removed" — it still exists, so only additions and edits are applied.
-                const changed = snapshot
-                    .docChanges()
-                    .filter((change) => change.type !== 'removed')
-                    .map((change) => toNotification(change.doc));
-                setById((current) => upsert(current, changed));
+                // Additions and edits are applied. "Removed" is applied only for deletions — a notification
+                // pushed out of the window by a newer one still exists and stays in the list.
+                const changes = snapshot.docChanges();
+                const changed = changes.filter((change) => change.type !== 'removed').map((change) => toNotification(change.doc));
+                const deleted = changes.filter((change) => change.type === 'removed' && wasDeleted(change, snapshot, pageSize));
+                setById((current) => {
+                    const next = upsert(current, changed);
+                    for (const change of deleted) delete next[change.doc.id];
+                    return next;
+                });
 
                 if (!paged.current) {
                     cursor.current = snapshot.docs.at(-1) ?? null;

@@ -33,31 +33,54 @@ export interface NotificationTypeConfig {
     urgency: PushUrgency;
     /** How long FCM keeps the message for an offline device before dropping it. */
     ttlSeconds: number;
+    /**
+     * What makes two notifications of this type "the same one" when the caller gave no `tag`
+     * (see lib/identity.server.ts): 'link' — the same `link` (one conversation, one notification, whatever
+     * its latest text), or 'content' — only an exact repeat.
+     */
+    identity: 'link' | 'content';
 }
 
 const ONE_DAY = 24 * 60 * 60;
 
 /** Per-type delivery defaults. A caller can still override them per call. */
 export const NOTIFICATION_TYPE_CONFIG: Record<NotificationType, NotificationTypeConfig> = {
-    general: { urgency: 'normal', ttlSeconds: ONE_DAY },
-    chat_message: { urgency: 'high', ttlSeconds: ONE_DAY },
-    lesson: { urgency: 'normal', ttlSeconds: ONE_DAY },
-    create_account: { urgency: 'high', ttlSeconds: ONE_DAY },
-    sign_in: { urgency: 'low', ttlSeconds: ONE_DAY }
+    general: { urgency: 'normal', ttlSeconds: ONE_DAY, identity: 'content' },
+    chat_message: { urgency: 'high', ttlSeconds: ONE_DAY, identity: 'link' },
+    lesson: { urgency: 'normal', ttlSeconds: ONE_DAY, identity: 'content' },
+    create_account: { urgency: 'high', ttlSeconds: ONE_DAY, identity: 'content' },
+    sign_in: { urgency: 'low', ttlSeconds: ONE_DAY, identity: 'content' }
 };
 
 /** Where the browser registers its FCM token (see app/api/notification/fcm-token). */
 export const FCM_TOKEN_ENDPOINT = '/api/notification/fcm-token';
 
 // ─── In-app notification list (separate from push) ────────────────────────────
-// Every user-addressed sendNotification() also stores one document per recipient in this Firestore
-// collection (lib/inbox.server.ts). NotificationBody reads them back in real time, so the list
-// works whether or not the user ever granted push permission.
+// A user-addressed sendNotification() also stores one document per recipient in this Firestore
+// collection (lib/inbox.server.ts) — unless the caller passes `persist: false`. NotificationBody reads
+// them back in real time, so the list works whether or not the user ever granted push permission.
+//
+// ── Lifecycle of a stored notification ──
+//   sent                                   → stored, unread (a copy is stored even if the user has no device)
+//   sent again, same logical notification  → the stored document is UPDATED in place (new content, back on
+//                                            top, unread again) — never duplicated. What "same" means is
+//                                            decided in lib/identity.server.ts.
+//   delivered, user ignores or dismisses   → stays stored, unread: it is still unhandled
+//   delivered, user clicks it              → the stored document is DELETED: it was handled and has no
+//                                            reason to linger (see NOTIFICATION_HANDLED_ENDPOINT)
+//   "Mark as read" in the list             → the document stays, flagged read (the list is its own history)
 
 export const NOTIFICATION_COLLECTION = 'Notification';
 
 /** Marks notifications as read (see app/api/notification/read). */
 export const NOTIFICATION_READ_ENDPOINT = '/api/notification/read';
+
+/**
+ * Reports that the user clicked a delivered notification (a toast or a system notification), so its
+ * stored copy is deleted (see app/api/notification/handled). The service worker calls it too — keep
+ * the path in public/firebase-messaging-sw.js identical.
+ */
+export const NOTIFICATION_HANDLED_ENDPOINT = '/api/notification/handled';
 
 /**
  * unreadNotificationCount (collection) └── {userId} (document) -> { count: number }
@@ -122,6 +145,11 @@ export interface NotificationPayload {
     tag?: string;
     /** Free-form extra data for the app (all values are strings). */
     data?: Record<string, string>;
+    /**
+     * Identity of the stored copy of this notification (lib/identity.server.ts). Only present when a
+     * copy was stored; sent back to NOTIFICATION_HANDLED_ENDPOINT when the user clicks the notification.
+     */
+    key?: string;
     /** Epoch milliseconds. */
     sentAt: number;
 }
@@ -168,6 +196,7 @@ export function parseNotificationPayload(raw: unknown): NotificationPayload | nu
     if (typeof p.sentAt !== 'number') return null;
     if (p.link !== undefined && !isSafeInternalLink(p.link)) return null;
     if (p.tag !== undefined && typeof p.tag !== 'string') return null;
+    if (p.key !== undefined && typeof p.key !== 'string') return null;
     if (p.icon !== undefined && !isSafeAssetUrl(p.icon)) return null;
     if (p.image !== undefined && !isSafeAssetUrl(p.image)) return null;
     if (p.data !== undefined && !isStringRecord(p.data)) return null;

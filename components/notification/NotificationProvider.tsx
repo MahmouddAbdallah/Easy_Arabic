@@ -7,7 +7,7 @@ import { useAppContext } from '../AppContext';
 import { Button } from '../ui/button';
 import { ActiveContextReporter } from './ActiveContextReporter';
 import { NotificationToast } from './NotificationToast';
-import { isPushSupported, removeDeviceToken, syncDeviceToken } from './lib/client';
+import { isPushSupported, markNotificationHandled, removeDeviceToken, syncDeviceToken } from './lib/client';
 import { SW_MESSAGE, isSafeInternalLink, parseServiceWorkerMessage, type NotificationPayload, } from './lib/contract';
 
 const IN_APP_TOAST_MS = 6000;
@@ -30,6 +30,8 @@ function showInAppNotification(payload: NotificationPayload, open: (link?: strin
                 visible={t.visible}
                 onOpen={() => {
                     toast.dismiss(t.id);
+                    // Clicking the notification handles it: its stored copy is no longer needed.
+                    if (payload.key) markNotificationHandled(payload.key);
                     open(payload.link);
                 }}
                 onDismiss={() => toast.dismiss(t.id)}

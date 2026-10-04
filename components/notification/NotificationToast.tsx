@@ -9,8 +9,9 @@ interface NotificationToastProps {
     payload: NotificationPayload;
     /** react-hot-toast's `t.visible` — drives the enter/exit animation. */
     visible: boolean;
-    /** Clicked on the notification itself (the provider navigates to `payload.link`). */
+    /** Clicked on the notification itself: it is handled, and the provider navigates to `payload.link` if any. */
     onOpen: () => void;
+    /** The × button: closes the toast only — the notification stays unhandled in the list. */
     onDismiss: () => void;
 }
 
@@ -46,7 +47,7 @@ export function NotificationToast({ payload, visible, onOpen, onDismiss }: Notif
 
                 <button
                     type="button"
-                    onClick={payload.link ? onOpen : onDismiss}
+                    onClick={onOpen}
                     className="flex min-w-0 flex-1 items-center gap-4 text-start outline-none focus-visible:ring-2 focus-visible:ring-brand-deep/50 rounded-xl"
                 >
                     <span className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-deep/10 text-brand-deep ring-1 ring-brand-deep/30 transition-all duration-300 group-hover:scale-105 group-hover:bg-brand-deep group-hover:text-white group-hover:shadow-lg group-hover:shadow-brand-deep/40 group-hover:ring-white/30">

@@ -1,61 +1,71 @@
 'use client'
 
-import { useState } from "react"
-import { LogOut, ChevronDown, ShieldCheck } from "lucide-react"
-import clsx from "clsx"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import Link from "next/link"
+import { ChevronDown, KeyRound, LoaderCircle, LogOut } from "lucide-react"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import type { userType } from "@/types/userTypes"
+import { focusRing } from "./styles"
+import { UserAvatar } from "./UserAvatar"
 
 interface UserProfileMenuProps {
-    user: any
+    user: userType
     onLogout: () => void
+    loggingOut?: boolean
 }
 
-export const UserProfileMenu = ({ user, onLogout }: UserProfileMenuProps) => {
-    const [open, setOpen] = useState(false)
-
+export const UserProfileMenu = ({ user, onLogout, loggingOut = false }: UserProfileMenuProps) => {
     return (
-        <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger className="focus:outline-none">
-                <div className="flex items-center gap-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full sm:rounded-2xl bg-card/80 border border-border/80 hover:border-primary/40 hover:bg-card transition-all shadow-xs group cursor-pointer">
-                    <div className="relative text-xs font-black bg-primary text-primary-foreground w-8 h-8 sm:w-9 sm:h-9 flex justify-center items-center rounded-full sm:rounded-xl shrink-0 shadow-sm transition-transform group-hover:scale-105">
-                        {user?.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-left hidden md:block max-w-30">
-                        <p className="text-xs font-extrabold truncate text-foreground leading-tight">
-                            {user?.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground capitalize font-medium">
-                            {user?.role || 'User'}
-                        </p>
-                    </div>
-                    <ChevronDown className={clsx("w-4 h-4 text-muted-foreground transition-transform duration-200 hidden md:block", open && "rotate-180")} />
-                </div>
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                aria-label={`Account menu for ${user.name}`}
+                className={`group flex h-10 cursor-pointer items-center gap-2.5 rounded-full ps-1 pe-1 text-start transition-colors hover:bg-muted aria-expanded:bg-muted motion-reduce:transition-none lg:pe-3 ${focusRing}`}
+            >
+                <UserAvatar name={user.name} className="size-8 text-xs" />
+                <span className="hidden min-w-0 leading-tight lg:block">
+                    <span className="block max-w-32 truncate text-sm font-medium text-foreground">{user.name}</span>
+                    <span className="block text-xs capitalize text-muted-foreground">{user.role}</span>
+                </span>
+                <ChevronDown
+                    aria-hidden
+                    className="hidden size-4 text-muted-foreground transition-transform duration-200 group-aria-expanded:rotate-180 motion-reduce:transition-none lg:block"
+                />
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent
-                align="end"
-                sideOffset={12}
-                className="w-56 rounded-2xl bg-card/95 border border-border/90 backdrop-blur-2xl shadow-2xl p-2 z-50"
-            >
-                <div className="p-3 mb-1 rounded-xl bg-primary/5 border border-primary/10 flex items-center gap-3">
-                    <div className="text-sm font-black bg-primary text-primary-foreground w-9 h-9 flex justify-center items-center rounded-xl shrink-0">
-                        {user?.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-extrabold text-foreground truncate">{user?.name}</span>
-                        <span className="text-[10px] text-primary font-bold capitalize flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                            {user?.role || 'Member'}
-                        </span>
+            <DropdownMenuContent align="end" sideOffset={10} className="w-64 rounded-xl p-1.5">
+                <div className="flex items-center gap-3 px-2 py-2.5">
+                    <UserAvatar name={user.name} className="size-11 text-sm" />
+                    <div className="min-w-0 leading-tight">
+                        <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>
+                        {user.email && <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.email}</p>}
+                        <p className="mt-1.5 inline-block rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium capitalize text-brand">
+                            {user.role}
+                        </p>
                     </div>
                 </div>
 
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem render={<Link href="/change-password" />} className="cursor-pointer gap-2.5 px-2.5 py-2">
+                    <KeyRound aria-hidden />
+                    Change password
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
                 <DropdownMenuItem
+                    variant="destructive"
+                    disabled={loggingOut}
                     onClick={onLogout}
-                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-bold text-destructive focus:text-destructive hover:bg-destructive/10 focus:bg-destructive/10 rounded-xl cursor-pointer"
+                    className="cursor-pointer gap-2.5 px-2.5 py-2"
                 >
-                    <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
+                    {loggingOut ? <LoaderCircle aria-hidden className="animate-spin" /> : <LogOut aria-hidden />}
+                    {loggingOut ? "Signing out…" : "Sign out"}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

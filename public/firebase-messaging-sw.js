@@ -6,7 +6,9 @@
  *
  *   push arrives ──▶ a page of the app is visible? ──yes──▶ hand it to the page (in-app toast)
  *                                                  └──no───▶ show a system notification
- *   system notification clicked ──▶ focus the app and go to the notification's `link`
+ *   system notification clicked ──▶ tell the server it was handled (its stored copy is deleted),
+ *                                   focus the app and go to the notification's `link`
+ *   system notification dismissed / ignored ──▶ nothing: its stored copy stays, unread, in the list
  *
  * The messages are FCM *data-only* messages built by sendNotification(), so the Firebase SDK never
  * draws a second copy. Notifications that share a `tag` replace each other, which also absorbs
@@ -14,13 +16,14 @@
  *
  * No Firebase SDK is loaded here: this is plain Web Push handling, so there are no CDN scripts or
  * config values to keep in sync. The payload contract lives in components/notification/lib/contract.ts —
- * keep MESSAGE / PAYLOAD_KEY / PAYLOAD_VERSION below identical to it.
+ * keep MESSAGE / PAYLOAD_KEY / PAYLOAD_VERSION / HANDLED_ENDPOINT below identical to it.
  */
 'use strict';
 
 const MESSAGE = { RECEIVED: 'NOTIFICATION_RECEIVED', CLICK: 'NOTIFICATION_CLICK' };
 const PAYLOAD_KEY = 'payload';
 const PAYLOAD_VERSION = 1;
+const HANDLED_ENDPOINT = '/api/notification/handled';
 
 /** Shown when a notification doesn't specify its own icon (system notifications need PNG/JPEG — SVG is not supported). */
 const DEFAULT_ICON = '/icons/notification-icon.png';
@@ -36,7 +39,8 @@ self.addEventListener('push', (event) => event.waitUntil(handlePush(event)));
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     const data = event.notification.data || {};
-    event.waitUntil(openApp(toAppPath(data.link)));
+    // Side by side: opening the app never waits for the report, and the report is best-effort (it never rejects).
+    event.waitUntil(Promise.all([markHandled(data.key), openApp(toAppPath(data.link))]));
 });
 
 // ─── Incoming push ────────────────────────────────────────────────────────────
@@ -70,7 +74,7 @@ function showSystemNotification(payload) {
         renotify: Boolean(payload.tag), // buzz again when a tagged notification is replaced (needs a tag)
         dir: 'auto', // Arabic and English text both lay out correctly
         timestamp: payload.sentAt,
-        data: { link: toAppPath(payload.link), id: payload.id, type: payload.type },
+        data: { link: toAppPath(payload.link), id: payload.id, type: payload.type, key: payload.key },
     });
 }
 
@@ -164,6 +168,25 @@ async function openApp(path) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Tells the server the user clicked the notification identified by `key` (present only when a copy of it
+ * was stored), so that copy is deleted. The request is same-origin, so the session cookie goes with it.
+ * Best-effort: on any failure the notification just stays in the list as unread. Never rejects.
+ */
+function markHandled(key) {
+    if (typeof key !== 'string' || !key) return Promise.resolve();
+
+    return fetch(HANDLED_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+        credentials: 'same-origin',
+    }).then(
+        () => undefined,
+        () => undefined
+    );
+}
 
 function getWindowClients() {
     // includeUncontrolled: pages are not controlled by this worker (its scope is Firebase's own).

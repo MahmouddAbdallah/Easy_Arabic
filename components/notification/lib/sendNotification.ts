@@ -5,7 +5,12 @@
  * Callers describe WHO and WHAT; token lookup, FCM payloads, batching and cleanup of dead
  * device tokens all happen in here. Notifications addressed to users (`userId` / `userIds`) are
  * also stored in Firestore for the in-app list (see inbox.server.ts) — that copy is written even
- * when a user has no registered device, so the list never depends on push permission.
+ * when a user has no registered device, so the list never depends on push permission. Pass
+ * `persist: false` for a notification that should only be delivered and never stored.
+ *
+ * The stored copy follows a lifecycle (contract.ts): sending the same logical notification again
+ * (same `tag`, or what its type treats as the same — see identity.server.ts) updates the stored copy
+ * instead of adding another, and the copy is deleted when the user clicks the delivered notification.
  *
  * A user who is looking at the page the notification links to (same `link`, see
  * activeContext.server.ts) is skipped entirely — no push, no stored copy, nothing counted as unread —
@@ -19,8 +24,11 @@
  *       title: sender.name,
  *       body: 'Sent you a message',
  *       link: `/chat?receiverId=${sender.id}`,
- *       tag: `chat:${sender.id}`,            // later messages from the same sender replace this one
- *   });
+ *       tag: `chat:${sender.id}`,            // later messages from the same sender replace this one —
+ *   });                                      // on screen AND in the stored list (updated, not duplicated)
+ *
+ *   // delivery only — nothing is written to the `Notification` collection
+ *   await sendNotification({ userId, title: 'Typing…', body: '…', persist: false });
  *
  *   // other recipient forms:  { userIds: [...] }  { token: '...' }  { tokens: [...] }
  *
@@ -44,6 +52,7 @@ import {
 } from './contract';
 import { usersViewing } from './activeContext.server';
 import { chunk } from './chunk';
+import { notificationKey } from './identity.server';
 import { saveToInbox } from './inbox.server';
 import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
 import { deleteTokens, getTokensForUsers } from './tokens.server';
@@ -74,7 +83,13 @@ export interface NotificationContent {
     link?: string;
     /** Extra data delivered with the notification. Values are converted to strings. */
     data?: Record<string, string | number | boolean>;
-    /** Notifications sharing a tag replace each other instead of stacking. */
+    /**
+     * Notifications sharing a tag replace each other instead of stacking — and for a user-addressed
+     * notification, the tag is also its identity in the stored list: sending it again updates the
+     * stored copy (new title/body/link/data) rather than creating another. Use one tag per logical
+     * notification, e.g. `chat:${sender.id}`. Without a tag the type decides: a chat_message is
+     * identified by its `link`, anything else only matches an exact repeat (see identity.server.ts).
+     */
     tag?: string;
     /** Internal path or https URL. */
     icon?: string;
@@ -84,6 +99,12 @@ export interface NotificationContent {
     urgency?: PushUrgency;
     /** Overrides the type's default time-to-live (0 – 28 days). */
     ttlSeconds?: number;
+    /**
+     * Keep a copy in the in-app notification list (Firestore `Notification` collection)? Defaults to
+     * true. false = deliver only: nothing is stored, and clicking it has nothing to clean up. Ignored
+     * for raw device tokens, which have no user to store a copy for.
+     */
+    persist?: boolean;
 }
 
 export type SendNotificationInput = NotificationRecipient & NotificationContent;
@@ -115,8 +136,13 @@ export interface SendNotificationResult {
     failed: number;
     /** Dead device tokens FCM reported and we deleted from the database. */
     removedTokens: number;
-    /** In-app copies saved — one per user recipient. Token-addressed sends have no user, so 0. */
+    /**
+     * In-app copies saved — one per user recipient (new or updated). 0 for token-addressed sends,
+     * which have no user, and when `persist` is false.
+     */
     stored: number;
+    /** Of `stored`, how many refreshed an existing copy of the same notification instead of adding one. */
+    updated: number;
     /** Users skipped (nothing pushed or stored) because they were already viewing the notification's `link`. */
     suppressed: number;
     error?: { code: NotificationErrorCode; message: string };
@@ -137,7 +163,7 @@ const DEAD_TOKEN_ERROR_CODES = new Set([
 ]);
 
 function result(partial: Partial<SendNotificationResult> = {}): SendNotificationResult {
-    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, suppressed: 0, ...partial };
+    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, updated: 0, suppressed: 0, ...partial };
 }
 
 function failure(code: NotificationErrorCode, message: string, partial: Partial<SendNotificationResult> = {}) {
@@ -181,7 +207,8 @@ async function resolveTokens(input: ValidatedNotificationInput, userIds: string[
     return getTokensForUsers(userIds);
 }
 
-function buildPayload(input: ValidatedNotificationInput): NotificationPayload {
+/** `key` is the identity of the stored copy — pass it only when one is stored (see NotificationPayload.key). */
+function buildPayload(input: ValidatedNotificationInput, key?: string): NotificationPayload {
     const payload: NotificationPayload = {
         v: NOTIFICATION_PAYLOAD_VERSION,
         id: randomUUID(),
@@ -194,6 +221,7 @@ function buildPayload(input: ValidatedNotificationInput): NotificationPayload {
     if (input.icon) payload.icon = input.icon;
     if (input.image) payload.image = input.image;
     if (input.tag) payload.tag = input.tag;
+    if (key) payload.key = key;
     if (input.data) {
         payload.data = Object.fromEntries(Object.entries(input.data).map(([key, value]) => [key, String(value)]));
     }
@@ -297,13 +325,17 @@ async function sendPush(
     return result(summary);
 }
 
-/** The in-app copy for the notification list. Independent of push, so it never throws. */
-async function saveInAppCopies(userIds: string[], payload: NotificationPayload) {
+/**
+ * The in-app copy for the notification list: created, or updated when the user already has this
+ * notification. Independent of push, so it never throws.
+ */
+async function saveInAppCopies(userIds: string[], key: string, payload: NotificationPayload) {
     try {
-        return { stored: await saveToInbox(userIds, payload), ok: true };
+        const { created, updated } = await saveToInbox(userIds, key, payload);
+        return { stored: created + updated, updated, ok: true };
     } catch (error) {
         console.error('[notification] Could not save the in-app notification:', error);
-        return { stored: 0, ok: false };
+        return { stored: 0, updated: 0, ok: false };
     }
 }
 
@@ -317,8 +349,11 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     }
     const input = parsed.data;
 
-    // 2. Build the payload once; every device (and the in-app copy) gets the same content.
-    const payload = buildPayload(input);
+    // 2. Build the payload once; every device (and the in-app copy) gets the same content. A notification
+    //    that is stored carries the identity of its stored copy, so a click can find and clear it.
+    const addressed = recipientUserIds(input);
+    const key = input.persist && addressed.length > 0 ? notificationKey(input) : undefined;
+    const payload = buildPayload(input, key);
     const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
         const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
@@ -327,15 +362,18 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     }
 
     // 3. Leave out the users who are already looking at what the notification is about.
-    const addressed = recipientUserIds(input);
     const userIds = await withoutViewers(input, addressed);
     const suppressed = addressed.length - userIds.length;
     if (addressed.length > 0 && userIds.length === 0) return result({ suppressed });
 
     // 4. Push and in-app copy are independent: neither waits for, or fails because of, the other.
-    const [push, inApp] = await Promise.all([sendPush(input, userIds, payload), saveInAppCopies(userIds, payload)]);
+    const noCopy = { stored: 0, updated: 0, ok: true };
+    const [push, inApp] = await Promise.all([
+        sendPush(input, userIds, payload),
+        key ? saveInAppCopies(userIds, key, payload) : noCopy,
+    ]);
 
-    const outcome = { ...push, stored: inApp.stored, suppressed };
+    const outcome = { ...push, stored: inApp.stored, updated: inApp.updated, suppressed };
     if (!inApp.ok && push.success) {
         return failure('INBOX_FAILED', 'The notification was sent but could not be saved to the in-app list.', outcome);
     }

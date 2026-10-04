@@ -45,6 +45,9 @@ export const sendNotificationSchema = z
         // Delivery overrides (defaults come from NOTIFICATION_TYPE_CONFIG)
         urgency: z.enum(['very-low', 'low', 'normal', 'high']).optional(),
         ttlSeconds: z.number().int().min(0).max(MAX_TTL_SECONDS).optional(),
+
+        // Keep a copy in the in-app list (Firestore `Notification` collection)? Delivery-only when false.
+        persist: z.boolean().default(true),
     })
     .refine(
         (input) => [input.userId, input.userIds, input.token, input.tokens].filter((r) => r !== undefined).length === 1,
@@ -68,6 +71,16 @@ export const markReadSchema = z.union([
 ]);
 
 export type MarkReadInput = z.infer<typeof markReadSchema>;
+
+/**
+ * Body of POST /api/notification/handled: the user clicked the delivered notification whose identity
+ * is `key` (NotificationPayload.key — a sha256 hex string, see lib/identity.server.ts).
+ */
+export const handledSchema = z.strictObject({
+    key: z.string().regex(/^[a-f0-9]{64}$/, 'Invalid notification key'),
+});
+
+export type HandledInput = z.infer<typeof handledSchema>;
 
 /**
  * Body of POST /api/notification/context: this tab (`sessionId`) is now showing `link` — an internal
