@@ -1,30 +1,34 @@
-import { Award, BookOpen, Calendar, Clock, Banknote, Mail, Users } from 'lucide-react'
+import { Award, Calendar, CalendarCheck, CalendarX, GraduationCapIcon, MailIcon } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getUser } from '@/lib/data/users'
-import { getMoney, getTeacherFamilies } from '@/lib/data/families'
-import { getLessons } from '@/lib/data/lessons'
-import { getTeacherOverview } from '@/lib/data/home-data'
-import TeacherRateBadge from '@/components/dashboard/teachers/MoneyPerLessonView'
-import TeacherSectionNav from '@/components/dashboard/teachers/TeacherSectionNav'
+import { getFamilyOverview } from '@/lib/data/home-data'
 import StatTile from '../users/StatTile'
+import { DURATION_MAP } from '@/components/lesson/LessonOptions'
+import { getUser } from '@/lib/data/users'
+import { getTeacherFamilies } from '@/lib/data/families'
+import { getLessons } from '@/lib/data/lessons'
+import { formatWhen } from '@/components/home/RecentLessons'
+import FamilySectionNav from './FamilySectionNav'
 /**
  * Profile card + stats + section nav. Fetched here (not in layout.tsx) so the
  * layout can render instantly and stream this block behind a skeleton.
  */
-const TeacherDetailsHeader = async ({ teacherId }: { teacherId: string }) => {
-    const [{ data }, totalFamilies, totalLessons, { money }, overview] = await Promise.all([
-        getUser(teacherId, ['id', 'name', 'email', 'subject']),
-        getTeacherFamilies({ filter: { where: [{ key: 'teacherId', value: teacherId }], justCount: true } }),
-        getLessons({ filter: { where: [{ key: 'teacherId', value: teacherId }], justCount: true } }),
-        getMoney(teacherId),
-        getTeacherOverview(teacherId),
+const FamilyDetailsHeader = async ({ familyId }: { familyId: string }) => {
+    const [{ data }, totalTeachers, totalLessons, overview] = await Promise.all([
+        getUser(familyId, ['id', 'name', 'email', 'subject']),
+        getTeacherFamilies({ filter: { where: [{ key: 'familyId', value: familyId }], justCount: true } }),
+        getLessons({ filter: { where: [{ key: 'familyId', value: familyId }], justCount: true } }),
+        getFamilyOverview(familyId),
     ])
 
-    const familiesCount = totalFamilies?.count ?? 0
+    const next = data?.overview;
+    const nextDuration = next ? DURATION_MAP[String(next.duration)] : null;
+
+    const teacherCount = totalTeachers?.count ?? 0
     const lessonsCount = totalLessons?.count ?? 0
     const month = overview.success ? overview.data : null
-    const hours = month ? `${(month.minutesThisMonth / 60).toFixed(1)}h` : '—'
+    const hours = month ? `${(month.lessonsThisMonth / 60).toFixed(1)}h` : '—'
+
 
     return (
         <section className="space-y-6">
@@ -54,7 +58,7 @@ const TeacherDetailsHeader = async ({ teacherId }: { teacherId: string }) => {
                         <div className=" text-sm text-muted-foreground">
                             <p className="flex items-center gap-1.5">
                                 <Award className="h-4 w-4 text-brand" />
-                                {data?.subject ? `${data.subject} Teacher` : 'Teacher'}
+                                {data?.subject ? `${data.subject} Family` : 'Family'}
                             </p>
                             <p>
                                 {data?.email && (
@@ -62,7 +66,7 @@ const TeacherDetailsHeader = async ({ teacherId }: { teacherId: string }) => {
                                         href={`mailto:${data.email}`}
                                         className="flex min-w-0 items-center gap-1.5 transition-colors hover:text-foreground"
                                     >
-                                        <Mail className="h-3.5 w-3.5 shrink-0" />
+                                        <MailIcon className="h-3.5 w-3.5 shrink-0" />
                                         <span className="truncate">{data.email}</span>
                                     </a>
                                 )}
@@ -70,34 +74,35 @@ const TeacherDetailsHeader = async ({ teacherId }: { teacherId: string }) => {
                         </div>
                     </div>
 
-                    <div className="sm:shrink-0">
-                        <TeacherRateBadge teacherId={teacherId} initialMoney={money as any} />
-                    </div>
                 </div>
             </Card>
-
+            <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6 flex items-center gap-4">
+                <div className={`p-3 rounded-xl border shrink-0 ${next ? 'bg-brand-soft text-brand border-brand/20' : 'bg-muted text-muted-foreground border-transparent'}`}>
+                    {next ? <CalendarCheck className="h-5 w-5" /> : <CalendarX className="h-5 w-5" />}
+                </div>
+                <div className="min-w-0">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Next Lesson</p>
+                    {next ? (
+                        <p className="text-sm sm:text-base font-bold text-foreground mt-0.5">
+                            {next.student} with {next.teacher?.name ?? 'your teacher'} · {formatWhen(next.classDate)}
+                            {nextDuration && <span className="text-muted-foreground font-medium"> · {nextDuration.label}</span>}
+                        </p>
+                    ) : (
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                            No upcoming lesson scheduled yet — message your teacher to set one up.
+                        </p>
+                    )}
+                </div>
+            </div>
             {/* Stats */}
             <div className="grid grid-cols-2 sm-grid-cols-3 md-grid-cols-4 lg-grid-cols-5 gap-3">
-                <StatTile icon={Users} label="Families" value={String(familiesCount)} />
-                <StatTile icon={BookOpen} label="Lessons" value={String(lessonsCount)} hint="All time" />
-                <StatTile
-                    icon={Calendar}
-                    label="Lessons This Month"
-                    value={month ? String(month.lessonsThisMonth) : '—'}
-                />
-                <StatTile icon={Clock} label="Hours Taught" value={hours} hint="This month" />
-                <StatTile
-                    icon={Banknote}
-                    label="Earnings"
-                    value={month ? `$${month.moneyThisMonth.toLocaleString('en-US')}` : '—'}
-                    hint="This month"
-                    className="col-span-2 sm:col-span-1"
-                />
+                <StatTile icon={Calendar} label="Lessons This Month" value={data ? String(hours) : '—'} />
+                <StatTile icon={GraduationCapIcon} label="Your Teachers" value={data ? String(teacherCount) : '—'} />
             </div>
 
-            <TeacherSectionNav teacherId={teacherId} totalLessons={lessonsCount} totalFamilies={familiesCount} />
+            <FamilySectionNav familyId={familyId} totalLessons={lessonsCount} totalTeachers={teacherCount} />
         </section>
     )
 }
 
-export default TeacherDetailsHeader
+export default FamilyDetailsHeader

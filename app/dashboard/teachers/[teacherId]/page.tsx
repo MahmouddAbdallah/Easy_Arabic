@@ -6,10 +6,10 @@ type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 async function LessonsPage({ params, searchParams }: {
     searchParams: SearchParams,
-    params: Promise<{ id: string }>
+    params: Promise<{ teacherId: string }>
 }) {
     const search = await searchParams;
-    const { id } = await params;
+    const { teacherId } = await params;
 
     // Pagination
     const page = parseInt((search.page as string) || "1", 10);
@@ -25,7 +25,7 @@ async function LessonsPage({ params, searchParams }: {
     const familyId = search.familyId as string | undefined;
 
     const where = [
-        { key: 'teacherId', value: id },
+        { key: 'teacherId', value: teacherId },
         status && { key: 'status', value: status },
         teacherReward && { key: 'TeacherReward', value: teacherReward },
         duration && { key: 'duration', value: duration },
@@ -52,6 +52,7 @@ async function LessonsPage({ params, searchParams }: {
         <div className="space-y-6">
             <LessonsDashboardFilter />
             <LessonsTable
+                role="teacher"
                 count={count}
                 data={data}
             />

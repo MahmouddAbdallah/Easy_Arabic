@@ -36,7 +36,7 @@ export const navigationItems: NavItem[] = [
     },
     {
         title: "Teachers",
-        href: "/dashboard/teacher",
+        href: "/dashboard/teachers",
         icon: GraduationCap,
     },
     {

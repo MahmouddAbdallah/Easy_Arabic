@@ -10,13 +10,13 @@ import { TeacherFamilyType, useTeacherFamilyStore } from '@/stores/admin/teacher
 const DeleteFamily = ({ teacherFamily }: { teacherFamily: TeacherFamilyType }) => {
     const [Open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const { id } = useParams();
+    const { teacherId } = useParams();
     const removeFamily = useTeacherFamilyStore((state) => state.removeTeacherFamily);
 
     const confirmRemoveStudent = async () => {
         try {
             setLoading(true);
-            await axios.delete(`/api/teacher/${id}/family/${teacherFamily?.family?.id}`);
+            await axios.delete(`/api/teacher/${teacherId}/family/${teacherFamily?.family?.id}`);
             toast.success('Family removed successfully');
             removeFamily(teacherFamily?.id);
             setOpen(false);

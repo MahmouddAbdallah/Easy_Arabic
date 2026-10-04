@@ -27,7 +27,7 @@ interface NavItem {
 const getNavItems = (user: NavLinksProps['user']): NavItem[] => [
     { label: "Home", href: "/", icon: Home, visible: true },
     { label: "Contact", href: "/contact", icon: Mail, visible: !user },
-    { label: "Lessons", href: "/lesson", icon: BookOpen, visible: user?.role === 'teacher' || user?.role === 'admin' },
+    { label: "Lessons", href: "/lesson", icon: BookOpen, visible: !!user },
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, visible: user?.role === 'admin' },
     { label: "Chat", href: "/chat", icon: MessageSquare, visible: !!user, unread: true },
 ]
@@ -68,20 +68,20 @@ export const NavLinks = ({ user, onItemClick, variant = 'desktop' }: NavLinksPro
                                 focusRing,
                                 isMobile
                                     ? cn(
-                                          "h-12 w-full gap-3 rounded-lg px-3 text-[0.9375rem] font-medium",
-                                          active
-                                              ? // Gold marker on the leading edge, as in the dashboard sidebar.
-                                                "bg-brand-soft text-brand before:absolute before:inset-y-2.5 before:-start-4 before:w-[3px] before:rounded-e-full before:bg-gold before:content-['']"
-                                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                      )
+                                        "h-12 w-full gap-3 rounded-lg px-3 text-[0.9375rem] font-medium",
+                                        active
+                                            ? // Gold marker on the leading edge, as in the dashboard sidebar.
+                                            "bg-brand-soft text-brand before:absolute before:inset-y-2.5 before:-inset-s-4 before:w-0.75 before:rounded-e-full before:bg-gold before:content-['']"
+                                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    )
                                     : cn(
-                                          "h-9 gap-1.5 rounded-lg px-3.5 text-sm font-medium",
-                                          // Gold marker that sits on the header's bottom border (header is 64px, link 36px).
-                                          "after:pointer-events-none after:absolute after:inset-x-3.5 after:-bottom-[15px] after:h-0.5 after:rounded-full after:bg-gold after:content-[''] after:transition-transform after:duration-200 motion-reduce:after:transition-none",
-                                          active
-                                              ? "text-brand after:scale-x-100"
-                                              : "text-muted-foreground after:scale-x-0 hover:bg-muted hover:text-foreground"
-                                      )
+                                        "h-9 gap-1.5 rounded-lg px-3.5 text-sm font-medium",
+                                        // Gold marker that sits on the header's bottom border (header is 64px, link 36px).
+                                        "after:pointer-events-none after:absolute after:inset-x-3.5 after:-bottom-3.75 after:h-0.5 after:rounded-full after:bg-gold after:content-[''] after:transition-transform after:duration-200 motion-reduce:after:transition-none",
+                                        active
+                                            ? "text-brand after:scale-x-100"
+                                            : "text-muted-foreground after:scale-x-0 hover:bg-muted hover:text-foreground"
+                                    )
                             )}
                         >
                             {isMobile && <Icon aria-hidden className="size-5 shrink-0" />}

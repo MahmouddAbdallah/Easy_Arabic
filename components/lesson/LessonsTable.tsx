@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Calendar as CalendarIcon, Users, Edit3, Trash2, HelpCircle, UserIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Users, Edit3, Trash2, HelpCircle, UserIcon, GraduationCap } from "lucide-react";
 import { format } from "date-fns";
 import { DURATION_OPTIONS, OptionItem, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
 import PaginationPage from '../PaginationPage';
@@ -14,13 +14,15 @@ import { Dialog, DialogContent, } from '../ui/dialog';
 import { LessonItem } from '@/types/lessonTypes';
 import { DeleteLesson } from './DeleteLesson';
 import { useLessonStore } from '@/stores/lessons';
+import { clsx } from 'cn';
 
 interface LessonsTableProps {
     data: LessonItem[];
     count: number;
+    role: 'teacher' | 'family'
 }
 
-const LessonsTable: React.FC<LessonsTableProps> = ({ data, count = 0 }) => {
+const LessonsTable: React.FC<LessonsTableProps> = ({ data, count = 0, role = 'teacher' }) => {
     const [isEdit, setIsEdit] = useState(false);
     const [isDelete, setIsDelete] = useState(false);
     const [lesson, setLesson] = useState<Partial<LessonItem>>({})
@@ -62,19 +64,23 @@ const LessonsTable: React.FC<LessonsTableProps> = ({ data, count = 0 }) => {
                     <Table>
                         <TableHeader className="bg-muted/40">
                             <TableRow className="hover:bg-transparent border-border/60">
-                                <TableHead className="w-45 text-xs font-semibold uppercase tracking-wider">Family</TableHead>
+                                <TableHead className="w-45 text-xs font-semibold uppercase tracking-wider">
+                                    {role == 'teacher' ? 'Family' : 'Teacher'}
+                                </TableHead>
                                 <TableHead className="w-45 text-xs font-semibold uppercase tracking-wider">Student Name</TableHead>
                                 <TableHead className="text-xs font-semibold uppercase tracking-wider">Status</TableHead>
                                 <TableHead className="text-xs font-semibold uppercase tracking-wider">Reward</TableHead>
                                 <TableHead className="text-xs font-semibold uppercase tracking-wider">Duration</TableHead>
                                 <TableHead className="text-xs font-semibold uppercase tracking-wider">Date</TableHead>
-                                <TableHead className="text-right text-xs font-semibold uppercase tracking-wider">Actions</TableHead>
+                                <TableHead className={clsx(role == 'family' ? 'hidden' : "text-right text-xs font-semibold uppercase tracking-wider")}>
+                                    Actions
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {lessons?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-32 text-center text-xs text-muted-foreground">
+                                    <TableCell colSpan={7} className="h-32 text-center text-xs text-muted-foreground">
                                         No lessons found.
                                     </TableCell>
                                 </TableRow>
@@ -95,29 +101,55 @@ const LessonsTable: React.FC<LessonsTableProps> = ({ data, count = 0 }) => {
                                     return (
                                         <TableRow key={lesson.id} className="hover:bg-muted/30 transition-colors border-border/50 group">
                                             {/* Family / Student */}
-                                            <TableCell className="font-medium text-xs py-3.5">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
-                                                        <Users className="h-3.5 w-3.5" />
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span
-                                                            className="font-semibold text-foreground truncate max-w-40"
-                                                            title={lesson.family?.name || 'Family Name'}
-                                                        >
-                                                            {lesson.family?.name || 'Family Name'}
-                                                        </span>
-                                                        {lesson.family?.email && (
+                                            {role == 'teacher' ?
+                                                <TableCell className="font-medium text-xs py-3.5">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
+                                                            <Users className="h-3.5 w-3.5" />
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
                                                             <span
-                                                                className="text-[11px] text-muted-foreground truncate max-w-40"
-                                                                title={lesson.family.email}
+                                                                className="font-semibold text-foreground truncate max-w-40"
+                                                                title={lesson.family?.name || 'Family Name'}
                                                             >
-                                                                {lesson.family.email}
+                                                                {lesson.family?.name || 'Family Name'}
                                                             </span>
-                                                        )}
+                                                            {lesson.family?.email && (
+                                                                <span
+                                                                    className="text-[11px] text-muted-foreground truncate max-w-40"
+                                                                    title={lesson.family.email}
+                                                                >
+                                                                    {lesson.family.email}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </TableCell>
+                                                </TableCell>
+                                                :
+                                                <TableCell className="font-medium text-xs py-3.5">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
+                                                            <GraduationCap className="h-3.5 w-3.5" />
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span
+                                                                className="font-semibold text-foreground truncate max-w-40"
+                                                                title={lesson.teacher?.name || 'Teacher Name'}
+                                                            >
+                                                                {lesson.teacher?.name || 'Teacher Name'}
+                                                            </span>
+                                                            {lesson.teacher?.email && (
+                                                                <span
+                                                                    className="text-[11px] text-muted-foreground truncate max-w-40"
+                                                                    title={lesson.teacher.email}
+                                                                >
+                                                                    {lesson.teacher.email}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                            }
 
                                             {/* Student Name */}
                                             <TableCell className="py-3.5">
@@ -171,7 +203,7 @@ const LessonsTable: React.FC<LessonsTableProps> = ({ data, count = 0 }) => {
                                             </TableCell>
 
                                             {/* Actions */}
-                                            <TableCell className="text-right py-3.5">
+                                            <TableCell className={clsx(role == 'family' ? 'hidden' : "text-right py-3.5")}>
                                                 <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                                     <Button
                                                         variant="ghost"

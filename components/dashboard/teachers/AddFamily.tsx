@@ -28,7 +28,7 @@ const AddFamily = () => {
     const addTeacherFamily = useTeacherFamilyStore((state) => state.addTeacherFamily);
     const teacherFamilies = useTeacherFamilyStore((state) => state.teacherFamilies);
 
-    const { id } = useParams()
+    const { teacherId } = useParams()
 
     useEffect(() => {
         if (!search.trim()) {
@@ -62,9 +62,9 @@ const AddFamily = () => {
     const handleDone = async () => {
         try {
             setLoading(true)
-            const { data } = await axios.post(`/api/teacher/${id}/family`, {
+            const { data } = await axios.post(`/api/teacher/${teacherId}/family`, {
                 familiesIds: selectedUserIds,
-                teacherId: id,
+                teacherId: teacherId,
             })
             data.teacherFamilies.forEach((teacherFamily: any) => {
                 addTeacherFamily(teacherFamily);

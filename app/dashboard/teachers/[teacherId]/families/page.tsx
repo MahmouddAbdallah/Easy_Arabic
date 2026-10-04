@@ -3,16 +3,16 @@ import { getFamiliesOfTeacher } from '@/lib/data/users';
 
 
 const page = async ({ params }: {
-    params: Promise<{ id: string }>,
+    params: Promise<{ teacherId: string }>,
 }) => {
-    const { id } = await params;
+    const { teacherId } = await params;
 
     const { data } = await getFamiliesOfTeacher({
         filter: {
             where: [
                 {
                     key: "teacherId",
-                    value: id
+                    value: teacherId
                 }
             ],
             select: ['id'],

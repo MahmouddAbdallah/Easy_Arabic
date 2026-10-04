@@ -4,10 +4,17 @@ import { LessonsFilter } from '@/components/lesson/LessonsFilter';
 import Link from 'next/link';
 import { getLessons } from "@/lib/data/lessons";
 import LessonsTable from "@/components/lesson/LessonsTable";
+import { authorization } from "@/lib/verifyAuth";
+import { redirect } from "next/navigation";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function LessonsPage({ searchParams }: { searchParams: SearchParams }) {
+
+    const { user } = await authorization()
+    if (!user) {
+        return redirect('/sign-in')
+    }
     const params = await searchParams;
 
     // Pagination
@@ -24,6 +31,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     const familyId = params.familyId as string | undefined;
 
     const where = [
+        { key: user.role == 'teacher' ? 'teacherId' : 'familyId', value: user.id },
         status && { key: 'status', value: status },
         teacherReward && { key: 'TeacherReward', value: teacherReward },
         duration && { key: 'duration', value: duration },
@@ -40,7 +48,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
             select: ['id', 'TeacherReward', 'classDate', 'duration', 'status', 'student'],
             include: {
                 select: ['id', 'name', 'email'],
-                value: 'family'
+                value: user.role == 'family' ? 'teacher' : 'family'
             },
             orderBy: { 'createdAt': "desc" }
         }
@@ -68,6 +76,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
             </div>
             <LessonsFilter />
             <LessonsTable
+                role={user.role == 'teacher' ? 'teacher' : "family"}
                 count={count}
                 data={data}
             />

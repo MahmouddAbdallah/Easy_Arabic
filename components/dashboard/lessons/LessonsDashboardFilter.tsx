@@ -34,7 +34,7 @@ const EMPTY_VALUES: FilterFormValues = {
   familyId: undefined,
 };
 
-export const LessonsDashboardFilter = () => {
+export const LessonsDashboardFilter = ({ hiddenFamily }: { hiddenFamily?: boolean }) => {
   const [families, setFamilies] = useState<userType[]>([]);
 
   const router = useRouter();
@@ -247,11 +247,11 @@ export const LessonsDashboardFilter = () => {
               <div className="p-3 pt-2 border-t border-border/60 bg-muted/20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {/* Select Family */}
-                  <SelectFamiliesLessonDashboard
+                  {!hiddenFamily && <SelectFamiliesLessonDashboard
                     isFilter={true}
                     setFamilies={setFamilies}
                     families={families}
-                  />
+                  />}
 
                   {/* Date From */}
                   <div className="space-y-1">

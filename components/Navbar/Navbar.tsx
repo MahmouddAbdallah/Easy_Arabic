@@ -90,7 +90,7 @@ const Navbar = () => {
                 href="#main"
                 onClick={skipToContent}
                 // Parked above the viewport until focused. (`sr-only` + `focus:not-sr-only` would reset the padding.)
-                className="fixed start-4 top-3 z-[60] -translate-y-[calc(100%+1.5rem)] rounded-lg bg-card px-4 py-2 text-sm font-medium text-foreground shadow-lg ring-2 ring-brand transition-transform duration-150 focus:translate-y-0 motion-reduce:transition-none"
+                className="fixed inset-s-4 top-3 z-60 -translate-y-[calc(100%+1.5rem)] rounded-lg bg-card px-4 py-2 text-sm font-medium text-foreground shadow-lg ring-2 ring-brand transition-transform duration-150 focus:translate-y-0 motion-reduce:transition-none"
             >
                 Skip to content
             </a>

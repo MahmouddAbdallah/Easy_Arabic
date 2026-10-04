@@ -3,10 +3,10 @@ import TeacherDetailsHeader from '@/components/dashboard/teachers/TeacherDetails
 import { TeacherDetailsHeaderSkeleton } from '@/components/dashboard/teachers/TeacherSkeletons';
 
 const RootLayout = async ({ children, params }: {
-    params: Promise<{ id: string }>,
+    params: Promise<{ teacherId: string }>,
     children: React.ReactNode;
 }) => {
-    const { id } = await params;
+    const { teacherId } = await params;
 
     // The layout itself never waits on data: the profile/stats/nav block
     // streams in behind its own skeleton, and `children` is covered by the
@@ -14,7 +14,7 @@ const RootLayout = async ({ children, params }: {
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
             <Suspense fallback={<TeacherDetailsHeaderSkeleton />}>
-                <TeacherDetailsHeader id={id} />
+                <TeacherDetailsHeader teacherId={teacherId} />
             </Suspense>
             {children}
         </div>

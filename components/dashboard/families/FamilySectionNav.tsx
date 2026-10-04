@@ -1,13 +1,13 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Users } from 'lucide-react'
+import { BookOpen, GraduationCap } from 'lucide-react'
 import { cn } from 'cn'
 
-interface TeacherSectionNavProps {
-    teacherId: string
+interface FamilySectionNavProps {
+    familyId: string
     totalLessons: number
-    totalFamilies: number
+    totalTeachers: number
 }
 
 /**
@@ -15,16 +15,15 @@ interface TeacherSectionNavProps {
  * middle-click and browser back/forward all work and the active state always
  * mirrors the URL (the old uncontrolled Tabs drifted out of sync on back).
  */
-const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies }: TeacherSectionNavProps) => {
+const FamilySectionNav = ({ familyId, totalLessons, totalTeachers }: FamilySectionNavProps) => {
     const pathname = usePathname()
-    const basePath = `/dashboard/teachers/${teacherId}`
-    const onFamilies = pathname.startsWith(`${basePath}/families`)
+    const basePath = `/dashboard/families/${familyId}`
+    const onTeachers = pathname.startsWith(`${basePath}/teachers`)
 
     const items = [
-        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onFamilies },
-        { href: `${basePath}/families`, label: 'families', count: totalFamilies, icon: Users, active: onFamilies },
+        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onTeachers },
+        { href: `${basePath}/teachers`, label: 'teachers', count: totalTeachers, icon: GraduationCap, active: onTeachers },
     ]
-
     return (
         <nav
             aria-label="Teacher sections"
@@ -61,4 +60,4 @@ const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies }: TeacherSe
     )
 }
 
-export default TeacherSectionNav
+export default FamilySectionNav

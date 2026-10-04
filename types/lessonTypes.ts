@@ -22,6 +22,7 @@ export interface LessonItem {
     id: string;
     student?: string;
     family?: Partial<userType>;
+    teacher?: Partial<userType>;
     status: string;
     TeacherReward: string;
     duration: string;
