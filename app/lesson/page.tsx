@@ -67,12 +67,14 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
                         Overview, track, and filter all scheduled and completed lessons.
                     </p>
                 </div>
-                <Link href={'/lesson/new-lesson'}>
-                    <Button size="sm" className="h-9 text-xs font-semibold gap-2 rounded-md shadow-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-all self-start sm:self-auto">
-                        <Plus className="h-4 w-4" />
-                        <span>New Lesson</span>
-                    </Button>
-                </Link>
+                {user.role != 'family'
+                    && <Link href={'/lesson/new-lesson'}>
+                        <Button size="sm" className="h-9 text-xs font-semibold gap-2 rounded-md shadow-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-all self-start sm:self-auto">
+                            <Plus className="h-4 w-4" />
+                            <span>New Lesson</span>
+                        </Button>
+                    </Link>
+                }
             </div>
             <LessonsFilter />
             <LessonsTable
