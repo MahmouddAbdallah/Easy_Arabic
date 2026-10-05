@@ -171,9 +171,9 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                     className={
                         isVideo
                             ? cn(
-                                  "absolute inset-0 z-0 size-full object-cover transition-opacity duration-300",
-                                  showRemoteVideo ? "opacity-100" : "opacity-0"
-                              )
+                                "absolute inset-0 z-0 size-full object-cover transition-opacity duration-300",
+                                showRemoteVideo ? "opacity-100" : "opacity-0"
+                            )
                             : "pointer-events-none absolute size-px opacity-0"
                     }
                 />

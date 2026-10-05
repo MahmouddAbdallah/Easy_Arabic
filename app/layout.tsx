@@ -20,6 +20,7 @@ export const metadata: Metadata = {
     icon: "./favicon.svg"
   }
 };
+export const dynamic = 'force-dynamic';
 
 export default async function RootLayout({
   children,

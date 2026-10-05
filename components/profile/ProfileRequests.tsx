@@ -92,7 +92,7 @@ function Quote({ label, tone, children }: { label: string; tone?: 'admin'; child
     return (
         <div className={tone === 'admin' ? 'rounded-lg border border-brand/20 bg-brand-soft/60 p-3' : 'rounded-lg bg-muted/50 p-3'}>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm">{children}</p>
+            <p className="mt-1 whitespace-pre-wrap wrap-break-word text-sm">{children}</p>
         </div>
     );
 }
@@ -137,7 +137,13 @@ function PendingRequest({ request }: { request: CustomerRequest }) {
 
 function RequestForm({ profile, requestableFields }: { profile: OwnProfile; requestableFields: ProfileField[] }) {
     const router = useRouter();
-    const defaults: FormValues = { name: profile.name, subject: profile.subject, email: profile.email, phone: profile.phone, reason: '' };
+    const defaults: FormValues = {
+        name: profile.name,
+        subject: profile.subject,
+        email: profile.email,
+        phone: profile.phone ?? '',
+        reason: ''
+    };
     const {
         register,
         handleSubmit,

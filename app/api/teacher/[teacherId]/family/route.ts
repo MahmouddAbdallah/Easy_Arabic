@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
             return fail(404, "TEACHER_NOT_FOUND", "Teacher not found");
         }
 
-        const families: { id: string; email: string; name: string; phone: string; status: string }[] = [];
+        const families: { id: string; email: string; name: string; phone?: string; status: string }[] = [];
 
         for (const id of familiesIds) {
             const family = await db.orm.public.User
@@ -61,7 +61,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tea
                 );
             }
 
-            families.push({ id: family.id, email: family.email, name: family.name, phone: family.phone, status: family.status });
+            families.push({
+                id: family.id,
+                name: family.name,
+                email: family.email,
+                ...(family.phone && { phone: family.phone }),
+                status: family.status
+            });
         }
 
         const teacherFamilies = [];

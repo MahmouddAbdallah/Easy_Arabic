@@ -89,7 +89,7 @@ const ADMIN_PAGE_SIZE = 10;
 export type OwnProfile = {
     name: string;
     email: string;
-    phone: string;
+    phone?: string;
     subject: string;
     /** Join date. */
     createdAt: string;
@@ -144,7 +144,13 @@ async function loadOwnProfile(userId: string) {
     if (!user || user.role !== 'family') return null;
 
     // Explicit whitelist: a column added to `User` later can never leak to the customer by accident.
-    const profile: OwnProfile = { name: user.name, email: user.email, phone: user.phone, subject: user.subject, createdAt: iso(user.createdAt) };
+    const profile: OwnProfile = {
+        name: user.name,
+        email: user.email,
+        ...(user.phone && { phone: user.phone }),
+        subject: user.subject,
+        createdAt: iso(user.createdAt)
+    };
     const eligibility = evaluateProfileEligibility({ createdAt: user.createdAt, teacherCount: teachers.count });
     return { profile, eligibility };
 }
@@ -260,7 +266,13 @@ export async function cancelChangeRequest(userId: string, requestId: string): Pr
 /* ───────────────────────────────  Admin side  ─────────────────────────────── */
 
 export type AdminRequest = CustomerRequest & {
-    family: { id: string; name: string; email: string; phone: string; subject: string } | null;
+    family: {
+        id: string;
+        name: string;
+        email: string;
+        phone?: string | undefined;
+        subject: string
+    } | null;
     reviewerName: string | null;
 };
 
@@ -304,7 +316,10 @@ export async function listProfileChangeRequests(opts: { status?: RequestStatus |
 
     const requests: AdminRequest[] = rows.map((row) => ({
         ...toCustomerRequest(row as Parameters<typeof toCustomerRequest>[0]),
-        family: row.family ?? null,
+        family: row.family ? {
+            ...row.family,
+            phone: row.family.phone || ''
+        } : null,
         reviewerName: row.reviewer?.name ?? null,
     }));
     return ok({ requests, count: count.count, pageSize: ADMIN_PAGE_SIZE, totals });

@@ -32,7 +32,7 @@ export function FieldRow({ icon: Icon, label, kind, htmlFor, hint, children }: {
 /** A value that cannot be edited here. A plain element (not a disabled input) so it stays selectable. */
 export function StaticValue({ children, id }: { children: ReactNode; id?: string }) {
     return (
-        <div id={id} className="min-h-8 break-words rounded-lg bg-muted/60 px-2.5 py-1.5 text-sm text-foreground">
+        <div id={id} className="min-h-8 wrap-break-word rounded-lg bg-muted/60 px-2.5 py-1.5 text-sm text-foreground">
             {children}
         </div>
     );
