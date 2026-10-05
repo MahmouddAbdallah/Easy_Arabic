@@ -122,7 +122,7 @@ const UsersTable: React.FC<UsersTableProps> = ({ data, count, role, pageSize = 1
                                             </p>
                                             <p className="flex items-center gap-1.5">
                                                 <PhoneIcon className="size-3.5 shrink-0 text-brand/70" />
-                                                <span className="font-mono">{user.phone}</span>
+                                                <span className="font-mono">{user.phone ?? 'No Phone'}</span>
                                             </p>
                                         </div>
                                     </TableCell>

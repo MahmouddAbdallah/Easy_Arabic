@@ -3,10 +3,14 @@ import { create } from 'zustand'
 
 export type UserState = {
     users: userType[]
+    teachers: userType[]
+    families: userType[]
 }
 
 export type UserActions = {
     setUsers: (users: userType[]) => void
+    setTeachers: (teachers: userType[]) => void
+    setFamilies: (families: userType[]) => void
     addUser: (newUser: userType) => void
     updateUser: (id: string, updatedFields: Partial<userType>) => void
     removeUser: (id: string) => void
@@ -18,6 +22,8 @@ export type UserStore = UserState & UserActions
 // Use `create` instead of `createStore`
 export const useUserStore = create<UserStore>()((set) => ({
     users: [],
+    teachers: [],
+    families: [],
 
     setUsers: (users) => set({ users }),
 
@@ -39,4 +45,10 @@ export const useUserStore = create<UserStore>()((set) => ({
         })),
 
     clearUsers: () => set({ users: [] }),
+
+    //Teachers
+    setTeachers: (teachers) => set({ teachers }),
+
+    //Families
+    setFamilies: (families) => set({ families }),
 }))

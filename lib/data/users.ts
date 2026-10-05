@@ -27,7 +27,7 @@ export const getFamiliesOfTeacher: typeof getFamiliesOfTeacherUnguarded = async 
 // Mirror of getFamiliesOfTeacher for the family side: the same TeacherFamily rows,
 // queried by `familyId` (and usually including the `teacher` relation).
 export const getTeachersOfFamily: typeof getTeachersOfFamilyUnguarded = async (args) => {
-    const { error } = await authorization(["admin", "teacher"]);
+    const { error } = await authorization(["admin", "family"]);
     if (error) return FORBIDDEN;
     return getTeachersOfFamilyUnguarded(args);
 };

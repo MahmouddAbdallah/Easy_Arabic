@@ -11,9 +11,9 @@ import { RotateCcw, CalendarIcon, Clock, ChevronDown, Award, Timer, Filter, Slid
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
-import SelectFamilies from './SelectFamilies';
-import clsx from 'clsx';
+import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from '@/components/lesson/LessonOptions';
+import { clsx } from 'cn';
+import SelectUserByRole from '@/components/lesson/SelectUserByRole';
 import { useAppContext } from '../AppContext';
 
 interface FilterFormValues {
@@ -23,6 +23,7 @@ interface FilterFormValues {
   dateFrom: Date | undefined;
   dateTo: Date | undefined;
   familyId: string | undefined;
+  teacherId: string | undefined;
 }
 
 const EMPTY_VALUES: FilterFormValues = {
@@ -32,18 +33,20 @@ const EMPTY_VALUES: FilterFormValues = {
   dateFrom: undefined,
   dateTo: undefined,
   familyId: undefined,
+  teacherId: undefined,
 };
 
 export const LessonsFilter = () => {
-  const { user } = useAppContext();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useAppContext();
 
   const urlDateFrom = searchParams.get('dateFrom');
   const urlDateTo = searchParams.get('dateTo');
 
   const urlFamilyId = searchParams.get('familyId');
+  const urlTeacherId = searchParams.get('teacherId');
 
   const method = useForm<FilterFormValues>({
     defaultValues: {
@@ -53,12 +56,14 @@ export const LessonsFilter = () => {
       dateFrom: urlDateFrom ? new Date(urlDateFrom) : undefined,
       dateTo: urlDateTo ? new Date(urlDateTo) : undefined,
       familyId: urlFamilyId || '',
+      teacherId: urlTeacherId || '',
     },
   });
   const { control, reset, handleSubmit, formState: { isDirty } } = method
   useEffect(() => {
     const from = searchParams.get('dateFrom');
     const to = searchParams.get('dateTo');
+
     reset({
       status: searchParams.get('status') || 'ALL',
       teacherReward: searchParams.get('teacherReward') || 'ALL',
@@ -66,6 +71,7 @@ export const LessonsFilter = () => {
       dateFrom: from ? new Date(from) : undefined,
       dateTo: to ? new Date(to) : undefined,
       familyId: urlFamilyId || '',
+      teacherId: urlTeacherId || '',
     });
   }, [searchParams, reset]);
 
@@ -75,6 +81,7 @@ export const LessonsFilter = () => {
     searchParams.get('dateFrom') ||
     searchParams.get('dateTo') ||
     searchParams.get('familyId') ||
+    searchParams.get('teacherId') ||
     formValues.dateFrom ||
     formValues.dateTo
   );
@@ -244,10 +251,20 @@ export const LessonsFilter = () => {
             <CollapsibleContent className="transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
               <div className="p-3 pt-2 border-t border-border/60 bg-muted/20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {/* Select Family */}
                   {
-                    user?.role != 'family' &&
-                    <SelectFamilies isFilter={true} />}
+                    (pathname.includes('/dashboard/teachers') ||
+                      pathname.includes('/dashboard/families')
+                    ) ?
+                      <SelectUserByRole
+                        role={pathname.includes('families') ? 'teacher' : 'family'}
+                        isFilter={true}
+                      /> :
+                      <SelectUserByRole
+                        isFilter={true}
+                        role={user?.role == 'family' ? 'teacher' : 'family'}
+                      />
+                  }
+
                   {/* Date From */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">

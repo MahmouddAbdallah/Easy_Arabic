@@ -11,6 +11,7 @@ import { CommandMenu } from "./CommandMenu";
 import { NotificationsMenu } from "./NotificationsMenu";
 import { Sidebar } from "./Sidebar";
 import { UserMenu } from "./UserMenu";
+import { usePathname } from "next/navigation";
 
 /** Tailwind's `lg` breakpoint, where the sidebar becomes a permanent rail. */
 const DESKTOP_QUERY = "(min-width: 1024px)";
@@ -28,6 +29,7 @@ function ThemeToggle() {
 
 export function Navbar() {
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const pathname = usePathname();
 
     // Don't leave a modal drawer open over the desktop layout after the window is widened.
     useEffect(() => {
@@ -40,6 +42,7 @@ export function Navbar() {
     }, []);
 
     return (
+        !pathname.includes('chat') &&
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/70 sm:gap-3 sm:px-6 lg:px-8">
             {/* Menu button + slide-in sidebar, below `lg` only. */}
             <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>

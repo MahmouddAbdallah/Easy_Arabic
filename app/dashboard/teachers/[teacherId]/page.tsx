@@ -1,6 +1,6 @@
 import { getLessons } from "@/lib/data/lessons";
 import LessonsTable from "@/components/lesson/LessonsTable";
-import { LessonsDashboardFilter } from '@/components/dashboard/lessons/LessonsDashboardFilter';
+import { LessonsFilter } from '@/components/lesson/LessonsFilter';
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -50,7 +50,7 @@ async function LessonsPage({ params, searchParams }: {
 
     return (
         <div className="space-y-6">
-            <LessonsDashboardFilter />
+            <LessonsFilter />
             <LessonsTable
                 role="teacher"
                 count={count}

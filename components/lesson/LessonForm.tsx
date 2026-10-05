@@ -10,7 +10,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon, Clock, Award, Timer, Save, PlusCircle, Edit3, Loader2Icon } from "lucide-react";
 import { format, startOfDay, subDays } from "date-fns";
 import { clsx } from 'clsx';
-import SelectFamilies from './SelectFamilies';
 import ErrorMsg from '../ErrorMsg';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -18,6 +17,7 @@ import { useAppContext } from '../AppContext';
 import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
 import { LessonItem } from '@/types/lessonTypes';
 import { useLessonStore } from '@/stores/lessons';
+import SelectUserByRole from './SelectUserByRole';
 
 
 export interface LessonFormValues {
@@ -119,7 +119,8 @@ const LessonForm: React.FC<LessonFormProps> = ({
             <CardContent className="py-5 sm:py-6">
                 <FormProvider {...method}>
                     <form onSubmit={onSubmit} className="space-y-5">
-                        <SelectFamilies />
+                        <SelectUserByRole isFilter={false} />
+
                         <div className="space-y-1.5">
                             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                 Lesson Details

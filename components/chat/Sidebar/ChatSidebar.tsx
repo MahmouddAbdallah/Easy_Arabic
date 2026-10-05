@@ -12,6 +12,7 @@ import { firebaseClientDB } from "@/lib/config/firebase-client";
 import ReceiverInfo from "./ReceiverInfo";
 import { getUnreadCount, type UnreadCount } from "../lib/unread";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export interface ChatItemType {
     id: string;
@@ -29,6 +30,7 @@ export function ChatSidebar() {
 
     const { receiverId } = useChat();
     const { user } = useAppContext();
+    const pathname = usePathname();
 
     useEffect(() => {
         if (!user?.id) return;
@@ -85,7 +87,7 @@ export function ChatSidebar() {
                         return (
                             <Link
                                 key={chat?.id}
-                                href={`/chat?receiverId=${receiveId}`}
+                                href={`${pathname}?receiverId=${receiveId}`}
                             >
                                 <ReceiverInfo
                                     receiverId={receiveId as string}

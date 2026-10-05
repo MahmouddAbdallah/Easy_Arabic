@@ -1,12 +1,4 @@
-import {
-    BookOpen,
-    GraduationCap,
-    MessageSquare,
-    PhoneCall,
-    UserPen,
-    Users,
-    type LucideIcon,
-} from "lucide-react";
+import { GraduationCap, MessageSquare, PhoneCall, UserPen, Users, type LucideIcon, } from "lucide-react";
 
 /**
  * Single source of truth for the dashboard's navigation. The sidebar, the navbar
@@ -36,27 +28,18 @@ export const navigationItems: NavItem[] = [
         icon: Users,
     },
     {
-        title: "Profile Requests",
-        href: "/dashboard/profile-requests",
-        icon: UserPen,
-    },
-    {
         title: "Teachers",
         href: "/dashboard/teachers",
         icon: GraduationCap,
     },
     {
-        title: "Lessons",
-        href: "/lesson",
-        icon: BookOpen,
-        subItems: [
-            { title: "All Lessons", href: "/lesson" },
-            { title: "Create Lesson", href: "/lesson/new-lesson" },
-        ],
+        title: "Profile Requests",
+        href: "/dashboard/profile-requests",
+        icon: UserPen,
     },
     {
         title: "Chat",
-        href: "/chat",
+        href: "/dashboard/chat",
         icon: MessageSquare,
         counter: "chat",
     },
