@@ -19,7 +19,7 @@ interface RecentLessonsProps {
     emptyHint: string;
 }
 
-export default function RecentLessons({ lessons, variant, emptyHint }: RecentLessonsProps) {
+export default function RecentLessons({ lessons, emptyHint }: RecentLessonsProps) {
     return (
         <Card className="border-border/60">
             <CardHeader>
@@ -40,24 +40,18 @@ export default function RecentLessons({ lessons, variant, emptyHint }: RecentLes
                             const status = STATUS_MAP[lesson.status];
                             const reward = REWARD_MAP[lesson.TeacherReward];
                             const duration = DURATION_MAP[String(lesson.duration)];
-                            const participant =
-                                variant === 'admin'
-                                    ? [lesson.teacher?.name, lesson.family?.name].filter(Boolean).join(' · ')
-                                    : variant === 'teacher'
-                                        ? lesson.family?.name
-                                        : lesson.teacher?.name;
 
                             return (
                                 <li key={lesson.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                                     <div className="min-w-0">
                                         <p className="text-sm font-bold text-foreground truncate">
-                                            {lesson.student ?? 'Student'}
+                                            Student: {lesson.student ?? ""}
                                         </p>
-                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                                            {[participant, duration?.label ?? `${lesson.duration} min`, formatWhen(lesson.classDate)]
-                                                .filter(Boolean)
-                                                .join(' · ')}
-                                        </p>
+                                        <div className="block md:flex text-xs text-muted-foreground mt-0.5 truncate">
+                                            <p> {`Teacher: ${lesson.teacher?.name}`} <span className='max-md:hidden'>{" ,"}</span> </p>
+                                            <p> {`Family: ${lesson.family?.name}`} <span className='max-md:hidden'>{" ,"}</span></p>
+                                            <p>{duration?.label ?? `${lesson.duration} min`} . {formatWhen(lesson.classDate)}</p>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         {status && (

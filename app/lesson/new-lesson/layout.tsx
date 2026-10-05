@@ -11,7 +11,7 @@ export default async function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
-    const { user } = await authorization(['admin', 'teacher'])
+    const { user } = await authorization(['teacher'])
     if (!user) {
         redirect('/sign-in')
     }

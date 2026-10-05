@@ -1,6 +1,4 @@
-import Link from 'next/link'
-import { LayoutDashboard, Plus } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { LayoutDashboard } from 'lucide-react'
 
 /** Same header pattern as the Families / Teachers directories, so the dashboard reads as one product. */
 export default function OverviewHeader({ name }: { name: string }) {
@@ -19,11 +17,6 @@ export default function OverviewHeader({ name }: { name: string }) {
                     </p>
                 </div>
             </div>
-
-            <Link href="/lesson/new-lesson" className={buttonVariants({ size: 'lg', className: 'self-start sm:self-auto' })}>
-                <Plus />
-                New lesson
-            </Link>
         </div>
     )
 }
