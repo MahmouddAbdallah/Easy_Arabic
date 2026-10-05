@@ -11,7 +11,7 @@ import { deleteToken, getMessaging, getToken, isSupported } from 'firebase/messa
 import { firebaseClientApp } from '@/lib/config/firebase-client';
 import {
     ACTIVE_CONTEXT_ENDPOINT,
-    ACTIVE_CONTEXT_HEARTBEAT_MS,
+    ACTIVE_CONTEXT_TTL_MS,
     FCM_TOKEN_ENDPOINT,
     NOTIFICATION_HANDLED_ENDPOINT,
 } from './contract';
@@ -176,7 +176,7 @@ export function trackActiveContext(location: string): () => void {
         clearInterval(heartbeat);
         if (document.visibilityState === 'visible') {
             reportActiveContext(location);
-            heartbeat = setInterval(() => reportActiveContext(location), ACTIVE_CONTEXT_HEARTBEAT_MS);
+            heartbeat = setInterval(() => reportActiveContext(location), ACTIVE_CONTEXT_TTL_MS);
         } else {
             reportActiveContext(null);
         }
