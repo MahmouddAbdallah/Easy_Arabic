@@ -33,7 +33,7 @@ export function ChatArea() {
     useMarkChatRead(chatId, currentUserId);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView();
     };
 
     useEffect(() => {
