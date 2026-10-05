@@ -1,3 +1,4 @@
+import type { CallLogData } from "../lib/call";
 import type { ReactionMap } from "../lib/reactions";
 
 /**
@@ -93,6 +94,8 @@ export interface MessageType {
     deleted: boolean;
     deletedAt: Date | null;
     reactions: ReactionMap;
+    /** Set when this entry is a finished voice/video call rather than a message (see lib/call.ts). */
+    call?: CallLogData | null;
 }
 
 /**
@@ -116,4 +119,7 @@ export interface StoredMessage {
     deleted?: boolean;
     deletedAt?: unknown;
     reactions?: Record<string, string>;
+    /** "call" for the entry a finished voice/video call leaves in the conversation. Absent on messages. */
+    type?: "call";
+    call?: CallLogData;
 }

@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ArrowLeftIcon, ImageIcon, InfoIcon, MoreVerticalIcon, PhoneIcon, SearchIcon, VideoIcon } from 'lucide-react'
 import { useChat } from '../ChatProvider'
+import { useCallActions, useCallSelector } from '../hooks/useCall';
 import UserStatusDisplay from '../UserStatusDisplay';
 import { useTypingStatus } from '../hooks/useTyping';
 import { useRouter } from 'next/navigation'
@@ -13,6 +14,11 @@ const ChatHeader = () => {
     const { back } = useRouter();
     // Real-time "Typing..." of the other user; shown instead of Online/Offline while it lasts.
     const isTyping = useTypingStatus(chatId, receiverId);
+    const { startCall } = useCallActions();
+    const inCall = useCallSelector((call) => call.phase !== 'idle');
+    // `receiver` still holds the previous person for a moment after switching chats: only call who is on screen.
+    const peer = receiverId && receiver?.id === receiverId ? { id: receiverId, name: receiver.name ?? 'User' } : null;
+    const callButton = "h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all disabled:pointer-events-none disabled:opacity-40";
     return (
         <div className="h-16 px-4 md:px-6 border-b border-border/40 flex items-center justify-between bg-card/20 backdrop-blur-md shrink-0">
             <div className="flex items-center gap-3">
@@ -60,7 +66,11 @@ const ChatHeader = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger
-                            className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all"
+                            type="button"
+                            aria-label="Voice call"
+                            disabled={!peer || inCall}
+                            onClick={() => peer && startCall(peer, 'audio')}
+                            className={callButton}
                         >
 
                             <PhoneIcon className="h-4 w-4" />
@@ -69,7 +79,13 @@ const ChatHeader = () => {
                     </Tooltip>
 
                     <Tooltip>
-                        <TooltipTrigger className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                        <TooltipTrigger
+                            type="button"
+                            aria-label="Video call"
+                            disabled={!peer || inCall}
+                            onClick={() => peer && startCall(peer, 'video')}
+                            className={callButton}
+                        >
                             <VideoIcon className="h-4 w-4" />
                         </TooltipTrigger>
                         <TooltipContent>Video Call</TooltipContent>

@@ -9,6 +9,7 @@ import { useAppContext } from "@/components/AppContext";
 import { firebaseClientDB } from "@/lib/config/firebase-client";
 import ChatHeader from "./ChatHeader";
 import { MessageItem } from "./Message/MessageItem";
+import { CallLogMessage } from "../Call/CallLogMessage";
 import { DeleteMessageDialog } from "./Message/DeleteMessageDialog";
 import { useMessageActions } from "../hooks/useMessageActions";
 import { useMarkChatRead } from "../hooks/useMarkChatRead";
@@ -20,11 +21,13 @@ export function ChatArea() {
     const [loading, setLoading] = useState<boolean>(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<MessageType | null>(null);
-    const { receiver, chatId } = useChat();
+    const { receiver, receiverId, chatId } = useChat();
     const { user } = useAppContext();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const currentUserId = user?.id;
+    // Who "Call back" rings. `receiver` lags behind `receiverId` while a different chat is loading.
+    const peer = receiverId && receiver?.id === receiverId ? { id: receiverId, name: receiver.name ?? "User" } : null;
     const { editMessage, deleteMessage, reactToMessage, isPending } = useMessageActions(chatId);
     // Opening the chat (and keeping it open) clears the current user's own unread counter.
     useMarkChatRead(chatId, currentUserId);
@@ -98,7 +101,9 @@ export function ChatArea() {
                             <p className="text-[11px] opacity-70">Send a message to start the conversation!</p>
                         </div>
                     ) : (
-                        messages.map((msg) => (
+                        messages.map((msg) => msg.call ? (
+                            <CallLogMessage key={msg.id} message={msg} peer={peer} />
+                        ) : (
                             <MessageItem
                                 key={msg.id}
                                 message={msg}

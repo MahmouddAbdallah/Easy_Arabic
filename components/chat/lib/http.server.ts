@@ -4,6 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { consume, rateLimitKey } from "@/lib/auth/rateLimit";
 import { authorization } from "@/lib/verifyAuth";
 import type { userType } from "@/types/userTypes";
 import { ChatApiError } from "./messageOperations.server";
@@ -34,6 +35,29 @@ export async function requireUser(): Promise<
         return { response: errorResponse(code, error?.message ?? "You're not logged in.", status) };
     }
     return { user };
+}
+
+/**
+ * Fixed-window rate limit per user. Returns the 429 response to send when `userId` is over `policy`,
+ * or null when the request may go ahead. If the limiter itself fails the request goes through: a
+ * counter outage must not take chat down with it.
+ */
+export async function rateLimitUser(
+    scope: string,
+    userId: string,
+    policy: { limit: number; windowSeconds: number },
+    message: string
+): Promise<NextResponse | null> {
+    try {
+        const { allowed, retryAfterSeconds } = await consume(rateLimitKey(scope, userId), policy);
+        if (allowed) return null;
+        return errorResponse("RATE_LIMITED", message, 429, undefined, {
+            "Retry-After": String(Math.max(retryAfterSeconds, 1)),
+        });
+    } catch (error) {
+        console.error(`[chat] Rate limiter unavailable for "${scope}", letting the request through:`, error);
+        return null;
+    }
 }
 
 /** The JSON body of the request, validated against `schema`, or the 400 response to return instead. */

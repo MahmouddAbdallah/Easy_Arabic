@@ -56,7 +56,13 @@ async function loadMessage(tx: Transaction, actorId: string, chatId: string, mes
         throw new ChatApiError("MESSAGE_NOT_FOUND", "Message not found.", 404);
     }
 
-    return { chatRef, chatSnap, messageRef, participants, message: messageSnap.data() as StoredMessage };
+    const message = messageSnap.data() as StoredMessage;
+    // The entry a finished call leaves in the chat is history, not a message: nothing to edit, delete or react to.
+    if (message.type === "call") {
+        throw new ChatApiError("CALL_ENTRY", "Call history can't be changed.", 409);
+    }
+
+    return { chatRef, chatSnap, messageRef, participants, message };
 }
 
 /** Is this the newest message of the chat (i.e. the one the sidebar preview shows)? */

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useAppContext } from '@/components/AppContext';
 import { ChatSidebar } from './Sidebar/ChatSidebar';
 import { ChatArea } from './ChatArea/ChatArea';
+import { CallProvider } from './CallProvider';
 import NoChatSelected from './ChatArea/NoChatSelected';
 import { getChatId } from './lib/chatId';
 
@@ -49,27 +50,29 @@ export const ChatProvider: React.FC = () => {
                 chatId
             }}
         >
-            <div className="flex h-dvh min-h-dvh w-full items-center justify-center p-2 sm:p-4">
-                <div className="h-full w-full overflow-hidden rounded-3xl border bg-background shadow-sm lg:h-[90vh] lg:w-[90vw]">
-                    <div className="flex h-full w-full antialiased">
-                        {/* Sidebar Section */}
-                        <aside
-                            className={`${receiverId ? "hidden" : "flex"
-                                } h-full w-full md:flex md:w-80 lg:w-96 shrink-0 border-r`}
-                        >
-                            <ChatSidebar />
-                        </aside>
+            <CallProvider>
+                <div className="flex h-dvh min-h-dvh w-full items-center justify-center p-2 sm:p-4">
+                    <div className="h-full w-full overflow-hidden rounded-3xl border bg-background shadow-sm lg:h-[90vh] lg:w-[90vw]">
+                        <div className="flex h-full w-full antialiased">
+                            {/* Sidebar Section */}
+                            <aside
+                                className={`${receiverId ? "hidden" : "flex"
+                                    } h-full w-full md:flex md:w-80 lg:w-96 shrink-0 border-r`}
+                            >
+                                <ChatSidebar />
+                            </aside>
 
-                        {/* Main Chat Area Section */}
-                        <main
-                            className={`${!receiverId ? "hidden" : "flex"
-                                } h-full flex-1 flex-col md:flex`}
-                        >
-                            {receiverId ? <ChatArea /> : <NoChatSelected />}
-                        </main>
+                            {/* Main Chat Area Section */}
+                            <main
+                                className={`${!receiverId ? "hidden" : "flex"
+                                    } h-full flex-1 flex-col md:flex`}
+                            >
+                                {receiverId ? <ChatArea /> : <NoChatSelected />}
+                            </main>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </CallProvider>
         </ChatContext.Provider>
     );
 };

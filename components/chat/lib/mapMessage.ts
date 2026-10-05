@@ -1,6 +1,7 @@
 import type { DocumentData } from "firebase/firestore";
 import type { MessageType } from "../types";
 import { getMessageAttachments } from "./attachments";
+import { parseCallLog } from "./call";
 import { normalizeReactions } from "./reactions";
 
 /** Accepts a Firestore Timestamp, an ISO string or a Date. Returns null for anything else. */
@@ -41,5 +42,6 @@ export function mapMessageDoc(id: string, data: DocumentData, currentUserId: str
         deleted,
         deletedAt: toDate(data.deletedAt),
         reactions: deleted ? {} : normalizeReactions(data.reactions),
+        call: data.type === "call" ? parseCallLog(data.call) : null,
     };
 }

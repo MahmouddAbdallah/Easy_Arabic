@@ -9,7 +9,7 @@ import { REACTION_KEYS } from "./reactions";
  */
 
 // Firestore document ids: no slashes, and the `__name__` form is reserved.
-const firestoreId = z
+export const firestoreId = z
     .string()
     .min(1)
     .max(200)
