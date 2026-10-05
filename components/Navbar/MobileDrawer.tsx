@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link"
-import { KeyRound, LoaderCircle, LogIn, LogOut, X } from "lucide-react"
+import { KeyRound, LoaderCircle, LogIn, LogOut, UserRound, X } from "lucide-react"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { displayFont } from "@/lib/fonts"
 import { cn } from "@/lib/utils"
@@ -78,6 +78,12 @@ export const MobileDrawer = ({ isOpen, onClose, user, onLogout, loggingOut = fal
 
                     {signedIn ? (
                         <>
+                            {user?.role === "family" && (
+                                <Link href="/profile" onClick={onClose} className={footerRow}>
+                                    <UserRound aria-hidden className="size-5 shrink-0" />
+                                    Profile
+                                </Link>
+                            )}
                             <Link href="/change-password" onClick={onClose} className={footerRow}>
                                 <KeyRound aria-hidden className="size-5 shrink-0" />
                                 Change password

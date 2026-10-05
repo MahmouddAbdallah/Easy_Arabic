@@ -36,6 +36,10 @@
       "model": "MoneyPerLesson",
       "namespace": "public"
     },
+    "profileChangeRequest": {
+      "model": "ProfileChangeRequest",
+      "namespace": "public"
+    },
     "teacherFamily": {
       "model": "TeacherFamily",
       "namespace": "public"
@@ -63,6 +67,27 @@
               {
                 "name": "email_verification",
                 "value": "email_verification"
+              }
+            ]
+          },
+          "ProfileChangeRequestStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "PENDING",
+                "value": "PENDING"
+              },
+              {
+                "name": "APPROVED",
+                "value": "APPROVED"
+              },
+              {
+                "name": "REJECTED",
+                "value": "REJECTED"
+              },
+              {
+                "name": "CANCELLED",
+                "value": "CANCELLED"
               }
             ]
           },
@@ -1254,6 +1279,166 @@
               },
               "namespaceId": "public",
               "table": "moneyPerLesson"
+            }
+          },
+          "ProfileChangeRequest": {
+            "fields": {
+              "adminNote": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "currentValues": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
+              "familyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "reason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "requestedChanges": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
+              "reviewedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "reviewedById": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ProfileChangeRequestStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "family": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "familyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "reviewer": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "reviewedById"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "adminNote": {
+                  "column": "adminNote"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "currentValues": {
+                  "column": "currentValues"
+                },
+                "familyId": {
+                  "column": "familyId"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "reason": {
+                  "column": "reason"
+                },
+                "requestedChanges": {
+                  "column": "requestedChanges"
+                },
+                "reviewedAt": {
+                  "column": "reviewedAt"
+                },
+                "reviewedById": {
+                  "column": "reviewedById"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "profileChangeRequest"
             }
           },
           "TeacherFamily": {
@@ -2477,6 +2662,169 @@
                 }
               ]
             },
+            "profileChangeRequest": {
+              "checks": [
+                {
+                  "expression": "\"status\" IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')",
+                  "name": "profileChangeRequest_status_check_57fe5f48",
+                  "prefix": "profileChangeRequest_status_check"
+                }
+              ],
+              "columns": {
+                "adminNote": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "currentValues": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": false
+                },
+                "familyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "requestedChanges": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": false
+                },
+                "reviewedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "reviewedById": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "PENDING"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ProfileChangeRequestStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "familyId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "profileChangeRequest"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "reviewedById"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "profileChangeRequest"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "familyId",
+                    "createdAt"
+                  ],
+                  "name": "profileChangeRequest_familyId_createdAt_idx_82ed3fe4",
+                  "prefix": "profileChangeRequest_familyId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "familyId"
+                  ],
+                  "name": "profileChangeRequest_one_pending_cb0b7672",
+                  "prefix": "profileChangeRequest_one_pending",
+                  "unique": true,
+                  "where": "(status = 'PENDING')"
+                },
+                {
+                  "columns": [
+                    "reviewedById"
+                  ],
+                  "name": "profileChangeRequest_reviewedById_idx_e2835478",
+                  "prefix": "profileChangeRequest_reviewedById_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "status",
+                    "createdAt"
+                  ],
+                  "name": "profileChangeRequest_status_createdAt_idx_58610442",
+                  "prefix": "profileChangeRequest_status_createdAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "teacherFamily": {
               "columns": {
                 "createdAt": {
@@ -2807,6 +3155,15 @@
                 "email_verification"
               ]
             },
+            "ProfileChangeRequestStatus": {
+              "kind": "valueSet",
+              "values": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED"
+              ]
+            },
             "Role": {
               "kind": "valueSet",
               "values": [
@@ -2842,10 +3199,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "771d155c0bf2b76d1ce8a0923a43f3e2a0feffb95d31e8829a8ad69ae74c9712"
+    "storageHash": "a8e1062d8b9dbab52daffff5aac5973a1266814d90eba03e368a98d54d762632"
   },
   "execution": {
-    "executionHash": "19085eaa27c3932cd2acd9ea1c32d91a9162c7295a53a708c3dfeec8b461eeae",
+    "executionHash": "6de0e48d3f1c59e2a0a61163438e2873fa03ff2d9ec9032b69d0ecd52f841793",
     "mutations": {
       "defaults": [
         {
@@ -2912,6 +3269,17 @@
             "column": "id",
             "namespace": "public",
             "table": "moneyPerLesson"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "profileChangeRequest"
           }
         },
         {

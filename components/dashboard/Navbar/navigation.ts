@@ -3,6 +3,7 @@ import {
     GraduationCap,
     MessageSquare,
     PhoneCall,
+    UserPen,
     Users,
     type LucideIcon,
 } from "lucide-react";
@@ -33,6 +34,11 @@ export const navigationItems: NavItem[] = [
         title: "Families",
         href: "/dashboard/families",
         icon: Users,
+    },
+    {
+        title: "Profile Requests",
+        href: "/dashboard/profile-requests",
+        icon: UserPen,
     },
     {
         title: "Teachers",

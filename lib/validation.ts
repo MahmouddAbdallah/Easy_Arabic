@@ -37,9 +37,9 @@ export const passwordSchema = z
 /** For sign-in the password is only compared, never stored: accept whatever a legacy account may have, but cap it. */
 const loginPasswordSchema = z.string('Password is required').min(1, 'Password is required').max(1024, 'Password is too long');
 
-const nameSchema = z.string('Name is required').trim().min(1, 'Name is required').max(100, 'Name is too long');
+export const nameSchema = z.string('Name is required').trim().min(1, 'Name is required').max(100, 'Name is too long');
 
-const phoneSchema = z
+export const phoneSchema = z
     .string('Phone is required')
     .trim()
     .min(1, 'Phone is required')

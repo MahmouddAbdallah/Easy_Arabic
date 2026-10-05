@@ -3,10 +3,17 @@ import bcrypt from 'bcrypt'
 import { userSchema, firstValidationMessage } from "@/lib/validation";
 import { db } from "@/prisma/db";
 import { getUsers } from "@/lib/data/users";
+import { authorization } from "@/lib/verifyAuth";
+import { apiError } from "@/lib/apiResponse";
 
 
 export async function POST(req: NextRequest) {
     try {
+        // Admin only: this accepts a `role`, so open access would let anyone create an admin.
+        // (Public registration goes through /api/auth/sign-up.)
+        const { error } = await authorization(["admin"]);
+        if (error) return apiError(error.code === "INSUFFICIENT_PERMISSIONS" ? 403 : 401, "FORBIDDEN", "Forbidden");
+
         const body = await req.json();
         const validation = userSchema.safeParse(body);
         if (!validation.success) {
@@ -48,7 +55,9 @@ export async function POST(req: NextRequest) {
         });
 
 
-        return NextResponse.json({ message: 'Create user successfully', user }, { status: 201 });
+        const safeUser: Partial<typeof user> = { ...user };
+        delete safeUser.password;
+        return NextResponse.json({ message: 'Create user successfully', user: safeUser }, { status: 201 });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ success: false, error: { code: 'SERVER_ERROR', message: 'Error in server' } }, { status: 500 });

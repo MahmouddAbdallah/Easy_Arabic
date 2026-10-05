@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link"
-import { ChevronDown, KeyRound, LoaderCircle, LogOut } from "lucide-react"
+import { ChevronDown, KeyRound, LoaderCircle, LogOut, UserRound } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -50,6 +50,13 @@ export const UserProfileMenu = ({ user, onLogout, loggingOut = false }: UserProf
                 </div>
 
                 <DropdownMenuSeparator />
+
+                {user.role === "family" && (
+                    <DropdownMenuItem render={<Link href="/profile" />} className="cursor-pointer gap-2.5 px-2.5 py-2">
+                        <UserRound aria-hidden />
+                        Profile
+                    </DropdownMenuItem>
+                )}
 
                 <DropdownMenuItem render={<Link href="/change-password" />} className="cursor-pointer gap-2.5 px-2.5 py-2">
                     <KeyRound aria-hidden />

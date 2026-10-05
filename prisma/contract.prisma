@@ -80,6 +80,53 @@ model UserFCMToken {
   @@index([userId])
 }
 
+// ---------------------------------------------------------------------------
+// Profile change requests (customer -> admin)
+//
+// A family whose profile is locked (it has a teacher, or its account is 6+ months
+// old) - or who wants to change an admin-controlled field (email / phone) - asks
+// the admin instead of editing directly. See lib/profile/.
+// ---------------------------------------------------------------------------
+
+enum ProfileChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED // withdrawn by the customer while still pending
+}
+
+model ProfileChangeRequest {
+  id               String                     @id @default(uuid())
+  familyId         String
+  status           ProfileChangeRequestStatus @default(PENDING)
+
+  // Structured payload, validated by lib/profile/schemas.ts on the way in AND out.
+  // Both objects share the same keys (name | email | phone | subject):
+  //   requestedChanges - what the customer wants the fields to become
+  //   currentValues    - what those fields held when the request was submitted
+  requestedChanges Json
+  currentValues    Json
+  // Free-text explanation from the customer (optional).
+  reason           String?
+
+  // Review audit trail. All three stay NULL until an admin decides.
+  reviewedById     String?
+  reviewedAt       TimestamptzString?
+  adminNote        String?
+
+  createdAt        TimestamptzString          @default(now())
+  updatedAt        TimestamptzString          @default(now())
+
+  family           User                       @relation(fields:[familyId], references:[id], onDelete: Cascade, "ProfileRequestFamily")
+  reviewer         User?                      @relation(fields:[reviewedById], references:[id], onDelete: SetNull, "ProfileRequestReviewer")
+
+  @@index([familyId, createdAt])
+  @@index([status, createdAt])
+  // A family can have at most ONE pending request. Enforced by the database, so two
+  // simultaneous submissions cannot both succeed (the loser gets a unique violation).
+  @@index([familyId], unique: true, where: "(status = 'PENDING')", name: "profileChangeRequest_one_pending")
+}
+
 enum TeacherReward {
   EXCELLENT
   VERY_GOOD

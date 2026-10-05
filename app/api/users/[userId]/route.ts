@@ -2,6 +2,8 @@ import { NextResponse, NextRequest } from "next/server";
 import bcrypt from "bcrypt";
 import { db } from "@/prisma/db";
 import { firstValidationMessage, userSchema } from "@/lib/validation";
+import { authorization } from "@/lib/verifyAuth";
+import { apiError } from "@/lib/apiResponse";
 
 interface RouteParams {
     params: Promise<{ userId: string }>;
@@ -12,6 +14,12 @@ interface RouteParams {
 // ----------------------------------------------------------------------
 export async function PUT(req: NextRequest, { params }: RouteParams) {
     try {
+        // Admin only. This route can change ANY field of ANY user (role, status, email, phone...),
+        // so it must never be reachable by customers or anonymous callers. Customers edit their own
+        // profile through /api/profile instead.
+        const { error } = await authorization(["admin"]);
+        if (error) return apiError(error.code === "INSUFFICIENT_PERMISSIONS" ? 403 : 401, "FORBIDDEN", "Forbidden");
+
         const { userId } = await params;
         const body = await req.json();
 
@@ -65,6 +73,9 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 // ----------------------------------------------------------------------
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
     try {
+        const { error } = await authorization(["admin"]);
+        if (error) return apiError(error.code === "INSUFFICIENT_PERMISSIONS" ? 403 : 401, "FORBIDDEN", "Forbidden");
+
         const { userId } = await params;
 
         const existingUser = await db.orm.public.User.where({ id: userId }).first();
@@ -94,18 +105,26 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 // ----------------------------------------------------------------------
 export async function GET(req: NextRequest, { params }: RouteParams) {
     try {
+        // Any signed-in user (the chat looks up the person you are talking to), nobody else.
+        const { error } = await authorization();
+        if (error) return apiError(error.code === "INSUFFICIENT_PERMISSIONS" ? 403 : 401, "UNAUTHENTICATED", "Please sign in.");
+
         const { userId } = await params;
 
-        const user = await db.orm.public.User.where({ id: userId }).first();
-        if (!user) {
+        const found = await db.orm.public.User.where({ id: userId }).first();
+        if (!found) {
             return NextResponse.json(
                 { success: false, error: { code: "NOT_FOUND", message: "User not found" } },
                 { status: 404 }
             );
         }
+        // Never send the password hash (or the password-change timestamp) to the browser.
+        const user: Partial<typeof found> = { ...found };
+        delete user.password;
+        delete user.passwordLastChanged;
 
         return NextResponse.json(
-            { success: true, user: user },
+            { success: true, user },
             { status: 200 }
         );
     } catch (error) {
