@@ -26,7 +26,7 @@ export function NotificationsMenu() {
                 onClick={() => { push('/notification') }}
                 variant={'ghost'}
                 aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
-                className={cn("md:hidden cursor-pointer relative aria-expanded:bg-muted")}
+                className={cn("md:hidden flex justify-center items-center cursor-pointer relative aria-expanded:bg-muted")}
             >
                 <Bell aria-hidden />
                 {unread > 0 && (
@@ -39,7 +39,7 @@ export function NotificationsMenu() {
             <PopoverTrigger
                 disabled={pathname == '/notification'}
                 aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
-                className={cn(buttonVariants({ variant: "ghost", size: "icon-lg" }), "hidden md:block relative aria-expanded:bg-muted")}
+                className={cn(buttonVariants({ variant: "ghost", size: "icon-lg" }), "hidden md:flex justify-center items-center relative aria-expanded:bg-muted")}
             >
                 <Bell aria-hidden />
                 {unread > 0 && (
