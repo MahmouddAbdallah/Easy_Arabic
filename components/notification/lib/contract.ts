@@ -26,10 +26,19 @@
 export const NOTIFICATION_TYPES = ['general', 'chat_message', 'lesson', 'sign_in', 'create_account'] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+/**
+ * What a user can mute (see settings.ts). Types are many and grow; categories are the few things a person
+ * understands ("messages", "lessons"), so settings are keyed by category and each type maps to one.
+ */
+export const NOTIFICATION_CATEGORIES = ['messages', 'lessons', 'account', 'general'] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
 /** Web Push urgency header (RFC 8030). 'high' wakes sleeping devices sooner. */
 export type PushUrgency = 'very-low' | 'low' | 'normal' | 'high';
 
 export interface NotificationTypeConfig {
+    /** Which user-facing setting mutes this type (see settings.ts / policy.ts). */
+    category: NotificationCategory;
     urgency: PushUrgency;
     /** How long FCM keeps the message for an offline device before dropping it. */
     ttlSeconds: number;
@@ -45,11 +54,11 @@ const ONE_DAY = 24 * 60 * 60;
 
 /** Per-type delivery defaults. A caller can still override them per call. */
 export const NOTIFICATION_TYPE_CONFIG: Record<NotificationType, NotificationTypeConfig> = {
-    general: { urgency: 'normal', ttlSeconds: ONE_DAY, identity: 'content' },
-    chat_message: { urgency: 'high', ttlSeconds: ONE_DAY, identity: 'link' },
-    lesson: { urgency: 'normal', ttlSeconds: ONE_DAY, identity: 'content' },
-    create_account: { urgency: 'high', ttlSeconds: ONE_DAY, identity: 'content' },
-    sign_in: { urgency: 'low', ttlSeconds: ONE_DAY, identity: 'content' }
+    general: { category: 'general', urgency: 'normal', ttlSeconds: ONE_DAY, identity: 'content' },
+    chat_message: { category: 'messages', urgency: 'high', ttlSeconds: ONE_DAY, identity: 'link' },
+    lesson: { category: 'lessons', urgency: 'normal', ttlSeconds: ONE_DAY, identity: 'content' },
+    create_account: { category: 'account', urgency: 'high', ttlSeconds: ONE_DAY, identity: 'content' },
+    sign_in: { category: 'account', urgency: 'low', ttlSeconds: ONE_DAY, identity: 'content' }
 };
 
 /** Where the browser registers its FCM token (see app/api/notification/fcm-token). */
@@ -63,12 +72,14 @@ export const FCM_TOKEN_ENDPOINT = '/api/notification/fcm-token';
 // ── Lifecycle of a stored notification ──
 //   sent                                   → stored, unread (a copy is stored even if the user has no device)
 //   sent again, same logical notification  → the stored document is UPDATED in place (new content, back on
-//                                            top, unread again) — never duplicated. What "same" means is
-//                                            decided in lib/server/identity.ts.
+//                                            top, unread again, `count` +1 while it stayed unread) — never
+//                                            duplicated. What "same" means is decided in lib/server/identity.ts.
 //   delivered, user ignores or dismisses   → stays stored, unread: it is still unhandled
 //   delivered, user clicks it              → the stored document is DELETED: it was handled and has no
 //                                            reason to linger (see NOTIFICATION_HANDLED_ENDPOINT)
-//   "Mark as read" in the list             → the document stays, flagged read (the list is its own history)
+//   "Mark as read" in the list             → the document stays, flagged read (the list is its own history) and
+//                                            gets an `expireAt` — a Firestore TTL policy on that field prunes
+//                                            READ notifications only, so the unread counter can never drift
 
 export const NOTIFICATION_COLLECTION = 'Notification';
 
@@ -95,19 +106,31 @@ export const UNREAD_COUNT_COLLECTION = 'unreadNotificationCount';
 // ─── What the user is looking at right now ────────────────────────────────────
 // A notification whose `link` is the page a user is already viewing tells them nothing new, so
 // sendNotification() skips such users entirely (no push, no stored copy). Only the server can make
-// that call, so every visible tab reports its location to this endpoint (see lib/client/presence.ts) and
-// refreshes it while it stays visible. A report that stops arriving (closed tab, lost connection)
-// expires on its own after ACTIVE_CONTEXT_TTL_MS — the TTL must outlast a few missed heartbeats.
+// that call, so a tab that is visible reports its location to this endpoint (see lib/client/presence.ts).
 //
-// These two numbers are the load knob of the whole feature: every visible tab costs one request (and one
-// Firestore write) per heartbeat. The TTL is also how long a notification about the page of a tab that died
-// without saying goodbye (crash, lost connection) is held back, so raise the heartbeat and the TTL together
-// and only as far as that wait is acceptable. A missed heartbeat itself fails safe: the user just gets a
-// notification about the page they are on.
+// There is NO heartbeat. A report is sent when something actually changes — the page settles, the tab
+// becomes visible or hidden, or the user interacts after the previous report has aged past
+// ACTIVE_CONTEXT_REFRESH_MS — and every report is trusted for ACTIVE_CONTEXT_TTL_MS. So the entry of a
+// tab that is open but untouched simply lapses: someone who walked away from /chat is treated as not
+// "actively viewing" it and is notified, which is also the safe failure (a crash or a lost connection
+// can never hide a notification for longer than the TTL). An idle tab costs nothing, an active one costs
+// at most one request per REFRESH interval.
+//
+// REFRESH must be at most half of TTL, so a user who keeps interacting is covered without a gap.
 
 export const ACTIVE_CONTEXT_ENDPOINT = '/api/notification/context';
-export const ACTIVE_CONTEXT_HEARTBEAT_MS = 60_000;
-export const ACTIVE_CONTEXT_TTL_MS = 150_000;
+export const ACTIVE_CONTEXT_TTL_MS = 5 * 60_000;
+export const ACTIVE_CONTEXT_REFRESH_MS = 150_000;
+
+// ─── Notification settings (per user) ─────────────────────────────────────────
+// One document per user, `notificationSettings/{userId}` (shape: settings.ts). The browser only READS it
+// (live, so a change made in one tab or device applies everywhere at once); every change goes through
+// NOTIFICATION_SETTINGS_ENDPOINT, which validates it. sendNotification() reads it too — in the same
+// round trip as the presence check — to decide whether to push (policy.ts); the in-app list is always
+// written, so pausing or muting never loses a notification, it only silences the alert.
+
+export const NOTIFICATION_SETTINGS_COLLECTION = 'notificationSettings';
+export const NOTIFICATION_SETTINGS_ENDPOINT = '/api/notification/settings';
 
 /** A stored notification as the list shows it. */
 export interface InAppNotification {
@@ -121,6 +144,12 @@ export interface InAppNotification {
     isRead: boolean;
     /** Epoch milliseconds. */
     createdAt: number;
+    /** How many sends this (still unread) notification stands for — "3 new messages". Always ≥ 1. */
+    count: number;
+    /** Identity of the notification (NotificationPayload.key); what a click reports to NOTIFICATION_HANDLED_ENDPOINT. */
+    key?: string;
+    /** Id of the latest send (NotificationPayload.id) — lets the page recognise a push it already showed. */
+    sendId?: string;
 }
 
 /** The single FCM `data` key that carries the JSON-encoded NotificationPayload. */
@@ -147,8 +176,14 @@ export interface NotificationPayload {
     link?: string;
     icon?: string;
     image?: string;
-    /** Notifications with the same tag replace each other instead of stacking. */
+    /**
+     * Notifications with the same tag replace each other instead of stacking (and the service worker counts
+     * them: "Ali (3)"). Set from the caller's `tag`, or — for types identified by their link — from the
+     * stored copy's identity, so a conversation is one notification on the device as well as in the list.
+     */
     tag?: string;
+    /** The recipient turned sound off: show the system notification without sound or vibration. */
+    silent?: boolean;
     /** Free-form extra data for the app (all values are strings). */
     data?: Record<string, string>;
     /**
@@ -202,6 +237,7 @@ export function parseNotificationPayload(raw: unknown): NotificationPayload | nu
     if (typeof p.sentAt !== 'number') return null;
     if (p.link !== undefined && !isSafeInternalLink(p.link)) return null;
     if (p.tag !== undefined && typeof p.tag !== 'string') return null;
+    if (p.silent !== undefined && typeof p.silent !== 'boolean') return null;
     if (p.key !== undefined && typeof p.key !== 'string') return null;
     if (p.icon !== undefined && !isSafeAssetUrl(p.icon)) return null;
     if (p.image !== undefined && !isSafeAssetUrl(p.image)) return null;

@@ -2,14 +2,14 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import NotificationBody from "@/components/notification/NotificationBody";
 import { UNREAD_COUNT_COLLECTION } from "@/components/notification/lib/contract";
 import { cn } from "@/lib/utils";
-import { useUnreadCount } from "./useUnreadCount";
+import { useUnreadCount } from "./dashboard/Navbar/useUnreadCount";
 
 /**
  * Bell with a live unread dot. Opens the in-app notification list in a popover.
@@ -18,19 +18,34 @@ import { useUnreadCount } from "./useUnreadCount";
 export function NotificationsMenu() {
     const pathname = usePathname();
     const unread = useUnreadCount(UNREAD_COUNT_COLLECTION);
+    const { push } = useRouter();
 
     return (
-        // Keyed by URL: following a notification link closes the popover instead of leaving it over the new page.
         <Popover key={pathname}>
-            <PopoverTrigger
+            <Button
+                onClick={() => { push('/notification') }}
+                variant={'ghost'}
                 aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
-                className={cn(buttonVariants({ variant: "ghost", size: "icon-lg" }), "relative aria-expanded:bg-muted")}
+                className={cn("md:hidden cursor-pointer relative aria-expanded:bg-muted")}
             >
                 <Bell aria-hidden />
                 {unread > 0 && (
                     <span
                         aria-hidden
                         className="absolute end-1.5 top-1.5 size-2.5 rounded-full bg-destructive ring-2 ring-card"
+                    />
+                )}
+            </Button>
+            <PopoverTrigger
+                disabled={pathname == '/notification'}
+                aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+                className={cn(buttonVariants({ variant: "ghost", size: "icon-lg" }), "hidden md:block relative aria-expanded:bg-muted")}
+            >
+                <Bell aria-hidden />
+                {unread > 0 && (
+                    <span
+                        aria-hidden
+                        className="absolute cursor-pointer end-1.5 top-1.5 size-2.5 rounded-full bg-destructive ring-2 ring-card"
                     />
                 )}
             </PopoverTrigger>

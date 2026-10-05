@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { fcmTokenSchema } from '@/lib/validation';
 import { NOTIFICATION_TYPES, isSafeAssetUrl, isSafeInternalLink } from './contract';
+import { isValidTime, isValidTimeZone } from './settings';
 
 /** Upper bounds that keep one call (and one FCM payload) well within sane limits. */
 export const MAX_USER_IDS = 1000;
@@ -95,6 +96,38 @@ export const activeContextSchema = z.strictObject({
 });
 
 export type ActiveContextInput = z.infer<typeof activeContextSchema>;
+
+/**
+ * Body of PATCH /api/notification/settings: any non-empty subset of the settings (settings.ts). Strict at
+ * every level so a typo ("sond") is rejected instead of silently ignored.
+ */
+const time = z.string().refine(isValidTime, 'Use a 24-hour time such as "22:00"');
+
+export const settingsPatchSchema = z
+    .strictObject({
+        enabled: z.boolean().optional(),
+        popups: z.boolean().optional(),
+        sound: z.boolean().optional(),
+        categories: z
+            .strictObject({
+                messages: z.boolean().optional(),
+                lessons: z.boolean().optional(),
+                account: z.boolean().optional(),
+                general: z.boolean().optional(),
+            })
+            .optional(),
+        quietHours: z
+            .strictObject({
+                enabled: z.boolean().optional(),
+                start: time.optional(),
+                end: time.optional(),
+                timeZone: z.string().refine(isValidTimeZone, 'Unknown time zone').optional(),
+            })
+            .optional(),
+    })
+    .refine((patch) => Object.keys(patch).length > 0, { message: 'Nothing to update' });
+
+export type SettingsPatchInput = z.infer<typeof settingsPatchSchema>;
 
 /** "title: title is required; link: link must be ..." — readable in logs and API responses. */
 export function formatValidationIssues(error: z.ZodError): string {

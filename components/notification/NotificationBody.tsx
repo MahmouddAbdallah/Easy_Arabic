@@ -1,12 +1,15 @@
 'use client';
 
-import { Bell, CheckCheck, LoaderCircle } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Bell, CheckCheck, LoaderCircle, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppContext } from '../AppContext';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { useNotifications } from './hooks/useNotifications';
 import { NotificationItem } from './NotificationItem';
+import { NotificationSettingsPanel } from './NotificationSettingsPanel';
+import { useOptionalNotificationControls } from './NotificationProvider';
 
 interface NotificationBodyProps {
     /** How many notifications to load at first and on each "Load more". */
@@ -15,13 +18,33 @@ interface NotificationBodyProps {
 }
 
 /**
- * The signed-in user's in-app notification list, live from Firestore. Drop it anywhere inside
- * the app — it needs no props, no push permission and no NotificationProvider.
+ * The signed-in user's in-app notification list, live from Firestore, with the notification settings one
+ * click away. Drop it anywhere inside the app — it needs no props and no push permission. The settings
+ * screen appears when a NotificationProvider is above it (the app root has one); without it the list works
+ * on its own.
  */
 export default function NotificationBody({ pageSize, className }: NotificationBodyProps) {
     const { user } = useAppContext();
     const { notifications, status, hasUnread, hasMore, loadingMore, loadMore, markAsRead, markAllAsRead } =
         useNotifications(user?.id, pageSize);
+    const { push, settingsState } = useOptionalNotificationControls();
+
+    const [view, setView] = useState<'list' | 'settings'>('list');
+    const settingsButton = useRef<HTMLButtonElement>(null);
+
+    const closeSettings = () => {
+        setView('list');
+        // The button that opened the settings is back on screen: leave the keyboard user where they were.
+        requestAnimationFrame(() => settingsButton.current?.focus());
+    };
+
+    if (view === 'settings' && settingsState) {
+        return (
+            <section aria-label="Notification settings" className={cn('mx-auto w-full max-w-2xl p-4', className)}>
+                <NotificationSettingsPanel settingsState={settingsState} push={push} onBack={closeSettings} />
+            </section>
+        );
+    }
 
     return (
         <section aria-labelledby="notifications-title" className={cn('mx-auto flex w-full max-w-2xl flex-col gap-4 p-4', className)}>
@@ -29,12 +52,27 @@ export default function NotificationBody({ pageSize, className }: NotificationBo
                 <h2 id="notifications-title" className="text-lg font-semibold">
                     Notifications
                 </h2>
-                {hasUnread && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => void markAllAsRead()}>
-                        <CheckCheck />
-                        Mark all as read
-                    </Button>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {hasUnread && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => void markAllAsRead()}>
+                            <CheckCheck />
+                            Mark all as read
+                        </Button>
+                    )}
+                    {settingsState && (
+                        <Button
+                            ref={settingsButton}
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setView('settings')}
+                            aria-label="Notification settings"
+                            title="Notification settings"
+                        >
+                            <Settings />
+                        </Button>
+                    )}
+                </div>
             </header>
 
             {status === 'loading' && (

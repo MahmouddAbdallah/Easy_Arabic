@@ -9,7 +9,8 @@ import { trackActiveContext } from './lib/client/presence';
  * sendNotification() can skip notifications about a page they are already looking at. Renders
  * nothing. useSearchParams() needs a <Suspense> boundary above it — NotificationProvider adds one.
  *
- * Signing out stops the reports; the last one expires on the server by itself.
+ * Reports are event-driven, not periodic (see lib/client/presence.ts), so a tab left open and untouched
+ * costs the server nothing. Signing out stops them; the last one expires on the server by itself.
  */
 export function ActiveContextReporter({ userId }: { userId: string | undefined }) {
     const pathname = usePathname();
@@ -18,7 +19,7 @@ export function ActiveContextReporter({ userId }: { userId: string | undefined }
 
     useEffect(() => {
         if (!userId) return;
-        return trackActiveContext(location);
+        return trackActiveContext(userId, location);
     }, [userId, location]);
 
     return null;

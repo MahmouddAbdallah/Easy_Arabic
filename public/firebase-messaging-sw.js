@@ -11,12 +11,15 @@
  *   system notification dismissed / ignored ──▶ nothing: its stored copy stays, unread, in the list
  *
  * The messages are FCM *data-only* messages built by sendNotification(), so the Firebase SDK never
- * draws a second copy. Notifications that share a `tag` replace each other, which also absorbs
- * any duplicate delivery of the same push.
+ * draws a second copy. Notifications that share a `tag` replace each other and are counted ("Ali (3)");
+ * one without a tag is still replaced by an identical repeat (same `key`), so neither a re-sent notification
+ * nor a duplicate delivery of the same push ever stacks. A push with `silent: true` (the recipient turned
+ * sound off in the app's settings) is shown without sound or vibration.
  *
  * No Firebase SDK is loaded here: this is plain Web Push handling, so there are no CDN scripts or
  * config values to keep in sync. The payload contract lives in components/notification/lib/contract.ts —
- * keep MESSAGE / PAYLOAD_KEY / PAYLOAD_VERSION / HANDLED_ENDPOINT below identical to it.
+ * keep MESSAGE / PAYLOAD_KEY / PAYLOAD_VERSION / HANDLED_ENDPOINT below identical to it, and read the payload
+ * fields it describes (title, body, link, icon, image, tag, silent, key, id, type, sentAt).
  */
 'use strict';
 
@@ -64,17 +67,35 @@ async function handlePush(event) {
     await showSystemNotification(payload);
 }
 
-function showSystemNotification(payload) {
-    return self.registration.showNotification(payload.title, {
+async function showSystemNotification(payload) {
+    // `tag` is the sender saying "these are the same notification, newer content" (a conversation): it replaces
+    // the one on screen and alerts again. `key` is the identity of the stored copy: identical content, so it
+    // replaces quietly. Neither: the notification stands alone.
+    const grouped = Boolean(payload.tag);
+    const tag = payload.tag || payload.key || payload.id;
+
+    let count = 1;
+    if (grouped) {
+        // A tagged notification stands for every send still on screen under its tag, plus this one. The same send
+        // delivered twice (FCM can) is not a new send.
+        const shown = await self.registration.getNotifications({ tag }).catch(() => []);
+        const previous = shown[0];
+        if (previous) {
+            const data = previous.data || {};
+            count = data.id === payload.id ? Number(data.count) || 1 : (Number(data.count) || 1) + 1;
+        }
+    }
+
+    return self.registration.showNotification(count > 1 ? payload.title + ' (' + count + ')' : payload.title, {
         body: payload.body,
         icon: payload.icon || DEFAULT_ICON,
         image: payload.image,
-        // Same tag = replace instead of stack. Untagged notifications get their unique id, so they stack.
-        tag: payload.tag || payload.id,
-        renotify: Boolean(payload.tag), // buzz again when a tagged notification is replaced (needs a tag)
+        tag,
+        renotify: grouped, // buzz again when a tagged notification is replaced (needs a tag)
+        silent: payload.silent === true ? true : undefined, // the user's sound preference, where the browser honours it
         dir: 'auto', // Arabic and English text both lay out correctly
         timestamp: payload.sentAt,
-        data: { link: toAppPath(payload.link), id: payload.id, type: payload.type, key: payload.key },
+        data: { link: toAppPath(payload.link), id: payload.id, type: payload.type, key: payload.key, count },
     });
 }
 

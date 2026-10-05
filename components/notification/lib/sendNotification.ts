@@ -4,16 +4,21 @@
  *
  * `sendNotification` is the one function the rest of the project calls to push a notification.
  * Callers describe WHO and WHAT; this file validates and orchestrates, and the pieces it composes each
- * do one job (all under ./server):
+ * do one job (all under ./server, rules shared with the browser in policy.ts):
  *
- *   presence.ts  — is the recipient already looking at the notification's page? (suppression)
- *   inbox.ts     — the stored copy for the in-app list + unread counter (identity.ts decides "same one")
- *   devices.ts   — which FCM tokens belong to the recipients
- *   push.ts      — FCM delivery and cleanup of dead tokens
+ *   recentSends.ts — an identical send a moment ago? (accidental repeats are dropped for free)
+ *   recipients.ts  — per recipient, in ONE batched read: are they already looking at the notification's page
+ *                    (presence.ts), and what did they choose to be alerted about (settings.ts)?
+ *   policy.ts      — turns those choices into "may this push?" (paused, muted category, quiet hours)
+ *   inbox.ts       — the stored copy for the in-app list + unread counter (identity.ts decides "same one")
+ *   devices.ts     — which FCM tokens belong to the recipients
+ *   push.ts        — FCM delivery and cleanup of dead tokens
  *
  * Notifications addressed to users (`userId` / `userIds`) are also stored in Firestore for the in-app
- * list — that copy is written even when a user has no registered device, so the list never depends on
- * push permission. Pass `persist: false` for a notification that should only be delivered and never stored.
+ * list — that copy is written even when a user has no registered device, has paused notifications or muted
+ * the category, so the list never depends on push permission or on alert preferences. Pass `persist: false`
+ * for a notification that should only be delivered and never stored. Push and the stored copy are
+ * independent: neither waits for, or fails because of, the other.
  *
  * The stored copy follows a lifecycle (contract.ts): sending the same logical notification again
  * (same `tag`, or what its type treats as the same — see identity.ts) updates the stored copy
@@ -22,7 +27,9 @@
  * A user who is looking at the page the notification links to (same `link`, see presence.ts) is
  * skipped entirely — no push, no stored copy, nothing counted as unread — because the notification
  * would only repeat what is already on their screen. Without a `link`, or when addressed to raw
- * device tokens, nothing is skipped.
+ * device tokens, nothing is skipped. A user who paused notifications, muted the notification's category
+ * or is inside their quiet hours is not pushed to (and one who turned sound off gets a silent push),
+ * but still gets the stored copy.
  *
  *   // to every device of one user
  *   await sendNotification({
@@ -38,6 +45,10 @@
  *   await sendNotification({ userId, title: 'Typing…', body: '…', persist: false });
  *
  *   // other recipient forms:  { userIds: [...] }  { token: '...' }  { tokens: [...] }
+ *
+ * The same content to the same recipients twice within a few seconds is treated as an accidental repeat and
+ * dropped (`duplicate: true`); give notifications that differ only in meaning something to tell them apart,
+ * e.g. `data: { messageId }`.
  *
  * It NEVER throws. Invalid input, a missing Firebase config, a database hiccup or an FCM outage
  * all come back as `{ success: false, error }`, so a notification can never take down the
@@ -57,12 +68,15 @@ import {
     type NotificationType,
     type PushUrgency,
 } from './contract';
-import { getTokensForUsers } from './server/devices';
+import { decideAlerts } from './policy';
+import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
+import { getDevicesForUsers } from './server/devices';
 import { notificationKey } from './server/identity';
 import { saveToInbox } from './server/inbox';
-import { usersViewing } from './server/presence';
-import { loadMessaging, pushToDevices } from './server/push';
-import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
+import { loadMessaging, pushToDevices, type PushOutcome } from './server/push';
+import { forgetSend, isRecentDuplicate, sendFingerprint } from './server/recentSends';
+import { loadRecipientState, type RecipientState } from './server/recipients';
+import { DEFAULT_SETTINGS } from './settings';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -152,6 +166,13 @@ export interface SendNotificationResult {
     updated: number;
     /** Users skipped (nothing pushed or stored) because they were already viewing the notification's `link`. */
     suppressed: number;
+    /**
+     * Users who were stored for but not pushed to, because of their own settings: notifications paused,
+     * the category muted, or quiet hours. (Not an error — it is what they asked for.)
+     */
+    muted: number;
+    /** The exact same send was made moments ago, so this one was dropped as an accidental repeat. */
+    duplicate: boolean;
     error?: { code: NotificationErrorCode; message: string };
 }
 
@@ -161,7 +182,19 @@ export interface SendNotificationResult {
 const MAX_PAYLOAD_BYTES = 3500;
 
 function result(partial: Partial<SendNotificationResult> = {}): SendNotificationResult {
-    return { success: true, targeted: 0, sent: 0, failed: 0, removedTokens: 0, stored: 0, updated: 0, suppressed: 0, ...partial };
+    return {
+        success: true,
+        targeted: 0,
+        sent: 0,
+        failed: 0,
+        removedTokens: 0,
+        stored: 0,
+        updated: 0,
+        suppressed: 0,
+        muted: 0,
+        duplicate: false,
+        ...partial,
+    };
 }
 
 function failure(code: NotificationErrorCode, message: string, partial: Partial<SendNotificationResult> = {}) {
@@ -174,29 +207,47 @@ function recipientUserIds(input: ValidatedNotificationInput): string[] {
 }
 
 /**
- * Drops the users who are already looking at the page the notification links to. If the lookup
- * fails nobody is dropped: a duplicate notification is better than a lost one.
+ * Per recipient: are they already looking at the notification's page, and what did they choose? If the
+ * lookup fails nobody is held back and everyone gets the defaults: a duplicate notification is better than a lost one.
  */
-async function withoutViewers(input: ValidatedNotificationInput, userIds: string[]): Promise<string[]> {
-    if (!input.link || userIds.length === 0) return userIds;
+async function loadRecipients(input: ValidatedNotificationInput, userIds: string[]): Promise<Map<string, RecipientState>> {
+    if (userIds.length === 0) return new Map();
 
     try {
-        const viewers = await usersViewing(userIds, input.link);
-        return userIds.filter((userId) => !viewers.has(userId));
+        return await loadRecipientState(userIds, input.link, DEFAULT_SETTINGS);
     } catch (error) {
-        console.error('[notification] Could not check what the recipients are viewing:', error);
-        return userIds;
+        console.error('[notification] Could not load the recipients\' presence and settings:', error);
+        return new Map(userIds.map((userId) => [userId, { viewing: false, settings: DEFAULT_SETTINGS }] as const));
     }
 }
 
-async function resolveTokens(input: ValidatedNotificationInput, userIds: string[]): Promise<string[]> {
-    if (input.token) return [input.token];
-    if (input.tokens) return [...new Set(input.tokens)];
-    return getTokensForUsers(userIds);
+/** Users who may be pushed to, split by whether their settings allow the system notification to make a sound. */
+interface PushAudience {
+    loud: string[];
+    silent: string[];
 }
 
-/** `key` is the identity of the stored copy — pass it only when one is stored (see NotificationPayload.key). */
-function buildPayload(input: ValidatedNotificationInput, key?: string): NotificationPayload {
+interface Devices {
+    loud: string[];
+    silent: string[];
+}
+
+async function resolveDevices(input: ValidatedNotificationInput, audience: PushAudience): Promise<Devices> {
+    if (input.token) return { loud: [input.token], silent: [] };
+    if (input.tokens) return { loud: [...new Set(input.tokens)], silent: [] };
+    if (audience.loud.length + audience.silent.length === 0) return { loud: [], silent: [] };
+
+    const silentUsers = new Set(audience.silent);
+    const loud: string[] = [];
+    const silent: string[] = [];
+    for (const { userId, fcmToken } of await getDevicesForUsers([...audience.loud, ...audience.silent])) {
+        (silentUsers.has(userId) ? silent : loud).push(fcmToken);
+    }
+    return { loud, silent };
+}
+
+/** `tag` and `key` decide how the device and the list group this notification — see NotificationPayload. */
+function buildPayload(input: ValidatedNotificationInput, grouping: { tag?: string; key?: string }): NotificationPayload {
     const payload: NotificationPayload = {
         v: NOTIFICATION_PAYLOAD_VERSION,
         id: randomUUID(),
@@ -208,29 +259,32 @@ function buildPayload(input: ValidatedNotificationInput, key?: string): Notifica
     if (input.link) payload.link = input.link;
     if (input.icon) payload.icon = input.icon;
     if (input.image) payload.image = input.image;
-    if (input.tag) payload.tag = input.tag;
-    if (key) payload.key = key;
+    if (grouping.tag) payload.tag = grouping.tag;
+    if (grouping.key) payload.key = grouping.key;
     if (input.data) {
         payload.data = Object.fromEntries(Object.entries(input.data).map(([name, value]) => [name, String(value)]));
     }
     return payload;
 }
 
+const NO_OUTCOME: PushOutcome = { sent: 0, failed: 0, removedTokens: 0, errorCodes: [] };
+
 /** Push delivery: resolve device tokens, send through FCM (server/push.ts), forget dead tokens. */
 async function sendPush(
     input: ValidatedNotificationInput,
-    userIds: string[],
+    audience: PushAudience,
     payload: NotificationPayload
 ): Promise<SendNotificationResult> {
     // 1. Resolve who to send to
-    let tokens: string[];
+    let devices: Devices;
     try {
-        tokens = await resolveTokens(input, userIds);
+        devices = await resolveDevices(input, audience);
     } catch (error) {
         console.error('[notification] Could not load device tokens:', error);
         return failure('TOKEN_LOOKUP_FAILED', 'Could not load the recipients\' devices.');
     }
-    if (tokens.length === 0) return result(); // nobody has notifications enabled — not an error
+    const targeted = devices.loud.length + devices.silent.length;
+    if (targeted === 0) return result(); // nobody has notifications enabled — not an error
 
     // 2. Send
     let messaging: Messaging;
@@ -238,20 +292,29 @@ async function sendPush(
         messaging = await loadMessaging();
     } catch (error) {
         console.error('[notification] Firebase Admin is not configured:', error);
-        return failure('NOT_CONFIGURED', 'Firebase Admin could not be initialised.', { targeted: tokens.length });
+        return failure('NOT_CONFIGURED', 'Firebase Admin could not be initialised.', { targeted });
     }
 
     const config = NOTIFICATION_TYPE_CONFIG[input.type];
-    const outcome = await pushToDevices(messaging, tokens, payload, {
-        urgency: input.urgency ?? config.urgency,
-        ttlSeconds: input.ttlSeconds ?? config.ttlSeconds,
-    });
+    const delivery = { urgency: input.urgency ?? config.urgency, ttlSeconds: input.ttlSeconds ?? config.ttlSeconds };
 
-    const summary = { targeted: tokens.length, sent: outcome.sent, failed: outcome.failed, removedTokens: outcome.removedTokens };
+    // Two sends at most: devices that may make a sound, and devices of people who turned sound off.
+    const [audible, quiet] = await Promise.all([
+        devices.loud.length > 0 ? pushToDevices(messaging, devices.loud, payload, delivery) : NO_OUTCOME,
+        devices.silent.length > 0 ? pushToDevices(messaging, devices.silent, { ...payload, silent: true }, delivery) : NO_OUTCOME,
+    ]);
+
+    const outcome = {
+        sent: audible.sent + quiet.sent,
+        failed: audible.failed + quiet.failed,
+        removedTokens: audible.removedTokens + quiet.removedTokens,
+        errorCodes: [...new Set([...audible.errorCodes, ...quiet.errorCodes])],
+    };
+    const summary = { targeted, sent: outcome.sent, failed: outcome.failed, removedTokens: outcome.removedTokens };
     if (outcome.failed > 0) {
         const codes = outcome.errorCodes.join(', ');
-        console.error(`[notification] ${outcome.failed}/${tokens.length} deliveries failed (${codes})`);
-        return failure('DELIVERY_FAILED', `${outcome.failed} of ${tokens.length} deliveries failed (${codes}).`, summary);
+        console.error(`[notification] ${outcome.failed}/${targeted} deliveries failed (${codes})`);
+        return failure('DELIVERY_FAILED', `${outcome.failed} of ${targeted} deliveries failed (${codes}).`, summary);
     }
     return result(summary);
 }
@@ -280,11 +343,16 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     }
     const input = parsed.data;
 
-    // 2. Build the payload once; every device (and the in-app copy) gets the same content. A notification
-    //    that is stored carries the identity of its stored copy, so a click can find and clear it.
+    // 2. Build the payload once; every device (and the in-app copy) gets the same content.
+    //    - `identity` says which notifications are "the same one" (identity.ts). A notification that is stored
+    //      carries it as `key`, so a click can find and clear the stored copy.
+    //    - A type identified by its link (a conversation) also uses it as the device `tag`, so the device shows
+    //      one notification per conversation even when the caller passed no tag.
     const addressed = recipientUserIds(input);
-    const key = input.persist && addressed.length > 0 ? notificationKey(input) : undefined;
-    const payload = buildPayload(input, key);
+    const identity = addressed.length > 0 ? notificationKey(input) : undefined;
+    const key = input.persist ? identity : undefined;
+    const tag = input.tag ?? (NOTIFICATION_TYPE_CONFIG[input.type].identity === 'link' ? identity : undefined);
+    const payload = buildPayload(input, { tag, key });
     const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
         const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
@@ -292,19 +360,52 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
         return failure('INVALID_INPUT', message);
     }
 
-    // 3. Leave out the users who are already looking at what the notification is about.
-    const userIds = await withoutViewers(input, addressed);
-    const suppressed = addressed.length - userIds.length;
-    if (addressed.length > 0 && userIds.length === 0) return result({ suppressed });
+    // 3. An accidental repeat costs nothing: drop it before touching Firestore, the database or FCM.
+    const fingerprint = sendFingerprint({
+        recipients: addressed.length > 0 ? addressed : [...(input.tokens ?? []), ...(input.token ? [input.token] : [])],
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        link: input.link,
+        tag: input.tag,
+        data: input.data,
+    });
+    if (isRecentDuplicate(fingerprint)) return result({ duplicate: true });
 
-    // 4. Push and in-app copy are independent: neither waits for, or fails because of, the other.
+    const outcome = await deliver(input, addressed, key, payload);
+    if (!outcome.success) forgetSend(fingerprint); // let the caller retry
+    return outcome;
+}
+
+async function deliver(
+    input: ValidatedNotificationInput,
+    addressed: string[],
+    key: string | undefined,
+    payload: NotificationPayload
+): Promise<SendNotificationResult> {
+    // 4. Leave out the users who are already looking at what the notification is about, and work out who
+    //    may be pushed to. Everyone else is still stored for — alerts are a preference, the list is a record.
+    const recipients = await loadRecipients(input, addressed);
+    const reachable = addressed.filter((userId) => !recipients.get(userId)?.viewing);
+    const suppressed = addressed.length - reachable.length;
+    if (addressed.length > 0 && reachable.length === 0) return result({ suppressed });
+
+    const audience: PushAudience = { loud: [], silent: [] };
+    const now = Date.now();
+    for (const userId of reachable) {
+        const settings = recipients.get(userId)?.settings ?? DEFAULT_SETTINGS;
+        if (decideAlerts(settings, input.type, now).push) (settings.sound ? audience.loud : audience.silent).push(userId);
+    }
+    const muted = reachable.length - audience.loud.length - audience.silent.length;
+
+    // 5. Push and in-app copy are independent: neither waits for, or fails because of, the other.
     const noCopy = { stored: 0, updated: 0, ok: true };
     const [push, inApp] = await Promise.all([
-        sendPush(input, userIds, payload),
-        key ? saveInAppCopies(userIds, key, payload) : noCopy,
+        sendPush(input, audience, payload),
+        key ? saveInAppCopies(reachable, key, payload) : noCopy,
     ]);
 
-    const outcome = { ...push, stored: inApp.stored, updated: inApp.updated, suppressed };
+    const outcome = { ...push, stored: inApp.stored, updated: inApp.updated, suppressed, muted };
     if (!inApp.ok && push.success) {
         return failure('INBOX_FAILED', 'The notification was sent but could not be saved to the in-app list.', outcome);
     }

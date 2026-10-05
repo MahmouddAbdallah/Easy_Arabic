@@ -15,7 +15,7 @@ interface NotificationItemProps {
 
 /** One row of the in-app notification list. */
 export function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
-    const { id, type, title, body, link, isRead, createdAt } = notification;
+    const { id, type, title, body, link, isRead, createdAt, count } = notification;
     const Icon = TYPE_ICONS[type];
 
     const content = (
@@ -39,6 +39,13 @@ export function NotificationItem({ notification, onMarkRead }: NotificationItemP
                     <span dir="auto" className={cn('truncate text-sm', isRead ? 'font-medium' : 'font-semibold')}>
                         {title}
                     </span>
+                    {count > 1 && (
+                        // The same notification was sent again while it was unread: one row, with a tally.
+                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-xs font-medium tabular-nums text-muted-foreground">
+                            <span aria-hidden="true">×{count}</span>
+                            <span className="sr-only">, {count} times</span>
+                        </span>
+                    )}
                 </span>
                 <span dir="auto" className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">
                     {body}

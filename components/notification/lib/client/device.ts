@@ -18,6 +18,30 @@ import { registerDevice, unregisterDevice } from './api';
 const SYNC_MARKER_KEY = 'notification:registered-device';
 const SYNC_MARKER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * "Not on this device": the person turned push off here in the settings while the browser permission is
+ * still granted. It is a choice about THIS browser, so it lives here and not in the account's settings (the
+ * same person's phone is unaffected). Named per user so a different account on a shared browser starts fresh.
+ */
+export const PUSH_OPT_OUT_PREFIX = 'notification:push-opt-out:';
+
+export function isPushOptedOut(userId: string): boolean {
+    try {
+        return localStorage.getItem(PUSH_OPT_OUT_PREFIX + userId) === '1';
+    } catch {
+        return false;
+    }
+}
+
+export function setPushOptOut(userId: string, optedOut: boolean): void {
+    try {
+        if (optedOut) localStorage.setItem(PUSH_OPT_OUT_PREFIX + userId, '1');
+        else localStorage.removeItem(PUSH_OPT_OUT_PREFIX + userId);
+    } catch {
+        /* ignore */
+    }
+}
+
 /** Can this browser receive web push at all? (false e.g. on iOS Safari outside an installed web app) */
 export async function isPushSupported(): Promise<boolean> {
     if (typeof window === 'undefined' || !('Notification' in window)) return false;
@@ -60,6 +84,11 @@ function markRegisteredHere(device: string | null): void {
     } catch {
         /* ignore */
     }
+}
+
+/** Forgets that this browser is registered, so the next permission grant registers it again from scratch. */
+export function forgetRegistration(): void {
+    markRegisteredHere(null);
 }
 
 /** One registration at a time per user, even if several components/effects ask at once. */

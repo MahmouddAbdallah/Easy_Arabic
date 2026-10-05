@@ -17,6 +17,7 @@ import { NavLinks } from "./NavLinks"
 import ThemeToggle from "./ThemeToggle"
 import { UserProfileMenu } from "./UserProfileMenu"
 import { focusRing, iconButtonClass } from "./styles"
+import { NotificationsMenu } from "../NotificationsMenu"
 
 /** Tailwind's `md` breakpoint, where the inline links replace the drawer. */
 const DESKTOP_QUERY = "(min-width: 768px)"
@@ -118,10 +119,14 @@ const Navbar = () => {
                         <NavLinks user={user} variant="desktop" />
                     </nav>
 
-                    <div className="ms-auto flex items-center gap-1.5">
+                    <div className="ms-auto flex justify-center items-center gap-1.5">
                         <div className="hidden md:block">
                             <ThemeToggle />
                         </div>
+                        <div className="max-md:mt-1">
+                            {user && <NotificationsMenu />}
+                        </div>
+
                         <span aria-hidden className="mx-1.5 hidden h-6 w-px bg-border md:block" />
 
                         {user?.name ? (
@@ -142,7 +147,6 @@ const Navbar = () => {
                                 Sign in
                             </Link>
                         )}
-
                         <button
                             type="button"
                             onClick={() => setDrawerOpen(true)}

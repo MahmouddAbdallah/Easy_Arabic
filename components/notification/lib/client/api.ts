@@ -16,12 +16,14 @@ import {
     FCM_TOKEN_ENDPOINT,
     NOTIFICATION_HANDLED_ENDPOINT,
     NOTIFICATION_READ_ENDPOINT,
+    NOTIFICATION_SETTINGS_ENDPOINT,
 } from '../contract';
 import type { MarkReadInput } from '../schema';
+import type { NotificationSettingsPatch } from '../settings';
 
-function sendBeacon(url: string, body: unknown): void {
+function sendBeacon(url: string, body: unknown, method: 'POST' | 'PATCH' = 'POST'): void {
     fetch(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         keepalive: true,
@@ -43,6 +45,16 @@ export function unregisterDevice(fcmToken: string) {
 /** Marks notifications as read: specific ids, or every unread one. */
 export function markRead(body: MarkReadInput) {
     return axios.patch(NOTIFICATION_READ_ENDPOINT, body);
+}
+
+/** Saves a change to the notification settings (any subset of them). The server validates it. */
+export function saveSettings(patch: NotificationSettingsPatch) {
+    return axios.patch(NOTIFICATION_SETTINGS_ENDPOINT, patch);
+}
+
+/** Same, for a change still waiting when the page is closing: it must not be lost with the page. */
+export function saveSettingsOnExit(patch: NotificationSettingsPatch): void {
+    sendBeacon(NOTIFICATION_SETTINGS_ENDPOINT, patch, 'PATCH');
 }
 
 /**

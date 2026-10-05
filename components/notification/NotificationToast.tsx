@@ -12,7 +12,8 @@ const IN_APP_TOAST_MS = 6000;
 /**
  * Shows an incoming push as an in-app toast. Clicking it handles the notification — its stored copy is no
  * longer needed — and then calls `open` with the notification's link; the × only closes the toast.
- * A tagged notification replaces the toast of the same tag instead of stacking.
+ * A notification about the same thing as one already on screen (same tag, or the same stored notification)
+ * replaces that toast instead of stacking another.
  */
 export function showNotificationToast(payload: NotificationPayload, open: (link?: string) => void) {
     toast.custom(
@@ -28,7 +29,7 @@ export function showNotificationToast(payload: NotificationPayload, open: (link?
                 onDismiss={() => toast.dismiss(t.id)}
             />
         ),
-        { id: payload.tag ?? payload.id, duration: IN_APP_TOAST_MS }
+        { id: payload.tag ?? payload.key ?? payload.id, duration: IN_APP_TOAST_MS }
     );
 }
 

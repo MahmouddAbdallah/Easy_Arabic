@@ -13,16 +13,27 @@ import { chunk } from './chunk';
 /** Keeps `IN (...)` lists comfortably small. */
 const IN_CLAUSE_CHUNK = 500;
 
-/** Every registered device token for the given users (de-duplicated). */
-export async function getTokensForUsers(userIds: string[]): Promise<string[]> {
+export interface Device {
+    userId: string;
+    fcmToken: string;
+}
+
+/**
+ * Every registered device for the given users, as (owner, token) pairs. The owner is returned so the
+ * caller can treat users differently — e.g. send a silent push to those who turned sound off — without a
+ * second query. A token belongs to at most one user (registerUserToken moves it), so tokens are unique.
+ */
+export async function getDevicesForUsers(userIds: string[]): Promise<Device[]> {
     if (userIds.length === 0) return [];
 
     const rows = await db.orm.public.UserFCMToken
         .where((t) => t.userId.in(userIds))
-        .select('fcmToken')
+        .select('userId', 'fcmToken')
         .all();
 
-    return [...new Set(rows.map((row) => row.fcmToken))];
+    const byToken = new Map<string, Device>();
+    for (const row of rows) byToken.set(row.fcmToken, { userId: row.userId, fcmToken: row.fcmToken });
+    return [...byToken.values()];
 }
 
 /**

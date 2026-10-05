@@ -6,7 +6,14 @@
  * (components/notification/hooks/useNotifications.ts); everything that changes them goes through
  * here, behind an authenticated route.
  *
- *   { userId, type, title, body, link?, data?, isRead, createdAt }
+ *   { userId, type, title, body, link?, data?, isRead, createdAt, key, sendId, count, expireAt? }
+ *
+ *   key      the notification's identity (identity.ts) — what a click reports so the copy can be cleared
+ *   sendId   id of the latest send — lets an open page recognise a push it already showed (no double alert)
+ *   count    how many sends this unread notification stands for ("3 new messages"); restarts at 1 once read
+ *   expireAt set when the notification is marked read, cleared if it becomes unread again: point a Firestore
+ *            TTL policy at it to prune old READ notifications — unread ones never expire, so the unread
+ *            counter cannot drift
  *
  * Document ids are derived from the recipient and the notification's identity (identity.ts), so
  * sending the same notification again updates its document rather than adding another. The
@@ -31,6 +38,11 @@ const USERS_PER_COMMIT = MAX_WRITES / 2;
 
 /** Marking notifications read is one write each, plus one for the counter. */
 const MARK_READ_PER_COMMIT = MAX_WRITES - 1;
+
+/** How long a notification that was read stays in the list before a TTL policy on `expireAt` may remove it. */
+export const READ_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const readUpdate = () => ({ isRead: true, expireAt: new Date(Date.now() + READ_RETENTION_MS) });
 
 async function notificationCollection() {
     return (await firestore()).collection(NOTIFICATION_COLLECTION);
@@ -66,6 +78,7 @@ export async function saveToInbox(userIds: string[], key: string, payload: Notif
 /** One transaction for up to USERS_PER_COMMIT users (`group` has no duplicates). */
 function saveGroup(collection: CollectionReference, group: string[], key: string, payload: NotificationPayload): Promise<SaveToInboxResult> {
     const { type, title, body, link, data } = payload;
+    const identity = { key, sendId: payload.id };
 
     return collection.firestore.runTransaction(async (tx) => {
         // Reads must happen before writes inside a transaction. (Counted per attempt: a retry starts over.)
@@ -85,13 +98,20 @@ function saveGroup(collection: CollectionReference, group: string[], key: string
             const userId = group[index];
 
             if (snapshot.exists) {
+                // Still unread: one more send of the same notification. Read (or unknown): it starts over at 1.
+                const previous = snapshot.get('count');
+                const count = snapshot.get('isRead') === true ? 1 : (typeof previous === 'number' && previous >= 1 ? previous : 1) + 1;
+
                 tx.update(snapshot.ref, {
                     type,
                     title,
                     body,
                     link: link ?? FieldValue.delete(),
                     data: data ?? FieldValue.delete(),
+                    ...identity,
+                    count,
                     isRead: false,
+                    expireAt: FieldValue.delete(),
                     createdAt: FieldValue.serverTimestamp(),
                 });
                 attempt.updated += 1;
@@ -103,6 +123,8 @@ function saveGroup(collection: CollectionReference, group: string[], key: string
                     body,
                     ...(link ? { link } : {}),
                     ...(data ? { data } : {}),
+                    ...identity,
+                    count: 1,
                     isRead: false,
                     createdAt: FieldValue.serverTimestamp(),
                 });
@@ -155,7 +177,7 @@ export async function markAsRead(userId: string, ids: string[]): Promise<number>
 
         const [counter] = await readUnreadCounters(tx, [userId]);
 
-        unread.forEach((s) => tx.update(s.ref, { isRead: true }));
+        unread.forEach((s) => tx.update(s.ref, readUpdate()));
         writeUnreadCounter(tx, counter, -unread.length);
         return unread.length;
     });
@@ -174,7 +196,7 @@ export async function markAllAsRead(userId: string): Promise<number> {
 
             const [counter] = await readUnreadCounters(tx, [userId]);
 
-            unread.docs.forEach((doc) => tx.update(doc.ref, { isRead: true }));
+            unread.docs.forEach((doc) => tx.update(doc.ref, readUpdate()));
             writeUnreadCounter(tx, counter, -unread.size);
             return unread.size;
         });
