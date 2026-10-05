@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'233c4560e22327d488bc7447fce330a896f033a4516f8dd7c86882045d55ddfc'>;
+  StorageHashBase<'cbed644961c2b50eb2ef039f8769e7151659391bf4e06a0639f1870032c354e0'>;
 export type ExecutionHash =
   ExecutionHashBase<'6de0e48d3f1c59e2a0a61163438e2873fa03ff2d9ec9032b69d0ecd52f841793'>;
 export type ProfileHash =
@@ -393,7 +393,6 @@ export type FieldOutputTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly status: 'active' | 'banned' | 'suspended';
       readonly subject: CodecTypes['pg/text@1']['output'];
-      readonly imageUrl: CodecTypes['pg/text@1']['output'] | null;
       readonly emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     };
     readonly UserFCMToken: {
@@ -559,7 +558,6 @@ export type FieldInputTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly status: 'active' | 'banned' | 'suspended';
       readonly subject: CodecTypes['pg/text@1']['input'];
-      readonly imageUrl: CodecTypes['pg/text@1']['input'] | null;
       readonly emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
     };
     readonly UserFCMToken: {
@@ -718,7 +716,6 @@ export type StorageColumnTypes = {
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
-      readonly imageUrl: CodecTypes['pg/text@1']['output'] | null;
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly password: CodecTypes['pg/text@1']['output'];
       readonly passwordLastChanged: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -884,7 +881,6 @@ export type StorageColumnInputTypes = {
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
-      readonly imageUrl: CodecTypes['pg/text@1']['input'] | null;
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly password: CodecTypes['pg/text@1']['input'];
       readonly passwordLastChanged: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -918,7 +914,6 @@ export namespace Models {
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     status: 'active' | 'banned' | 'suspended';
     subject: CodecTypes['pg/text@1']['output'];
-    imageUrl: CodecTypes['pg/text@1']['output'] | null;
     emailVerifiedAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
     readonly [RelationKeys]?: never;
   };
@@ -2115,11 +2110,6 @@ type ContractBase = Omit<
                     readonly value: DefaultLiteralValue<'pg/text@1', 'Quran'>;
                   };
                 };
-                readonly imageUrl: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
                 readonly emailVerifiedAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-string@1';
@@ -3135,10 +3125,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly imageUrl: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
               readonly emailVerifiedAt: {
                 readonly nullable: true;
                 readonly type: {
@@ -3163,7 +3149,6 @@ type ContractBase = Omit<
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly status: { readonly column: 'status' };
                 readonly subject: { readonly column: 'subject' };
-                readonly imageUrl: { readonly column: 'imageUrl' };
                 readonly emailVerifiedAt: { readonly column: 'emailVerifiedAt' };
               };
             };

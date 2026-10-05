@@ -44,7 +44,8 @@ export const phoneSchema = z
     .trim()
     .min(1, 'Phone is required')
     .max(30, 'Phone number is too long')
-    .regex(/^[+\d\s().-]+$/, 'Enter a valid phone number');
+    .regex(/^[+\d\s().-]+$/, 'Enter a valid phone number')
+    .optional();
 
 /** One-time tokens are 43-char base64url strings; cap the length so junk can't be hashed at scale. */
 const tokenSchema = z.string('Token is required').trim().min(20, 'Invalid or expired link').max(200, 'Invalid or expired link');
@@ -67,6 +68,7 @@ export const userSchema = z.object({
 
 export const userUpdateSchema = z.object({
     name: nameSchema,
+    imageUrl: z.string('please enter real url').optional(),
     email: emailSchema,
     phone: phoneSchema,
     password: passwordSchema,
@@ -121,6 +123,7 @@ export const signInSchema = z.object({
 
 export const signUpSchema = z.object({
     name: nameSchema,
+    imageUrl: z.string('please enter real url').optional(),
     email: emailSchema,
     phone: phoneSchema,
     password: passwordSchema,

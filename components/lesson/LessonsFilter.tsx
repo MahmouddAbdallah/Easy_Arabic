@@ -14,6 +14,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
 import SelectFamilies from './SelectFamilies';
 import clsx from 'clsx';
+import { useAppContext } from '../AppContext';
 
 interface FilterFormValues {
   status: string;
@@ -34,6 +35,7 @@ const EMPTY_VALUES: FilterFormValues = {
 };
 
 export const LessonsFilter = () => {
+  const { user } = useAppContext();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,7 +59,6 @@ export const LessonsFilter = () => {
   useEffect(() => {
     const from = searchParams.get('dateFrom');
     const to = searchParams.get('dateTo');
-
     reset({
       status: searchParams.get('status') || 'ALL',
       teacherReward: searchParams.get('teacherReward') || 'ALL',
@@ -244,8 +245,9 @@ export const LessonsFilter = () => {
               <div className="p-3 pt-2 border-t border-border/60 bg-muted/20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {/* Select Family */}
-                  <SelectFamilies isFilter={true} />
-
+                  {
+                    user?.role != 'family' &&
+                    <SelectFamilies isFilter={true} />}
                   {/* Date From */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
@@ -256,15 +258,9 @@ export const LessonsFilter = () => {
                       control={control}
                       render={({ field }) => (
                         <Popover>
-                          <PopoverTrigger className={'w-full'} >
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`w-full h-8 justify-start text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
-                              {field.value ? format(field.value, "PP") : <span>From Date</span>}
-                            </Button>
+                          <PopoverTrigger className={`flex justify-start items-center border w-full h-8 text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`} >
+                            <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
+                            {field.value ? format(field.value, "PP") : <span>From Date</span>}
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0 rounded-md border-border/80" align="start">
                             <Calendar
@@ -289,15 +285,9 @@ export const LessonsFilter = () => {
                       control={control}
                       render={({ field }) => (
                         <Popover>
-                          <PopoverTrigger className={'w-full'} >
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`w-full h-8 justify-start text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
-                              {field.value ? format(field.value, "PP") : <span>To Date</span>}
-                            </Button>
+                          <PopoverTrigger className={`flex justify-start items-center border w-full h-8 text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`} >
+                            <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
+                            {field.value ? format(field.value, "PP") : <span>To Date</span>}
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0 rounded-md border-border/80" align="start">
                             <Calendar

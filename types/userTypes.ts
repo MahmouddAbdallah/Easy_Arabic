@@ -8,5 +8,6 @@ export type userType = {
     emailVerifiedAt?: string | null;
     role: "admin" | "teacher" | "family";
     createdAt: Date;
-    updatedAt: Date
+    updatedAt: Date;
+    imageUrl?: string
 }

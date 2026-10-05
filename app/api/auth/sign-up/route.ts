@@ -1,13 +1,12 @@
 import { NextResponse, NextRequest, after } from "next/server";
 import { signUpSchema, firstValidationMessage } from "@/lib/validation";
-import { authConfig } from "@/lib/auth/config";
 import { hashPassword } from "@/lib/auth/password";
 import { findUserByEmail } from "@/lib/auth/users";
-import { issueToken } from "@/lib/auth/tokens";
 import { consume, rateLimitKey } from "@/lib/auth/rateLimit";
-import { sendAccountExistsEmail, sendVerificationEmail } from "@/lib/auth/email";
+import { sendAccountExistsEmail } from "@/lib/auth/email";
 import { errorResponse, forbiddenOrigin, getClientIp, invalidBody, isSameOrigin, readJsonBody, tooManyRequests } from "@/lib/auth/request";
 import { db } from "@/prisma/db";
+import { setSessionCookie } from "@/lib/auth/session";
 
 // The SAME response is returned whether or not the email is already
 // registered, so this form can't be used to discover who has an account.
@@ -54,10 +53,11 @@ export async function POST(req: NextRequest) {
                 phone: data.phone,
                 password: passwordHash,
             });
-            after(async () => {
-                const token = await issueToken(user.id, 'email_verification', authConfig.tokens.emailVerificationTtlSeconds);
-                await sendVerificationEmail(user.email, token);
-            });
+            // after(async () => {
+            //     const token = await issueToken(user.id, 'email_verification', authConfig.tokens.emailVerificationTtlSeconds);
+            //     await sendVerificationEmail(user.email, token);
+            // });
+            await setSessionCookie(user);
         } catch (error) {
             // Two simultaneous sign-ups for one email: the unique index lets
             // exactly one win. The loser gets the same generic response.

@@ -1,4 +1,5 @@
 import BackgroundImage from '@/components/auth/BackgroundImage'
+import ButtonGoogleProvider from '@/components/auth/ButtonGoogleProvider'
 import SignUpForm from '@/components/auth/SignUpForm'
 import { BookOpen } from 'lucide-react'
 import Image from 'next/image'
@@ -42,6 +43,7 @@ const Page = () => {
                             Fill in your details below to get started
                         </p>
                     </div>
+                    <ButtonGoogleProvider />
                     <SignUpForm />
                     <p className="text-center text-xs text-muted-foreground pt-2">
                         Already have an account?{" "}

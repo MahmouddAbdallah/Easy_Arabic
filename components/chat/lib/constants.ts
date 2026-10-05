@@ -3,6 +3,9 @@ import { formatDuration } from "./attachments";
 
 export const MESSAGES_API_URL = "/api/chat/messages";
 
+/** How many messages a chat loads when it opens, and each time "Load more" is pressed. */
+export const MESSAGES_PAGE_SIZE = 15;
+
 /**
  * Where the composer's toasts appear. The app-wide Toaster sits bottom-right, right on top of the
  * Send button, which would block pressing Send again after a failure.

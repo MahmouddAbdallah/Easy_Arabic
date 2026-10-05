@@ -263,15 +263,9 @@ export const LessonsDashboardFilter = ({ hiddenFamily }: { hiddenFamily?: boolea
                       control={control}
                       render={({ field }) => (
                         <Popover>
-                          <PopoverTrigger className={'w-full'} >
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`w-full h-8 justify-start text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
-                              {field.value ? format(field.value, "PP") : <span>From Date</span>}
-                            </Button>
+                          <PopoverTrigger className={`flex justify-start items-center border w-full h-8 text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`} >
+                            <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
+                            {field.value ? format(field.value, "PP") : <span>From Date</span>}
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0 rounded-md border-border/80" align="start">
                             <Calendar
@@ -296,15 +290,9 @@ export const LessonsDashboardFilter = ({ hiddenFamily }: { hiddenFamily?: boolea
                       control={control}
                       render={({ field }) => (
                         <Popover>
-                          <PopoverTrigger className={'w-full'} >
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`w-full h-8 justify-start text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
-                              {field.value ? format(field.value, "PP") : <span>To Date</span>}
-                            </Button>
+                          <PopoverTrigger className={`flex justify-start items-center border w-full h-8 text-left font-normal text-xs bg-background border-border/70 rounded-md px-2.5 ${!field.value && "text-muted-foreground"}`} >
+                            <CalendarIcon className="mr-1.5 h-3 w-3 text-muted-foreground" />
+                            {field.value ? format(field.value, "PP") : <span>To Date</span>}
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0 rounded-md border-border/80" align="start">
                             <Calendar

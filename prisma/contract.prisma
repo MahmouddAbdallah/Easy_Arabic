@@ -15,7 +15,7 @@ model User {
   id                  String             @id @default(uuid())
   name                String
   email               String             @unique
-  phone               String
+  phone               String?
   password            String
   passwordLastChanged TimestamptzString  @default(now())
   role                Role               @default(family)
@@ -23,6 +23,8 @@ model User {
   updatedAt           TimestamptzString  @default(now())
   status              Status             @default(active)
   subject             String             @default("Quran")
+
+  imageUrl            String?
   // Set when the user proves ownership of `email` (verification link or a
   // completed password reset). NULL = not verified yet.
   emailVerifiedAt     TimestamptzString?
@@ -87,7 +89,6 @@ model UserFCMToken {
 // old) - or who wants to change an admin-controlled field (email / phone) - asks
 // the admin instead of editing directly. See lib/profile/.
 // ---------------------------------------------------------------------------
-
 enum ProfileChangeRequestStatus {
   PENDING
   APPROVED
@@ -204,80 +205,80 @@ model Contact {
 // Singleton: exactly one row, always id = 'default' (enforced by the check
 // below). Every column is one concrete piece of information shown on /contact.
 model ContactInfo {
-  id                      String            @id
+  id                       String            @id
 
   // Hero
-  heroBadgeText           String
-  heroHeadline            String
-  heroDescription         String
+  heroBadgeText            String
+  heroHeadline             String
+  heroDescription          String
 
   // Phone
-  phoneLabel              String
-  phoneNumber             String
-  phoneNote               String
+  phoneLabel               String
+  phoneNumber              String
+  phoneNote                String
 
   // Support email
-  supportEmailLabel       String
-  supportEmail            String
-  supportEmailNote        String
+  supportEmailLabel        String
+  supportEmail             String
+  supportEmailNote         String
 
   // Billing email (hidden on the page when empty)
-  billingEmail            String?
+  billingEmail             String?
 
   // WhatsApp (the whole callout is hidden when `whatsappNumber` is empty)
-  whatsappNumber          String?           // digits only, with country code
-  whatsappTitle           String
-  whatsappDescription     String
-  whatsappButtonLabel     String
+  whatsappNumber           String? // digits only, with country code
+  whatsappTitle            String
+  whatsappDescription      String
+  whatsappButtonLabel      String
   whatsappPrefilledMessage String
 
   // Office address + map pin
-  officeName              String
-  addressLine1            String
-  addressLine2            String?
-  city                    String
-  stateRegion             String?
-  postalCode              String?
-  country                 String
-  latitude                Float
-  longitude               Float
+  officeName               String
+  addressLine1             String
+  addressLine2             String?
+  city                     String
+  stateRegion              String?
+  postalCode               String?
+  country                  String
+  latitude                 Float
+  longitude                Float
 
   // Business hours settings (the per-day rows live in ContactBusinessHour)
-  timezone                String            // IANA zone, e.g. "Africa/Cairo"
-  businessHoursNote       String
+  timezone                 String // IANA zone, e.g. "Africa/Cairo"
+  businessHoursNote        String
 
   // Support promises shown in the highlights strip
-  responseTime            String
-  supportLanguages        String
-  trialLessonText         String
+  responseTime             String
+  supportLanguages         String
+  trialLessonText          String
 
   // Contact form copy
-  formTitle               String
-  formDescription         String
-  formSuccessTitle        String
-  formSuccessMessage      String
+  formTitle                String
+  formDescription          String
+  formSuccessTitle         String
+  formSuccessMessage       String
 
   // FAQ section header (the questions live in ContactFaq)
-  faqTitle                String
-  faqDescription          String
+  faqTitle                 String
+  faqDescription           String
 
   // Social profiles (a link is hidden when empty)
-  facebookUrl             String?
-  instagramUrl            String?
-  linkedinUrl             String?
-  xUrl                    String?
-  whatsappUrl             String?           // https://wa.me/… (or whatsapp.com) profile / chat link
+  facebookUrl              String?
+  instagramUrl             String?
+  linkedinUrl              String?
+  xUrl                     String?
+  whatsappUrl              String? // https://wa.me/… (or whatsapp.com) profile / chat link
 
   // Section visibility on the public /contact page, one flag per dashboard
   // section (true = shown, false = hidden). Defaults to shown.
-  showContentSection      Boolean           @default(true)
-  showChannelsSection     Boolean           @default(true)
-  showLocationSection     Boolean           @default(true)
-  showHoursSection        Boolean           @default(true)
-  showSocialSection       Boolean           @default(true)
-  showFaqsSection         Boolean           @default(true)
+  showContentSection       Boolean           @default(true)
+  showChannelsSection      Boolean           @default(true)
+  showLocationSection      Boolean           @default(true)
+  showHoursSection         Boolean           @default(true)
+  showSocialSection        Boolean           @default(true)
+  showFaqsSection          Boolean           @default(true)
 
-  updatedAt               TimestamptzString @default(now())
+  updatedAt                TimestamptzString @default(now())
 
   @@check(expression: "id = 'default'", name: "contact_info_singleton")
 }

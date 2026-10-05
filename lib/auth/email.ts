@@ -33,7 +33,13 @@ class ResendProvider implements EmailProvider {
         const res = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from: this.from, to: [message.to], subject: message.subject, text: message.text, html: message.html }),
+            body: JSON.stringify({
+                from: this.from,
+                to: [message.to],
+                subject: message.subject,
+                text: message.text,
+                html: message.html
+            }),
             signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) throw new Error(`Resend responded with HTTP ${res.status}`);

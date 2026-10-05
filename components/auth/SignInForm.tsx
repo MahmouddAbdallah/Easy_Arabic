@@ -3,11 +3,9 @@
 import { useForm } from 'react-hook-form';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { EyeIcon, EyeOffIcon, Loader2Icon, MailIcon, LockIcon } from 'lucide-react';
-
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -28,14 +26,8 @@ const SignInForm = () => {
     const [resending, setResending] = useState(false);
     const lockout = useCountdown();
     const resendCooldown = useCountdown();
-    const router = useRouter();
 
-    const {
-        register,
-        handleSubmit,
-        reset,
-        formState: { errors, isSubmitting }
-    } = useForm<FormInputs>();
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormInputs>();
 
     const onSubmit = handleSubmit(async (formData) => {
         if (lockout.active) return;
@@ -50,10 +42,7 @@ const SignInForm = () => {
 
             toast.success(data.message || 'Signed in successfully');
             reset();
-            // Navigate first, then refresh: refreshing before the push doesn't
-            // reliably refetch the root layout, leaving the navbar signed-out.
-            router.push('/');
-            router.refresh();
+            window.location.reload();
         } catch (error: any) {
             const err = getApiError(error);
             if (err.code === 'LOGIN_LOCKED' && err.retryAfterSeconds) {

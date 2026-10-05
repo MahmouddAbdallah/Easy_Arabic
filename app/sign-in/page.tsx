@@ -1,4 +1,5 @@
 import BackgroundImage from "@/components/auth/BackgroundImage"
+import ButtonGoogleProvider from "@/components/auth/ButtonGoogleProvider"
 import SignInForm from "@/components/auth/SignInForm"
 import { BookOpen } from "lucide-react"
 import Image from "next/image"
@@ -43,6 +44,9 @@ const SignIn = async () => {
                         <p className="text-sm text-muted-foreground">
                             Enter your details below to sign in
                         </p>
+                    </div>
+                    <div className="relative mt-10">
+                        <ButtonGoogleProvider />
                     </div>
                     <SignInForm />
                     <p className="text-center text-xs text-muted-foreground pt-2">

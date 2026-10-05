@@ -31,9 +31,9 @@ const page = async () => {
     <div className={displayFont.variable}>
       <HeroSection />
       <About />
-      <Features />
       <ChatShowcase />
       <NotificationsShowcase />
+      <Features />
       <ForRoleSection />
       <CTA />
       <Footer />
