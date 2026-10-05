@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { authorization } from "@/lib/verifyAuth";
 import { AppProvider } from "@/components/AppContext";
 import { Toaster } from "react-hot-toast";
+import CallProvider from "@/components/chat/CallProvider";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -35,21 +36,23 @@ export default async function RootLayout({
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <AppProvider userData={user}>
-          <main>
-            {children}
-          </main>
-          <Toaster
-            position={'bottom-right'}
-            reverseOrder={false}
-            gutter={12}
-            toastOptions={{
-              style: {
-                background: 'var(--card)',
-                color: 'var(--foreground)',
-                border: '1px solid var(--border)',
-              }
-            }}
-          />
+          <CallProvider>
+            <main>
+              {children}
+            </main>
+            <Toaster
+              position={'bottom-right'}
+              reverseOrder={false}
+              gutter={12}
+              toastOptions={{
+                style: {
+                  background: 'var(--card)',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                }
+              }}
+            />
+          </CallProvider>
         </AppProvider>
       </body>
     </html>
