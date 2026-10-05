@@ -17,7 +17,7 @@ import { NavLinks } from "./NavLinks"
 import ThemeToggle from "./ThemeToggle"
 import { UserProfileMenu } from "./UserProfileMenu"
 import { focusRing, iconButtonClass } from "./styles"
-import { NotificationsMenu } from "../NotificationsMenu"
+import { NotificationsMenu } from "../notification/NotificationsMenu"
 
 /** Tailwind's `md` breakpoint, where the inline links replace the drawer. */
 const DESKTOP_QUERY = "(min-width: 768px)"

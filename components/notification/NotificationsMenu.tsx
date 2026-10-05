@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import NotificationBody from "@/components/notification/NotificationBody";
 import { UNREAD_COUNT_COLLECTION } from "@/components/notification/lib/contract";
 import { cn } from "@/lib/utils";
-import { useUnreadCount } from "./dashboard/Navbar/useUnreadCount";
+import { useUnreadCount } from "../dashboard/Navbar/useUnreadCount";
 
 /**
  * Bell with a live unread dot. Opens the in-app notification list in a popover.

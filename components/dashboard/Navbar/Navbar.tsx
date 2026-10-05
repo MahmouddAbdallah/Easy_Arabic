@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { CommandMenu } from "./CommandMenu";
-import { NotificationsMenu } from "../../NotificationsMenu";
+import { NotificationsMenu } from "../../notification/NotificationsMenu";
 import { Sidebar } from "./Sidebar";
 import { UserMenu } from "./UserMenu";
 import { usePathname } from "next/navigation";

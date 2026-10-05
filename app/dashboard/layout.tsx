@@ -1,7 +1,13 @@
 import { Navbar } from "@/components/dashboard/Navbar/Navbar";
 import { Sidebar } from "@/components/dashboard/Navbar/Sidebar";
+import { authorization } from "@/lib/verifyAuth";
+import { redirect } from "next/navigation";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+    const { user } = await authorization(['admin'])
+    if (!user) {
+        return redirect('/sign-in')
+    }
     return (
         <div className="min-h-dvh bg-muted/40 dark:bg-background lg:flex">
             <a
