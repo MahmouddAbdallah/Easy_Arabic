@@ -6,7 +6,9 @@ import {
     Users,
     Banknote,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import IconTile from './shared/IconTile';
+import Section from './shared/Section';
+import SectionHeader from './shared/SectionHeader';
 
 const features = [
     {
@@ -43,33 +45,26 @@ const features = [
 
 export default function Features() {
     return (
-        <section className="relative w-full py-20 md:py-28 bg-background border-b border-border/60">
-            <div className="container max-w-7xl mx-auto px-4 md:px-6 space-y-14">
-                <div className="flex flex-col items-center text-center space-y-4 max-w-2xl mx-auto">
-                    <span className="text-xs font-bold tracking-wider text-brand uppercase">What You Get</span>
-                    <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-                        Everything a family and teacher actually need
-                    </h2>
-                    <p className="text-muted-foreground text-base leading-relaxed">
-                        No bloated feature list — just what makes 1-on-1 Quran and Arabic
-                        tutoring work well for everyone involved.
-                    </p>
-                </div>
+        <Section aria-labelledby="features-heading" containerClassName="space-y-12 lg:space-y-14">
+            <SectionHeader
+                id="features-heading"
+                eyebrow="What You Get"
+                title="Everything a family and teacher actually need"
+                description="No bloated feature list — just what makes 1-on-1 Quran and Arabic tutoring work well for everyone involved."
+            />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {features.map((feature) => (
-                        <Card key={feature.title} className="border-border/60 hover:border-brand/40 transition-colors">
-                            <CardContent className="space-y-3.5">
-                                <div className="p-2.5 rounded-xl bg-brand-soft text-brand border border-brand/20 w-fit">
-                                    <feature.icon className="h-5 w-5" />
-                                </div>
-                                <h3 className="text-base font-bold text-foreground">{feature.title}</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            </div>
-        </section>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {features.map((feature) => (
+                    <li
+                        key={feature.title}
+                        className="space-y-3.5 rounded-2xl border border-border/60 bg-card p-5 sm:p-6 transition-colors hover:border-brand/40 motion-reduce:transition-none"
+                    >
+                        <IconTile icon={feature.icon} />
+                        <h3 className="text-base font-bold text-foreground">{feature.title}</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
+                    </li>
+                ))}
+            </ul>
+        </Section>
     );
 }

@@ -1,9 +1,11 @@
 import About from '@/components/landing/About'
+import ChatShowcase from '@/components/landing/ChatShowcase'
 import CTA from '@/components/landing/Cta'
 import Features from '@/components/landing/Features'
 import Footer from '@/components/Footer'
 import ForRoleSection from '@/components/landing/ForRole'
 import HeroSection from '@/components/landing/Hero'
+import NotificationsShowcase from '@/components/landing/NotificationsShowcase'
 import { authorization } from '@/lib/verifyAuth'
 import { displayFont } from '@/lib/fonts'
 import AdminHome from '@/components/home/AdminHome'
@@ -30,6 +32,8 @@ const page = async () => {
       <HeroSection />
       <About />
       <Features />
+      <ChatShowcase />
+      <NotificationsShowcase />
       <ForRoleSection />
       <CTA />
       <Footer />

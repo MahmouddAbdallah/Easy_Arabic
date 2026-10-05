@@ -1,5 +1,8 @@
 import Image from 'next/image';
 import { Send, HeartHandshake, BookOpenCheck } from 'lucide-react';
+import IconTile from './shared/IconTile';
+import Section from './shared/Section';
+import SectionHeader from './shared/SectionHeader';
 
 const steps = [
     {
@@ -30,71 +33,62 @@ const facts = [
 
 export default function About() {
     return (
-        <section className="relative w-full py-20 md:py-28 bg-background border-b border-border/60">
-            <div className="container max-w-7xl mx-auto px-4 md:px-6 space-y-16">
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-                    {/* LEFT: image */}
-                    <div className="lg:col-span-5 relative">
-                        <div className="absolute inset-0 bg-linear-to-tr from-brand/15 to-gold/10 blur-3xl rounded-[32px] -z-10" />
-                        <div className="relative aspect-[4/5] rounded-[24px] overflow-hidden border border-border/70 shadow-lg">
-                            <Image
-                                src="/assets/about.jpg"
-                                alt="An open Quran, ready for study"
-                                fill
-                                sizes="(min-width: 1024px) 38vw, 90vw"
-                                className="object-cover"
-                            />
-                        </div>
-                    </div>
-
-                    {/* RIGHT: steps */}
-                    <div className="lg:col-span-7 space-y-8">
-                        <div className="space-y-3">
-                            <span className="text-xs font-bold tracking-wider text-brand uppercase">How Easy Arabic Works</span>
-                            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-                                A simple, human process — not a marketplace to browse.
-                            </h2>
-                            <p className="text-muted-foreground text-base leading-relaxed max-w-xl">
-                                No endless list of profiles to compare. You tell us what you need,
-                                and our team takes it from there.
-                            </p>
-                        </div>
-
-                        <div className="space-y-4">
-                            {steps.map((step) => (
-                                <div
-                                    key={step.number}
-                                    className="flex gap-4 items-start p-4 sm:p-5 rounded-2xl border border-border/60 bg-card"
-                                >
-                                    <div className="shrink-0 flex flex-col items-center gap-1.5">
-                                        <div className="p-2.5 rounded-xl bg-brand-soft text-brand border border-brand/20">
-                                            <step.icon className="h-5 w-5" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-brand">{step.number}</span>
-                                            <h3 className="text-base font-bold text-foreground">{step.title}</h3>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+        <Section aria-labelledby="how-it-works-heading" containerClassName="space-y-12 lg:space-y-16">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+                {/* LEFT: image — short on phones so the steps start sooner, tall on desktop */}
+                <div className="lg:col-span-5 relative">
+                    <div aria-hidden="true" className="absolute inset-0 bg-linear-to-tr from-brand/15 to-gold/10 blur-3xl rounded-[32px] -z-10" />
+                    <div className="relative aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/5] rounded-[24px] overflow-hidden border border-border/70 shadow-lg">
+                        <Image
+                            src="/assets/about.jpg"
+                            alt="An open Quran, ready for study"
+                            fill
+                            sizes="(min-width: 1024px) 38vw, 90vw"
+                            className="object-cover"
+                        />
                     </div>
                 </div>
 
-                {/* Honest fact strip — real product facts, not growth stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 p-6 sm:p-8 rounded-3xl border border-border/60 bg-card">
-                    {facts.map((fact) => (
-                        <div key={fact.label} className="flex flex-col items-center text-center gap-1">
-                            <p className="font-display text-2xl sm:text-3xl font-bold text-brand">{fact.value}</p>
-                            <p className="text-xs sm:text-sm text-muted-foreground font-medium">{fact.label}</p>
-                        </div>
-                    ))}
+                {/* RIGHT: steps */}
+                <div className="lg:col-span-7 space-y-8">
+                    <SectionHeader
+                        id="how-it-works-heading"
+                        align="left"
+                        eyebrow="How Easy Arabic Works"
+                        title="A simple, human process — not a marketplace to browse."
+                        description="No endless list of profiles to compare. You tell us what you need, and our team takes it from there."
+                    />
+
+                    <ol className="space-y-4">
+                        {steps.map((step) => (
+                            <li
+                                key={step.number}
+                                className="flex gap-4 items-start p-4 sm:p-5 rounded-2xl border border-border/60 bg-card"
+                            >
+                                <IconTile icon={step.icon} />
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-brand" aria-hidden="true">{step.number}</span>
+                                        <h3 className="text-base font-bold text-foreground">{step.title}</h3>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
                 </div>
             </div>
-        </section>
+
+            {/* Honest fact strip — real product facts, not growth stats. Label comes first in the
+                markup (so it reads as "label, value") and the value is shown on top. */}
+            <dl className="grid grid-cols-1 sm:grid-cols-3 divide-y divide-border/60 sm:divide-y-0 sm:divide-x p-2 sm:p-4 rounded-3xl border border-border/60 bg-card">
+                {facts.map((fact) => (
+                    <div key={fact.label} className="flex flex-col-reverse items-center text-center gap-1 px-4 py-5 sm:py-4">
+                        <dt className="text-xs sm:text-sm text-muted-foreground font-medium">{fact.label}</dt>
+                        <dd className="font-display text-2xl sm:text-3xl font-bold text-brand">{fact.value}</dd>
+                    </div>
+                ))}
+            </dl>
+        </Section>
     );
 }
