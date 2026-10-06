@@ -7,7 +7,11 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function handleDeleteCloudinary(url: string) {
+/**
+ * `resourceType` defaults to "image", so every existing caller behaves exactly as before. Cloudinary
+ * only finds a video under its own resource type, so callers deleting videos must pass "video".
+ */
+export async function handleDeleteCloudinary(url: string, resourceType: 'image' | 'video' | 'raw' = 'image') {
     try {
         const decodedUrl = decodeURIComponent(url);
 
@@ -16,7 +20,7 @@ export async function handleDeleteCloudinary(url: string) {
             ?.replace(/^v\d+\//, "")
             ?.split(".")[0];
 
-        const result = await cloudinary.uploader.destroy(publicId);
+        const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 
         return {
             success: true,
@@ -109,5 +113,38 @@ export async function handleUploadCloudinary(file: File, folder?: string, rootFo
             message: error?.message,
             result: undefined,
         }
+    }
+}
+
+/**
+ * Deletes everything stored under `${rootFolder}/${folder}/` (images and videos), then the folder itself.
+ * For features that give each record its own folder, so removing the record removes all of its files,
+ * including ones no longer referenced anywhere.
+ *
+ * The prefix always ends with "/", so "blog/abc" can never also match "blog/abc123".
+ */
+export async function handleDeleteCloudinaryFolder(folder: string, rootFolder: string = 'ease_arabic') {
+    const path = `${rootFolder}/${folder}`.replace(/^\/+|\/+$/g, '');
+    if (!folder.replace(/\//g, '').trim()) {
+        // Never build a prefix that could match the whole root.
+        return { success: false, error: new Error('A folder is required') };
+    }
+
+    try {
+        for (const resourceType of ['image', 'video'] as const) {
+            // Cloudinary deletes up to 1000 files per call and reports `partial` when there are more.
+            let partial = true;
+            while (partial) {
+                const result = await cloudinary.api.delete_resources_by_prefix(`${path}/`, { resource_type: resourceType });
+                partial = Boolean(result?.partial);
+            }
+        }
+        // Only removes an empty folder; if that fails the files are already gone, which is what matters.
+        await cloudinary.api.delete_folder(path).catch(() => undefined);
+
+        return { success: true };
+    } catch (error) {
+        console.error("Cloudinary folder delete error:", error);
+        return { success: false, error };
     }
 }

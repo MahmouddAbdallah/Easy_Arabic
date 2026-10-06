@@ -1,0 +1,78 @@
+/* Editor-only styles. Typography itself comes from components/blog/content/blog-prose.css, so the
+   writing surface looks like the published page; this file only adds what an editor needs. */
+
+.blog-editor {
+  min-height: 30rem;
+  padding: 1.75rem 1.5rem 4rem;
+  outline: none;
+}
+
+@media (min-width: 640px) {
+  .blog-editor {
+    padding-inline: 2.25rem;
+  }
+}
+
+/* Placeholder on the empty first paragraph. */
+.blog-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: inline-start;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+  opacity: 0.75;
+}
+
+/* A selected image, video, embed or callout. */
+.blog-editor .ProseMirror-selectednode {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 0.75rem;
+}
+
+.blog-editor img,
+.blog-editor video {
+  cursor: default;
+}
+
+/* YouTube / Vimeo are shown as a thumbnail card while writing. */
+.blog-editor .blog-embed-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--brand-deep);
+  color: #fff;
+}
+.blog-editor .blog-embed-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  opacity: 0.55;
+}
+.blog-editor .blog-embed-card span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  font-size: 0.875rem;
+  line-height: 1;
+}
+.blog-editor .blog-embed-card span::before {
+  content: "";
+  border-inline-start: 0.7em solid currentColor;
+  border-block: 0.45em solid transparent;
+}
+
+/* Code blocks are plain <pre> here (the public page adds the label bar). */
+.blog-editor pre {
+  margin-inline: 0;
+}
