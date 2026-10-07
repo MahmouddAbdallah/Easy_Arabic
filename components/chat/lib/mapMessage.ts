@@ -18,21 +18,23 @@ function toDate(value: unknown): Date | null {
     return null;
 }
 
-function formatTime(iso: unknown): string {
-    const date = toDate(iso);
+function formatTime(date: Date | null): string {
     return date ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
 }
 
 /** Firestore message document -> UI message. */
 export function mapMessageDoc(id: string, data: DocumentData, currentUserId: string): MessageType {
     const deleted = data.deleted === true;
+    // The send time is never rewritten (not by an edit, not by a deletion), so a message keeps its place in its day.
+    const sentAt = toDate(data.time);
 
     return {
         id,
         senderId: data.senderId,
         // Deleted messages are cleared server-side; never render leftovers even if present.
         text: deleted ? "" : data.text || "",
-        time: formatTime(data.time),
+        time: formatTime(sentAt),
+        sentAt,
         isMe: data.senderId === currentUserId,
         status: data.status || "sent",
         // Handles both the `attachments` list and the single `attachment` older messages have.

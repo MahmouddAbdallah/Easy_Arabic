@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { ChevronUpIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,12 +8,15 @@ import InputMessage from "./InputMessage";
 import { useChat } from "../ChatProvider";
 import { useAppContext } from "@/components/AppContext";
 import ChatHeader from "./ChatHeader";
+import { DateSeparator } from "./DateSeparator";
 import { MessageItem } from "./Message/MessageItem";
 import { CallLogMessage } from "../Call/CallLogMessage";
 import { DeleteMessageDialog } from "./Message/DeleteMessageDialog";
 import { useMessageActions } from "../hooks/useMessageActions";
 import { useMarkChatRead } from "../hooks/useMarkChatRead";
 import { useChatMessages } from "../hooks/useChatMessages";
+import { useToday } from "../hooks/useToday";
+import { withDaySeparators } from "../lib/dateSeparators";
 import type { MessageType } from "../types";
 
 export function ChatArea() {
@@ -31,6 +34,10 @@ export function ChatArea() {
     const peer = receiverId && receiver?.id === receiverId ? { id: receiverId, name: receiver.name ?? "User" } : null;
     // The latest page of the conversation, kept live; older pages are added with `loadMore`.
     const { messages, loading, hasMore, loadingMore, loadMore } = useChatMessages(chatId, currentUserId);
+    // The current day, so "Today" turns into "Yesterday" by itself if the chat stays open past midnight.
+    const today = useToday();
+    // The conversation with a date separator before the first message of each calendar day.
+    const timeline = useMemo(() => withDaySeparators(messages, today), [messages, today]);
     const { editMessage, deleteMessage, reactToMessage, isPending } = useMessageActions(chatId);
     // Opening the chat (and keeping it open) clears the current user's own unread counter.
     useMarkChatRead(chatId, currentUserId);
@@ -98,12 +105,6 @@ export function ChatArea() {
 
             <ScrollArea className="flex-1 min-h-0 px-2 md:px-6">
                 <div ref={contentRef} className="space-y-6 max-w-full mx-auto py-6">
-                    <div className="flex items-center justify-center my-4">
-                        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground/70 bg-muted/40 px-3.5 py-1 rounded-full border border-border/30 backdrop-blur-md shadow-xs">
-                            Today
-                        </span>
-                    </div>
-
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-16 gap-2 text-xs text-muted-foreground/80">
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -142,16 +143,18 @@ export function ChatArea() {
                                 </div>
                             )}
 
-                            {messages.map((msg) => msg.call ? (
-                                <CallLogMessage key={msg.id} message={msg} peer={peer} />
+                            {timeline.map((item) => item.type === "separator" ? (
+                                <DateSeparator key={item.key} label={item.label} title={item.title} dateTime={item.dateTime} />
+                            ) : item.message.call ? (
+                                <CallLogMessage key={item.message.id} message={item.message} peer={peer} />
                             ) : (
                                 <MessageItem
-                                    key={msg.id}
-                                    message={msg}
+                                    key={item.message.id}
+                                    message={item.message}
                                     currentUserId={currentUserId ?? ""}
                                     otherUserName={receiver?.name}
-                                    isEditing={editingId === msg.id && !msg.deleted}
-                                    isPending={isPending(msg.id)}
+                                    isEditing={editingId === item.message.id && !item.message.deleted}
+                                    isPending={isPending(item.message.id)}
                                     onReact={reactToMessage}
                                     onStartEdit={setEditingId}
                                     onCancelEdit={() => setEditingId(null)}

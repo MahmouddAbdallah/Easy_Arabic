@@ -92,7 +92,7 @@ const ChatHeader = () => {
                     </Tooltip>
 
                     <Tooltip>
-                        <TooltipTrigger className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                        <TooltipTrigger className=" h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
                             <SearchIcon className="h-4 w-4" />
                         </TooltipTrigger>
                         <TooltipContent>Search in Chat</TooltipContent>

@@ -85,6 +85,12 @@ export interface MessageType {
     text: string;
     /** Formatted send time. Never changes when a message is edited. */
     time: string;
+    /**
+     * When the message was sent: the stored `time` the conversation is ordered by (for a call log, when the call
+     * ended). Date separators group on this, not on the formatted `time`. Edits and deletions don't change it.
+     * Null only if the stored value can't be read.
+     */
+    sentAt: Date | null;
     isMe: boolean;
     status?: "sent" | "delivered" | "read";
     /** Empty for text-only messages. Old single `attachment` documents are mapped into this list. */

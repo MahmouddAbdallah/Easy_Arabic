@@ -7,7 +7,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2Icon, Mic2Icon, SendHorizontalIcon, SmileIcon, UploadIcon } from "lucide-react";
+import { Loader2Icon, Mic2Icon, SendHorizontalIcon, UploadIcon } from "lucide-react";
 import { useChat } from "../ChatProvider";
 import { useAppContext } from "@/components/AppContext";
 import { useTypingIndicator } from "../hooks/useTyping";
@@ -147,16 +147,6 @@ const InputMessage = () => {
                             }}
                             className="border-none bg-transparent shadow-none focus-visible:ring-0 text-xs placeholder:text-muted-foreground/50 h-9 min-w-0 flex-1"
                         />
-
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Emoji"
-                            className="size-11 md:size-8 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
-                        >
-                            <SmileIcon className="h-4 w-4" />
-                        </Button>
 
                         {loading ? (
                             <Button
