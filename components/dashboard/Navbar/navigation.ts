@@ -1,4 +1,4 @@
-import { GraduationCap, MessageSquare, PhoneCall, UserPen, Users, type LucideIcon, } from "lucide-react";
+import { BellRingIcon, GraduationCap, MessageSquare, PhoneCall, SquareText, UserPen, Users, type LucideIcon, } from "lucide-react";
 
 /**
  * Single source of truth for the dashboard's navigation. The sidebar, the navbar
@@ -51,6 +51,16 @@ export const navigationItems: NavItem[] = [
             { title: "Messages", href: "/dashboard/contact" },
             { title: "Contact Page", href: "/dashboard/contact/contact-info" },
         ],
+    },
+    {
+        title: "Notification Settings",
+        href: "/dashboard/notification",
+        icon: BellRingIcon,
+    },
+    {
+        title: "Blog",
+        href: "/dashboard/blog",
+        icon: SquareText,
     },
 ];
 
