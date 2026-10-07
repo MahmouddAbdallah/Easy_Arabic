@@ -27,7 +27,7 @@ export default function NotificationBody({ pageSize, className }: NotificationBo
     const { user } = useAppContext();
     const { notifications, status, hasUnread, hasMore, loadingMore, loadMore, markAsRead, markAllAsRead } =
         useNotifications(user?.id, pageSize);
-    const { push, settingsState } = useOptionalNotificationControls();
+    const { push, settingsState, config } = useOptionalNotificationControls();
 
     const [view, setView] = useState<'list' | 'settings'>('list');
     const settingsButton = useRef<HTMLButtonElement>(null);
@@ -41,7 +41,7 @@ export default function NotificationBody({ pageSize, className }: NotificationBo
     if (view === 'settings' && settingsState) {
         return (
             <section aria-label="Notification settings" className={cn('mx-auto w-full max-w-2xl p-4', className)}>
-                <NotificationSettingsPanel settingsState={settingsState} push={push} onBack={closeSettings} />
+                <NotificationSettingsPanel settingsState={settingsState} push={push} config={config} onBack={closeSettings} />
             </section>
         );
     }

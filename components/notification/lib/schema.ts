@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fcmTokenSchema } from '@/lib/validation';
+import { CATEGORY_ID_PATTERN } from './config';
 import { NOTIFICATION_TYPES, isSafeAssetUrl, isSafeInternalLink } from './contract';
 import { isValidTime, isValidTimeZone } from './settings';
 
@@ -99,7 +100,9 @@ export type ActiveContextInput = z.infer<typeof activeContextSchema>;
 
 /**
  * Body of PATCH /api/notification/settings: any non-empty subset of the settings (settings.ts). Strict at
- * every level so a typo ("sond") is rejected instead of silently ignored.
+ * every level so a typo ("sond") is rejected instead of silently ignored. The sections a person can switch are
+ * the admin's configuration, which this static schema cannot know: it checks the id's FORMAT, and the route
+ * checks the ids against the configuration (a typo or a removed section is rejected there).
  */
 const time = z.string().refine(isValidTime, 'Use a 24-hour time such as "22:00"');
 
@@ -109,12 +112,8 @@ export const settingsPatchSchema = z
         popups: z.boolean().optional(),
         sound: z.boolean().optional(),
         categories: z
-            .strictObject({
-                messages: z.boolean().optional(),
-                lessons: z.boolean().optional(),
-                account: z.boolean().optional(),
-                general: z.boolean().optional(),
-            })
+            .record(z.string().regex(CATEGORY_ID_PATTERN, 'Invalid section id'), z.boolean())
+            .refine((choices) => Object.keys(choices).length > 0, { message: 'Nothing to update' })
             .optional(),
         quietHours: z
             .strictObject({
@@ -128,6 +127,18 @@ export const settingsPatchSchema = z
     .refine((patch) => Object.keys(patch).length > 0, { message: 'Nothing to update' });
 
 export type SettingsPatchInput = z.infer<typeof settingsPatchSchema>;
+
+/**
+ * Body of PUT /api/notification/config: the whole configuration plus the revision it was edited from (so a
+ * save never overwrites a configuration the admin has not seen). `config` is only required to be an object
+ * here; its contents are checked by parseConfig (configParse.ts), the one set of rules the dashboard shares.
+ */
+export const saveConfigSchema = z.strictObject({
+    config: z.record(z.string(), z.unknown()),
+    expectedRevision: z.number().int().min(0),
+});
+
+export type SaveConfigInput = z.infer<typeof saveConfigSchema>;
 
 /** "title: title is required; link: link must be ..." — readable in logs and API responses. */
 export function formatValidationIssues(error: z.ZodError): string {

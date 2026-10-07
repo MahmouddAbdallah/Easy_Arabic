@@ -4,12 +4,15 @@
  * What sendNotification() needs to know about each recipient before it sends: are they already looking
  * at the page the notification is about (./presence.ts), and what did they choose to be alerted about
  * (./settings.ts). Both live in Firestore, so they are fetched with ONE batched read — one round trip
- * for any number of recipients — and settings this instance remembers are not fetched again.
+ * for any number of recipients — and choices this instance remembers are not fetched again. What they chose
+ * is then resolved against the notification configuration (../config.ts): what a person never chose takes
+ * the configured default, and locked controls take theirs.
  */
 import { firestore } from './firestore';
 import { isViewing, presenceRef } from './presence';
-import { cachedSettings, rememberSettings, settingsRef } from './settings';
-import type { NotificationSettings } from '../settings';
+import { cachedChoices, rememberChoices, settingsRef } from './settings';
+import type { NotificationConfig } from '../config';
+import { normalizeSettings, type NotificationSettings, type NotificationSettingsPatch } from '../settings';
 
 export interface RecipientState {
     /** A live, recently active tab of theirs shows the notification's link. */
@@ -18,18 +21,19 @@ export interface RecipientState {
 }
 
 /**
- * The state of each of `userIds`. Presence is only looked up when the notification has a `link`.
- * Throws if Firestore fails — the caller decides what to do (sendNotification sends anyway).
+ * The state of each of `userIds`, with their settings resolved under `config`. Presence is only looked up
+ * when the notification has a `link`. Throws if Firestore fails — the caller decides what to do
+ * (sendNotification sends anyway, with the configured defaults).
  */
 export async function loadRecipientState(
     userIds: string[],
     link: string | undefined,
-    defaults: NotificationSettings
+    config: NotificationConfig
 ): Promise<Map<string, RecipientState>> {
     const db = await firestore();
     const now = Date.now();
 
-    const remembered = new Map(userIds.map((userId) => [userId, cachedSettings(userId, now)] as const));
+    const remembered = new Map<string, NotificationSettingsPatch | undefined>(userIds.map((userId) => [userId, cachedChoices(userId, now)] as const));
     const missing = userIds.filter((userId) => !remembered.get(userId));
 
     const presenceUsers = link ? userIds : [];
@@ -44,10 +48,12 @@ export async function loadRecipientState(
         if (link && isViewing(snapshot, link, now)) viewing.add(snapshot.id);
     });
     snapshots.slice(presenceUsers.length).forEach((snapshot) => {
-        remembered.set(snapshot.id, rememberSettings(snapshot, now));
+        remembered.set(snapshot.id, rememberChoices(snapshot, now));
     });
 
     return new Map(
-        userIds.map((userId) => [userId, { viewing: viewing.has(userId), settings: remembered.get(userId) ?? defaults }] as const)
+        userIds.map(
+            (userId) => [userId, { viewing: viewing.has(userId), settings: normalizeSettings(remembered.get(userId) ?? {}, config) }] as const
+        )
     );
 }

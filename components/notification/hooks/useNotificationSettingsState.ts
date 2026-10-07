@@ -5,12 +5,12 @@ import { toast } from 'react-hot-toast';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { firebaseClientDB } from '@/lib/config/firebase-client';
 import { saveSettings, saveSettingsOnExit } from '../lib/client/api';
+import { DEFAULT_NOTIFICATION_CONFIG, type NotificationConfig } from '../lib/config';
 import { NOTIFICATION_SETTINGS_COLLECTION } from '../lib/contract';
 import {
-    DEFAULT_SETTINGS,
-    applySettingsPatch,
     mergePatches,
     normalizeSettings,
+    pickStoredSettings,
     type NotificationSettings,
     type NotificationSettingsPatch,
 } from '../lib/settings';
@@ -31,17 +31,18 @@ const CACHE_PREFIX = 'notification:settings:';
 /** Rapid changes (a toggle clicked twice, a time being adjusted) are sent as one request. */
 const SAVE_DELAY_MS = 400;
 
-function readCache(userId: string): NotificationSettings {
+/** What this person chose, as last seen (nothing, if there is no copy). Only choices are kept — see ../lib/settings.ts. */
+function readCache(userId: string): NotificationSettingsPatch {
     try {
-        return normalizeSettings(JSON.parse(localStorage.getItem(CACHE_PREFIX + userId) ?? 'null'));
+        return pickStoredSettings(JSON.parse(localStorage.getItem(CACHE_PREFIX + userId) ?? 'null'));
     } catch {
-        return DEFAULT_SETTINGS;
+        return {};
     }
 }
 
-function writeCache(userId: string, settings: NotificationSettings) {
+function writeCache(userId: string, stored: NotificationSettingsPatch) {
     try {
-        localStorage.setItem(CACHE_PREFIX + userId, JSON.stringify(settings));
+        localStorage.setItem(CACHE_PREFIX + userId, JSON.stringify(stored));
     } catch {
         /* ignore */
     }
@@ -57,22 +58,30 @@ const hasChanges = (patch: NotificationSettingsPatch) => Object.keys(patch).leng
  *
  * While changes are unsaved or being saved, incoming snapshots are held back and applied afterwards, so
  * the screen never flickers back to an old value in the middle of an edit.
+ *
+ * What the hook keeps is what the person CHOSE (`stored`). The `settings` it returns are those choices resolved
+ * against the notification configuration (`config`: configured defaults, locked controls, the sections that
+ * exist — see ../lib/settings.ts). Resolving at read time means a configuration change reaches the screen and
+ * the alerts at once, with nothing the person chose lost or overwritten.
  */
-export function useNotificationSettingsState(userId: string | undefined): NotificationSettingsState {
-    const [server, setServer] = useState<NotificationSettings>(DEFAULT_SETTINGS);
+export function useNotificationSettingsState(
+    userId: string | undefined,
+    config: NotificationConfig = DEFAULT_NOTIFICATION_CONFIG
+): NotificationSettingsState {
+    const [stored, setStored] = useState<NotificationSettingsPatch>({});
     const [unsent, setUnsent] = useState<NotificationSettingsPatch>({});
     const [status, setStatus] = useState<NotificationSettingsState['status']>('loading');
     const [saving, setSaving] = useState(false);
 
-    const serverRef = useRef(server);
+    const storedRef = useRef(stored);
     const unsentRef = useRef<NotificationSettingsPatch>({});
     const busyRef = useRef(false);
-    const heldSnapshot = useRef<NotificationSettings | null>(null);
+    const heldSnapshot = useRef<NotificationSettingsPatch | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-    const setServerState = useCallback((next: NotificationSettings) => {
-        serverRef.current = next;
-        setServer(next);
+    const setStoredState = useCallback((next: NotificationSettingsPatch) => {
+        storedRef.current = next;
+        setStored(next);
     }, []);
 
     useEffect(() => {
@@ -83,21 +92,21 @@ export function useNotificationSettingsState(userId: string | undefined): Notifi
         setSaving(false);
 
         if (!userId) {
-            setServerState(DEFAULT_SETTINGS);
+            setStoredState({});
             setStatus('loading');
             return;
         }
 
-        setServerState(readCache(userId));
+        setStoredState(readCache(userId));
         setStatus('loading');
 
         return onSnapshot(
             doc(firebaseClientDB, NOTIFICATION_SETTINGS_COLLECTION, userId),
             (snapshot) => {
-                const next = normalizeSettings(snapshot.data()); // a missing document means "all defaults"
+                const next = pickStoredSettings(snapshot.data()); // a missing document means "chose nothing", so all defaults
                 writeCache(userId, next);
                 if (busyRef.current || hasChanges(unsentRef.current)) heldSnapshot.current = next;
-                else setServerState(next);
+                else setStoredState(next);
                 setStatus('ready');
             },
             (error) => {
@@ -106,7 +115,7 @@ export function useNotificationSettingsState(userId: string | undefined): Notifi
                 setStatus('error');
             }
         );
-    }, [userId, setServerState]);
+    }, [userId, setStoredState]);
 
     const flush = useCallback(async () => {
         clearTimeout(timer.current);
@@ -117,9 +126,9 @@ export function useNotificationSettingsState(userId: string | undefined): Notifi
             // One request at a time; changes made while it is out are sent right after, as one more.
             while (hasChanges(unsentRef.current)) {
                 const batch = unsentRef.current;
-                const before = serverRef.current;
+                const before = storedRef.current;
                 unsentRef.current = {};
-                setServerState(applySettingsPatch(before, batch)); // from here on the screen reads it from `server`
+                setStoredState(mergePatches(before, batch)); // from here on the screen reads it from `stored`
                 setUnsent({});
 
                 let saved = true;
@@ -133,14 +142,14 @@ export function useNotificationSettingsState(userId: string | undefined): Notifi
 
                 const held = heldSnapshot.current;
                 heldSnapshot.current = null;
-                if (!saved) setServerState(held ?? before);
-                else if (held) setServerState(applySettingsPatch(held, batch)); // `held` may predate our write
+                if (!saved) setStoredState(held ?? before);
+                else if (held) setStoredState(mergePatches(held, batch)); // `held` may predate our write
             }
         } finally {
             busyRef.current = false;
             setSaving(false);
         }
-    }, [setServerState]);
+    }, [setStoredState]);
 
     const update = useCallback(
         (patch: NotificationSettingsPatch) => {
@@ -167,7 +176,10 @@ export function useNotificationSettingsState(userId: string | undefined): Notifi
         };
     }, []);
 
-    const settings = useMemo(() => applySettingsPatch(server, unsent), [server, unsent]);
+    const settings: NotificationSettings = useMemo(
+        () => normalizeSettings(mergePatches(stored, unsent), config),
+        [stored, unsent, config]
+    );
 
     return useMemo(() => ({ settings, status, update, saving }), [settings, status, update, saving]);
 }

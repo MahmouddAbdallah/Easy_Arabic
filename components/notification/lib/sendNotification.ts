@@ -9,7 +9,9 @@
  *   recentSends.ts — an identical send a moment ago? (accidental repeats are dropped for free)
  *   recipients.ts  — per recipient, in ONE batched read: are they already looking at the notification's page
  *                    (presence.ts), and what did they choose to be alerted about (settings.ts)?
- *   policy.ts      — turns those choices into "may this push?" (paused, muted category, quiet hours)
+ *   config.ts      — the admin's configuration (server/config.ts, cached, never throws): which sections exist and are
+ *                    switched on, per-type urgency / time-to-live, the default icon, defaults for users who never chose
+ *   policy.ts      — turns those choices into "may this push?" (paused, muted or disabled section, quiet hours)
  *   inbox.ts       — the stored copy for the in-app list + unread counter (identity.ts decides "same one")
  *   devices.ts     — which FCM tokens belong to the recipients
  *   push.ts        — FCM delivery and cleanup of dead tokens
@@ -61,6 +63,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { Messaging } from 'firebase-admin/messaging';
+import { categoryOfType, typeDelivery, type NotificationConfig } from './config';
 import {
     NOTIFICATION_PAYLOAD_VERSION,
     NOTIFICATION_TYPE_CONFIG,
@@ -70,13 +73,14 @@ import {
 } from './contract';
 import { decideAlerts } from './policy';
 import { formatValidationIssues, sendNotificationSchema, type ValidatedNotificationInput } from './schema';
+import { loadNotificationConfig } from './server/config';
 import { getDevicesForUsers } from './server/devices';
 import { notificationKey } from './server/identity';
 import { saveToInbox } from './server/inbox';
 import { loadMessaging, pushToDevices, type PushOutcome } from './server/push';
 import { forgetSend, isRecentDuplicate, sendFingerprint } from './server/recentSends';
 import { loadRecipientState, type RecipientState } from './server/recipients';
-import { DEFAULT_SETTINGS } from './settings';
+import { normalizeSettings } from './settings';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -98,7 +102,10 @@ export type NotificationRecipient = OnlyOne<{
 export interface NotificationContent {
     title: string;
     body: string;
-    /** Defaults to 'general'. Sets delivery defaults — see NOTIFICATION_TYPE_CONFIG in contract.ts. */
+    /**
+     * Defaults to 'general'. Sets the delivery defaults and the section a user can mute it with — both come from the
+     * admin's configuration, which starts from NOTIFICATION_TYPE_CONFIG in contract.ts.
+     */
     type?: NotificationType;
     /** Internal path opened when the notification is clicked, e.g. "/chat?receiverId=abc". */
     link?: string;
@@ -171,6 +178,11 @@ export interface SendNotificationResult {
      * the category muted, or quiet hours. (Not an error — it is what they asked for.)
      */
     muted: number;
+    /**
+     * The notification's section is switched off in the notification configuration, so nobody was alerted. (Users
+     * addressed by id still got the stored copy and are counted in `muted`; a send to raw device tokens is dropped.)
+     */
+    disabled: boolean;
     /** The exact same send was made moments ago, so this one was dropped as an accidental repeat. */
     duplicate: boolean;
     error?: { code: NotificationErrorCode; message: string };
@@ -192,6 +204,7 @@ function result(partial: Partial<SendNotificationResult> = {}): SendNotification
         updated: 0,
         suppressed: 0,
         muted: 0,
+        disabled: false,
         duplicate: false,
         ...partial,
     };
@@ -208,16 +221,21 @@ function recipientUserIds(input: ValidatedNotificationInput): string[] {
 
 /**
  * Per recipient: are they already looking at the notification's page, and what did they choose? If the
- * lookup fails nobody is held back and everyone gets the defaults: a duplicate notification is better than a lost one.
+ * lookup fails nobody is held back and everyone gets the configured defaults: a duplicate notification is better than a lost one.
  */
-async function loadRecipients(input: ValidatedNotificationInput, userIds: string[]): Promise<Map<string, RecipientState>> {
+async function loadRecipients(
+    input: ValidatedNotificationInput,
+    userIds: string[],
+    config: NotificationConfig
+): Promise<Map<string, RecipientState>> {
     if (userIds.length === 0) return new Map();
 
     try {
-        return await loadRecipientState(userIds, input.link, DEFAULT_SETTINGS);
+        return await loadRecipientState(userIds, input.link, config);
     } catch (error) {
         console.error('[notification] Could not load the recipients\' presence and settings:', error);
-        return new Map(userIds.map((userId) => [userId, { viewing: false, settings: DEFAULT_SETTINGS }] as const));
+        const defaults = normalizeSettings({}, config);
+        return new Map(userIds.map((userId) => [userId, { viewing: false, settings: defaults }] as const));
     }
 }
 
@@ -246,8 +264,12 @@ async function resolveDevices(input: ValidatedNotificationInput, audience: PushA
     return { loud, silent };
 }
 
-/** `tag` and `key` decide how the device and the list group this notification — see NotificationPayload. */
-function buildPayload(input: ValidatedNotificationInput, grouping: { tag?: string; key?: string }): NotificationPayload {
+/**
+ * `tag` and `key` decide how the device and the list group this notification — see NotificationPayload.
+ * The service worker cannot read the configuration (it has no Firebase SDK on purpose), so what it needs from it
+ * travels in the payload: here, the configured icon for senders that gave none.
+ */
+function buildPayload(input: ValidatedNotificationInput, grouping: { tag?: string; key?: string }, config: NotificationConfig): NotificationPayload {
     const payload: NotificationPayload = {
         v: NOTIFICATION_PAYLOAD_VERSION,
         id: randomUUID(),
@@ -257,7 +279,8 @@ function buildPayload(input: ValidatedNotificationInput, grouping: { tag?: strin
         sentAt: Date.now(),
     };
     if (input.link) payload.link = input.link;
-    if (input.icon) payload.icon = input.icon;
+    const icon = input.icon ?? config.delivery.defaultIcon;
+    if (icon) payload.icon = icon;
     if (input.image) payload.image = input.image;
     if (grouping.tag) payload.tag = grouping.tag;
     if (grouping.key) payload.key = grouping.key;
@@ -273,7 +296,8 @@ const NO_OUTCOME: PushOutcome = { sent: 0, failed: 0, removedTokens: 0, errorCod
 async function sendPush(
     input: ValidatedNotificationInput,
     audience: PushAudience,
-    payload: NotificationPayload
+    payload: NotificationPayload,
+    config: NotificationConfig
 ): Promise<SendNotificationResult> {
     // 1. Resolve who to send to
     let devices: Devices;
@@ -295,8 +319,8 @@ async function sendPush(
         return failure('NOT_CONFIGURED', 'Firebase Admin could not be initialised.', { targeted });
     }
 
-    const config = NOTIFICATION_TYPE_CONFIG[input.type];
-    const delivery = { urgency: input.urgency ?? config.urgency, ttlSeconds: input.ttlSeconds ?? config.ttlSeconds };
+    const typeDefaults = typeDelivery(config, input.type);
+    const delivery = { urgency: input.urgency ?? typeDefaults.urgency, ttlSeconds: input.ttlSeconds ?? typeDefaults.ttlSeconds };
 
     // Two sends at most: devices that may make a sound, and devices of people who turned sound off.
     const [audible, quiet] = await Promise.all([
@@ -343,6 +367,9 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     }
     const input = parsed.data;
 
+    // The admin's configuration: cached, and it never throws (it falls back to what it last knew, then to the defaults).
+    const config = await loadNotificationConfig();
+
     // 2. Build the payload once; every device (and the in-app copy) gets the same content.
     //    - `identity` says which notifications are "the same one" (identity.ts). A notification that is stored
     //      carries it as `key`, so a click can find and clear the stored copy.
@@ -352,7 +379,7 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     const identity = addressed.length > 0 ? notificationKey(input) : undefined;
     const key = input.persist ? identity : undefined;
     const tag = input.tag ?? (NOTIFICATION_TYPE_CONFIG[input.type].identity === 'link' ? identity : undefined);
-    const payload = buildPayload(input, { tag, key });
+    const payload = buildPayload(input, { tag, key }, config);
     const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
         const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
@@ -372,7 +399,7 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     });
     if (isRecentDuplicate(fingerprint)) return result({ duplicate: true });
 
-    const outcome = await deliver(input, addressed, key, payload);
+    const outcome = await deliver(input, addressed, key, payload, config);
     if (!outcome.success) forgetSend(fingerprint); // let the caller retry
     return outcome;
 }
@@ -381,31 +408,38 @@ async function deliver(
     input: ValidatedNotificationInput,
     addressed: string[],
     key: string | undefined,
-    payload: NotificationPayload
+    payload: NotificationPayload,
+    config: NotificationConfig
 ): Promise<SendNotificationResult> {
+    // The notification's section can be switched off for everyone in the configuration. Users addressed by id are
+    // handled below like any muted section (stored, not alerted); with no user to store for there is nothing left to do.
+    const section = categoryOfType(config, input.type);
+    const disabled = section ? !section.enabled : false;
+    if (disabled && addressed.length === 0) return result({ disabled: true });
+
     // 4. Leave out the users who are already looking at what the notification is about, and work out who
     //    may be pushed to. Everyone else is still stored for — alerts are a preference, the list is a record.
-    const recipients = await loadRecipients(input, addressed);
+    const recipients = await loadRecipients(input, addressed, config);
     const reachable = addressed.filter((userId) => !recipients.get(userId)?.viewing);
     const suppressed = addressed.length - reachable.length;
-    if (addressed.length > 0 && reachable.length === 0) return result({ suppressed });
+    if (addressed.length > 0 && reachable.length === 0) return result({ suppressed, disabled });
 
     const audience: PushAudience = { loud: [], silent: [] };
     const now = Date.now();
     for (const userId of reachable) {
-        const settings = recipients.get(userId)?.settings ?? DEFAULT_SETTINGS;
-        if (decideAlerts(settings, input.type, now).push) (settings.sound ? audience.loud : audience.silent).push(userId);
+        const settings = recipients.get(userId)?.settings ?? normalizeSettings({}, config);
+        if (decideAlerts(settings, input.type, now, config).push) (settings.sound ? audience.loud : audience.silent).push(userId);
     }
     const muted = reachable.length - audience.loud.length - audience.silent.length;
 
     // 5. Push and in-app copy are independent: neither waits for, or fails because of, the other.
     const noCopy = { stored: 0, updated: 0, ok: true };
     const [push, inApp] = await Promise.all([
-        sendPush(input, audience, payload),
+        sendPush(input, audience, payload, config),
         key ? saveInAppCopies(reachable, key, payload) : noCopy,
     ]);
 
-    const outcome = { ...push, stored: inApp.stored, updated: inApp.updated, suppressed, muted };
+    const outcome = { ...push, stored: inApp.stored, updated: inApp.updated, suppressed, muted, disabled };
     if (!inApp.ok && push.success) {
         return failure('INBOX_FAILED', 'The notification was sent but could not be saved to the in-app list.', outcome);
     }

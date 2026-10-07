@@ -8,106 +8,121 @@
  *   popups      show a pop-up (toast) for a new notification while the app is open.
  *   sound       play a sound for a new notification — the in-app chime, and an audible (rather than silent)
  *               system notification where the browser allows it.
- *   categories  one switch per kind of notification (contract.ts maps every type to one). Off = no alert for
- *               that kind, but it is still listed.
+ *   categories  one switch per section of "What to be notified about". Which sections exist is the admin's
+ *               configuration (config.ts), not code. Off = no alert for that kind, but it is still listed.
  *   quietHours  a daily window with no push and no sound; pop-ups still appear because the person is
  *               plainly using the app. `timeZone` is an IANA name so the window follows the person, not the server.
  *
  * Push on a particular DEVICE is not here: that is the browser's permission plus a registered token
  * (lib/client/device.ts), not an account preference.
+ *
+ * ── Stored choices vs effective settings ──────────────────────────────────────────────────────────────────
+ * The document holds only what the person actually chose (a sparse NotificationSettingsPatch). The EFFECTIVE
+ * settings — what the rest of the app reads — are those choices resolved against the configuration
+ * (normalizeSettings): what they did not choose takes the configured default, a control the admin switched
+ * off is locked to its default, a section the admin made mandatory is on. Because the document is never
+ * rewritten by this, changing the configuration back restores exactly what each person had chosen.
  */
-import { NOTIFICATION_CATEGORIES, type NotificationCategory } from './contract';
+import {
+    DEFAULT_NOTIFICATION_CONFIG,
+    ownValue,
+    CATEGORY_ID_PATTERN,
+    type NotificationConfig,
+} from './config';
+import type { NotificationCategory } from './contract';
+import { isValidTime, isValidTimeZone, type QuietHours } from './time';
 
-export interface QuietHours {
-    enabled: boolean;
-    /** "HH:mm", 24-hour. */
-    start: string;
-    /** "HH:mm", 24-hour. A window that ends before it starts runs overnight (22:00 → 07:00). */
-    end: string;
-    /** IANA time zone, e.g. "Africa/Cairo". */
-    timeZone: string;
-}
+export { DEFAULT_QUIET_HOURS } from './config';
+export { isValidTime, isValidTimeZone, type QuietHours } from './time';
 
 export interface NotificationSettings {
     enabled: boolean;
     popups: boolean;
     sound: boolean;
+    /** One entry per section that exists in the configuration (true = alerts on). */
     categories: Record<NotificationCategory, boolean>;
     quietHours: QuietHours;
 }
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
-/** A change to the settings: any subset of them, nested groups included. */
+/**
+ * A change to the settings: any subset of them, nested groups included. It is also the shape of what is
+ * STORED — only the fields a person has chosen.
+ */
 export type NotificationSettingsPatch = DeepPartial<NotificationSettings>;
 
-export const DEFAULT_QUIET_HOURS: QuietHours = { enabled: false, start: '22:00', end: '07:00', timeZone: 'UTC' };
-
-export const DEFAULT_SETTINGS: NotificationSettings = {
-    enabled: true,
-    popups: true,
-    sound: true,
-    categories: Object.fromEntries(NOTIFICATION_CATEGORIES.map((category) => [category, true])) as Record<
-        NotificationCategory,
-        boolean
-    >,
-    quietHours: DEFAULT_QUIET_HOURS,
-};
-
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-export const isValidTime = (value: unknown): value is string => typeof value === 'string' && TIME.test(value);
-
-const knownTimeZones = new Set<string>();
-
-export function isValidTimeZone(value: unknown): value is string {
-    if (typeof value !== 'string' || value.length === 0 || value.length > 64) return false;
-    if (knownTimeZones.has(value)) return true;
-    try {
-        new Intl.DateTimeFormat('en-US', { timeZone: value });
-        knownTimeZones.add(value);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
- * Turns whatever is stored (or cached) into valid settings: a missing document, a missing field or a
- * field of the wrong type falls back to its default, and unknown fields are ignored. Never throws, so a
- * damaged document can never stop a notification or crash the settings screen.
+ * The choices in `raw` (a stored document, a cached copy) that are valid, nothing else: no defaults filled
+ * in, unknown fields and fields of the wrong type dropped. Never throws.
  */
-export function normalizeSettings(raw: unknown): NotificationSettings {
-    const source = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
-    const categories = typeof source.categories === 'object' && source.categories !== null ? (source.categories as Record<string, unknown>) : {};
-    const quiet = typeof source.quietHours === 'object' && source.quietHours !== null ? (source.quietHours as Record<string, unknown>) : {};
+export function pickStoredSettings(raw: unknown): NotificationSettingsPatch {
+    const source = isRecord(raw) ? raw : {};
+    const stored: NotificationSettingsPatch = {};
+
+    if (typeof source.enabled === 'boolean') stored.enabled = source.enabled;
+    if (typeof source.popups === 'boolean') stored.popups = source.popups;
+    if (typeof source.sound === 'boolean') stored.sound = source.sound;
+
+    if (isRecord(source.categories)) {
+        const categories: Record<string, boolean> = {};
+        for (const [id, value] of Object.entries(source.categories)) {
+            if (typeof value === 'boolean' && CATEGORY_ID_PATTERN.test(id)) categories[id] = value;
+        }
+        stored.categories = categories;
+    }
+
+    if (isRecord(source.quietHours)) {
+        const quiet = source.quietHours;
+        const quietHours: Partial<QuietHours> = {};
+        if (typeof quiet.enabled === 'boolean') quietHours.enabled = quiet.enabled;
+        if (isValidTime(quiet.start)) quietHours.start = quiet.start;
+        if (isValidTime(quiet.end)) quietHours.end = quiet.end;
+        if (isValidTimeZone(quiet.timeZone)) quietHours.timeZone = quiet.timeZone;
+        stored.quietHours = quietHours;
+    }
+
+    return stored;
+}
+
+/**
+ * Turns the stored choices into the settings that apply, under `config`:
+ *   - a choice the person never made takes the configured default;
+ *   - a control the admin hid (config.settings.controls) is locked to its default, whatever was stored;
+ *   - sound is off for everybody while the configuration's sound is off;
+ *   - a section the admin made mandatory is on; a new section starts at its own default.
+ * Never throws, so a damaged document can never stop a notification or crash the settings screen.
+ */
+export function normalizeSettings(raw: unknown, config: NotificationConfig = DEFAULT_NOTIFICATION_CONFIG): NotificationSettings {
+    const stored = pickStoredSettings(raw);
+    const { controls, defaults } = config.settings;
 
     return {
-        enabled: bool(source.enabled, DEFAULT_SETTINGS.enabled),
-        popups: bool(source.popups, DEFAULT_SETTINGS.popups),
-        sound: bool(source.sound, DEFAULT_SETTINGS.sound),
+        enabled: stored.enabled ?? defaults.enabled,
+        popups: controls.popups ? (stored.popups ?? defaults.popups) : defaults.popups,
+        sound: config.sound.enabled && (controls.sound ? (stored.sound ?? defaults.sound) : defaults.sound),
         categories: Object.fromEntries(
-            NOTIFICATION_CATEGORIES.map((category) => [category, bool(categories[category], true)])
-        ) as Record<NotificationCategory, boolean>,
-        quietHours: {
-            enabled: bool(quiet.enabled, DEFAULT_QUIET_HOURS.enabled),
-            start: isValidTime(quiet.start) ? quiet.start : DEFAULT_QUIET_HOURS.start,
-            end: isValidTime(quiet.end) ? quiet.end : DEFAULT_QUIET_HOURS.end,
-            timeZone: isValidTimeZone(quiet.timeZone) ? quiet.timeZone : DEFAULT_QUIET_HOURS.timeZone,
-        },
+            config.categories.map((category) => [
+                category.id,
+                category.userCanMute ? (ownValue(stored.categories as Record<string, boolean> | undefined, category.id) ?? category.defaultEnabled) : true,
+            ])
+        ),
+        quietHours: controls.quietHours ? { ...defaults.quietHours, ...stored.quietHours } : { ...defaults.quietHours },
     };
 }
 
-/** `settings` with `patch` applied on top (nested groups merge field by field). */
-export function applySettingsPatch(settings: NotificationSettings, patch: NotificationSettingsPatch): NotificationSettings {
-    return normalizeSettings({
-        ...settings,
-        ...patch,
-        categories: { ...settings.categories, ...patch.categories },
-        quietHours: { ...settings.quietHours, ...patch.quietHours },
-    });
+/** What applies to a person who has chosen nothing, under the built-in configuration. */
+export const DEFAULT_SETTINGS: NotificationSettings = normalizeSettings({}, DEFAULT_NOTIFICATION_CONFIG);
+
+/** `settings` with `patch` applied on top (nested groups merge field by field), resolved under `config`. */
+export function applySettingsPatch(
+    settings: NotificationSettings,
+    patch: NotificationSettingsPatch,
+    config: NotificationConfig = DEFAULT_NOTIFICATION_CONFIG
+): NotificationSettings {
+    return normalizeSettings(mergePatches(settings, patch), config);
 }
 
 /** Combines two patches into one that has the same effect as applying `first` then `second`. */

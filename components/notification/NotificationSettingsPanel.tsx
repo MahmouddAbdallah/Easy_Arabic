@@ -1,36 +1,15 @@
 'use client';
 
 import { useId, useState, type ReactNode } from 'react';
-import {
-    ArrowLeft,
-    BellOff,
-    BellRing,
-    BookOpen,
-    Info,
-    LoaderCircle,
-    Megaphone,
-    MessageCircle,
-    Moon,
-    Play,
-    TriangleAlert,
-    UserRound,
-    Volume2,
-    type LucideIcon,
-} from 'lucide-react';
+import { ArrowLeft, BellOff, BellRing, Info, LoaderCircle, Moon, Play, TriangleAlert, Volume2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { Switch } from './Switch';
+import { CATEGORY_ICONS } from './categoryIcons';
 import type { PushRegistration } from './hooks/usePushRegistration';
 import type { NotificationSettingsState } from './hooks/useNotificationSettingsState';
 import { previewNotificationSound } from './lib/client/sound';
-import type { NotificationCategory } from './lib/contract';
-
-const CATEGORY_ROWS: { category: NotificationCategory; icon: LucideIcon; title: string; description: string }[] = [
-    { category: 'messages', icon: MessageCircle, title: 'Messages', description: 'New chat messages.' },
-    { category: 'lessons', icon: BookOpen, title: 'Lessons', description: 'Lesson updates and reminders.' },
-    { category: 'account', icon: UserRound, title: 'Account activity', description: 'Sign-ins and account changes.' },
-    { category: 'general', icon: Megaphone, title: 'Announcements', description: 'News and everything else.' },
-];
+import { visibleCategories, type NotificationConfig } from './lib/config';
 
 function browserTimeZone(): string | undefined {
     try {
@@ -224,29 +203,45 @@ function TimeField({ label, value, onChange, disabled }: { label: string; value:
 interface NotificationSettingsPanelProps {
     settingsState: NotificationSettingsState;
     push: PushRegistration | undefined;
-    onBack: () => void;
+    /**
+     * The notification configuration the screen is drawn from: which sections exist, which controls are offered,
+     * how the sound plays. (The dashboard passes its draft here to preview its own changes.)
+     */
+    config: NotificationConfig;
+    /** Shows a back button when given. */
+    onBack?: () => void;
 }
 
 /**
  * Everything a person can tune about notifications, grouped the way they think about it:
  * the master switch, what happens inside the app, push on this device, what they hear about, quiet hours.
  * Changes apply immediately and are saved in the background (useNotificationSettingsState).
+ *
+ * WHAT is on offer is not decided here: the sections of "What to be notified about", the pop-up and sound controls,
+ * the push block and quiet hours all come from the admin's notification configuration (`config`), so adding,
+ * renaming, hiding or removing any of them is done in the dashboard, not in this file.
  */
-export function NotificationSettingsPanel({ settingsState, push, onBack }: NotificationSettingsPanelProps) {
+export function NotificationSettingsPanel({ settingsState, push, config, onBack }: NotificationSettingsPanelProps) {
     const { settings, status, update, saving } = settingsState;
     const quiet = settings.quietHours;
     const paused = !settings.enabled;
     const [soundError, setSoundError] = useState(false);
 
-    const playSample = async () => setSoundError(!(await previewNotificationSound()));
+    const { controls } = config.settings;
+    const showSound = controls.sound && config.sound.enabled;
+    const sections = visibleCategories(config);
+
+    const playSample = async () => setSoundError(!(await previewNotificationSound(config.sound)));
     const quietPatch = (patch: Partial<typeof quiet>) => update({ quietHours: { ...patch, timeZone: browserTimeZone() ?? quiet.timeZone } });
 
     return (
         <div className="flex flex-col gap-4">
             <header className="flex items-center gap-2">
-                <Button type="button" variant="ghost" size="icon" onClick={onBack} aria-label="Back to notifications">
-                    <ArrowLeft className="rtl:rotate-180" />
-                </Button>
+                {onBack && (
+                    <Button type="button" variant="ghost" size="icon" onClick={onBack} aria-label="Back to notifications">
+                        <ArrowLeft className="rtl:rotate-180" />
+                    </Button>
+                )}
                 <h2 className="flex-1 text-lg font-semibold">Notification settings</h2>
                 <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
                     {saving ? 'Saving…' : ''}
@@ -273,66 +268,76 @@ export function NotificationSettingsPanel({ settingsState, push, onBack }: Notif
                 />
             </Section>
 
-            <Section title="In the app" hint="While you're using Easy Arabic.">
-                <SettingRow
-                    title="Pop-ups"
-                    description="Show a pop-up when something new arrives."
-                    checked={settings.popups}
-                    disabled={paused}
-                    onChange={(popups) => update({ popups })}
-                />
-                <SettingRow
-                    icon={Volume2}
-                    title="Sound"
-                    description="A soft chime for new notifications. Also used for push notifications, where your browser allows it."
-                    checked={settings.sound}
-                    disabled={paused}
-                    onChange={(sound) => update({ sound })}
-                >
-                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void playSample()}>
-                        <Play aria-hidden="true" /> Play sample
-                    </Button>
-                    {soundError && (
-                        <p role="alert" className="mt-1.5 text-xs text-muted-foreground">
-                            Your browser blocked the sound. Check that this tab isn&apos;t muted and try again.
-                        </p>
+            {(controls.popups || showSound) && (
+                <Section title="In the app" hint="While you're using Easy Arabic.">
+                    {controls.popups && (
+                        <SettingRow
+                            title="Pop-ups"
+                            description="Show a pop-up when something new arrives."
+                            checked={settings.popups}
+                            disabled={paused}
+                            onChange={(popups) => update({ popups })}
+                        />
                     )}
-                </SettingRow>
-            </Section>
+                    {showSound && (
+                        <SettingRow
+                            icon={Volume2}
+                            title="Sound"
+                            description="A soft chime for new notifications. Also used for push notifications, where your browser allows it."
+                            checked={settings.sound}
+                            disabled={paused}
+                            onChange={(sound) => update({ sound })}
+                        >
+                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void playSample()}>
+                                <Play aria-hidden="true" /> Play sample
+                            </Button>
+                            {soundError && (
+                                <p role="alert" className="mt-1.5 text-xs text-muted-foreground">
+                                    Your browser blocked the sound. Check that this tab isn&apos;t muted and try again.
+                                </p>
+                            )}
+                        </SettingRow>
+                    )}
+                </Section>
+            )}
 
-            {push && <PushSection push={push} />}
+            {push && controls.push && <PushSection push={push} />}
 
-            <Section title="What to be notified about" hint="Muted kinds still appear in your list, without an alert.">
-                {CATEGORY_ROWS.map(({ category, icon, title, description }) => (
+            {sections.length > 0 && (
+                <Section title={config.copy.categoriesTitle} hint={config.copy.categoriesHint || undefined}>
+                    {sections.map((section) => (
+                        <SettingRow
+                            key={section.id}
+                            icon={CATEGORY_ICONS[section.icon]}
+                            title={section.title}
+                            description={[section.description, section.userCanMute ? '' : 'Always on.'].filter(Boolean).join(' ') || undefined}
+                            checked={settings.categories[section.id] ?? section.defaultEnabled}
+                            disabled={paused || !section.userCanMute}
+                            onChange={(on) => update({ categories: { [section.id]: on } })}
+                        />
+                    ))}
+                </Section>
+            )}
+
+            {controls.quietHours && (
+                <Section title="Quiet hours" hint="No push and no sound during these hours. Pop-ups still appear while you're in the app.">
                     <SettingRow
-                        key={category}
-                        icon={icon}
-                        title={title}
-                        description={description}
-                        checked={settings.categories[category]}
+                        icon={Moon}
+                        title="Quiet hours"
+                        description={quiet.enabled ? `Every day, in ${quiet.timeZone.replace(/_/g, ' ')} time.` : 'Silence push and sound at night.'}
+                        checked={quiet.enabled}
                         disabled={paused}
-                        onChange={(on) => update({ categories: { [category]: on } })}
-                    />
-                ))}
-            </Section>
-
-            <Section title="Quiet hours" hint="No push and no sound during these hours. Pop-ups still appear while you're in the app.">
-                <SettingRow
-                    icon={Moon}
-                    title="Quiet hours"
-                    description={quiet.enabled ? `Every day, in ${quiet.timeZone.replace(/_/g, ' ')} time.` : 'Silence push and sound at night.'}
-                    checked={quiet.enabled}
-                    disabled={paused}
-                    onChange={(enabled) => quietPatch({ enabled })}
-                >
-                    {quiet.enabled && (
-                        <div className="mt-2.5 flex flex-wrap gap-3">
-                            <TimeField label="From" value={quiet.start} disabled={paused} onChange={(start) => quietPatch({ start })} />
-                            <TimeField label="Until" value={quiet.end} disabled={paused} onChange={(end) => quietPatch({ end })} />
-                        </div>
-                    )}
-                </SettingRow>
-            </Section>
+                        onChange={(enabled) => quietPatch({ enabled })}
+                    >
+                        {quiet.enabled && (
+                            <div className="mt-2.5 flex flex-wrap gap-3">
+                                <TimeField label="From" value={quiet.start} disabled={paused} onChange={(start) => quietPatch({ start })} />
+                                <TimeField label="Until" value={quiet.end} disabled={paused} onChange={(end) => quietPatch({ end })} />
+                            </div>
+                        )}
+                    </SettingRow>
+                </Section>
+            )}
 
             <p className="px-1 text-xs text-muted-foreground">
                 These settings follow your account on every device. Push notifications are set per device.

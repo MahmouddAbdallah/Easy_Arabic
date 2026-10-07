@@ -21,6 +21,8 @@
  *   1. Add its name to NOTIFICATION_TYPES.
  *   2. Add its defaults to NOTIFICATION_TYPE_CONFIG (TypeScript will refuse to compile until you do).
  *   3. Call sendNotification({ type: 'your_type', ... }).
+ *   (Which category a type belongs to, and its urgency / time-to-live, can then be changed by an admin in the
+ *   notification dashboard — NOTIFICATION_TYPE_CONFIG only supplies the starting values. See config.ts.)
  */
 
 export const NOTIFICATION_TYPES = ['general', 'chat_message', 'lesson', 'sign_in', 'create_account'] as const;
@@ -29,16 +31,27 @@ export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 /**
  * What a user can mute (see settings.ts). Types are many and grow; categories are the few things a person
  * understands ("messages", "lessons"), so settings are keyed by category and each type maps to one.
+ *
+ * These four are the BUILT-IN categories: the ones that exist until an admin changes them in the dashboard
+ * (config.ts → DEFAULT_NOTIFICATION_CONFIG is built from this list). The categories actually in force are
+ * the admin's configuration (`NotificationConfig.categories`) and can be added to, renamed, disabled or
+ * removed there, so a category id is a plain string, not a closed union.
  */
 export const NOTIFICATION_CATEGORIES = ['messages', 'lessons', 'account', 'general'] as const;
-export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+export type BuiltInNotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+/** The id of a category: a built-in one or one the admin created (see config.ts for the allowed format). */
+export type NotificationCategory = string;
 
 /** Web Push urgency header (RFC 8030). 'high' wakes sleeping devices sooner. */
 export type PushUrgency = 'very-low' | 'low' | 'normal' | 'high';
 
 export interface NotificationTypeConfig {
-    /** Which user-facing setting mutes this type (see settings.ts / policy.ts). */
-    category: NotificationCategory;
+    /**
+     * Which user-facing setting mutes this type (see settings.ts / policy.ts). This is the DEFAULT: the
+     * dashboard can route a type to another category, and `category`, `urgency` and `ttlSeconds` below are
+     * what the configuration starts from (config.ts). `identity` is code-only on purpose — see identity.ts.
+     */
+    category: BuiltInNotificationCategory;
     urgency: PushUrgency;
     /** How long FCM keeps the message for an offline device before dropping it. */
     ttlSeconds: number;
@@ -131,6 +144,19 @@ export const ACTIVE_CONTEXT_REFRESH_MS = 150_000;
 
 export const NOTIFICATION_SETTINGS_COLLECTION = 'notificationSettings';
 export const NOTIFICATION_SETTINGS_ENDPOINT = '/api/notification/settings';
+
+// ─── Notification configuration (system-wide, set by an admin) ────────────────
+// What the notification system offers and how it behaves by default: the categories users can mute, the
+// sound, which settings users get to change and their defaults, per-type delivery (config.ts). It is ONE
+// document, `notificationConfig/main`, and it is a different thing from the per-user settings above: those
+// are choices within what this configuration allows. Nobody reads or writes the document from the browser:
+// everyone gets it from NOTIFICATION_CONFIG_ENDPOINT, and only an admin can change it (PUT). When the
+// document does not exist the built-in defaults apply, so an app that never opens the dashboard behaves
+// exactly as it did before the configuration existed.
+
+export const NOTIFICATION_CONFIG_COLLECTION = 'notificationConfig';
+export const NOTIFICATION_CONFIG_DOC = 'main';
+export const NOTIFICATION_CONFIG_ENDPOINT = '/api/notification/config';
 
 /** A stored notification as the list shows it. */
 export interface InAppNotification {

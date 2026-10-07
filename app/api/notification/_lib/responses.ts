@@ -14,6 +14,13 @@ export const validationError = (message: string) =>
         { status: 400 }
     );
 
+/** The thing being changed was changed by someone else since the caller loaded it. */
+export const conflict = (message: string) =>
+    NextResponse.json(
+        { success: false, error: { code: "CONFLICT", message } },
+        { status: 409 }
+    );
+
 export const serverError = (error: unknown) => {
     console.error(error);
     return NextResponse.json(

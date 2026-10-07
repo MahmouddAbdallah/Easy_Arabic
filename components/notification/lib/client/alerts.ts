@@ -12,12 +12,13 @@
  * the stored copy as `sendId`) tells them apart from genuinely new ones, so the person gets one pop-up and
  * one sound whichever route is faster.
  *
- * What it then decides is policy.ts, shared with the server: paused / muted / quiet hours / pop-ups off /
- * sound off. Two more rules are about the moment rather than the person:
+ * What it then decides is policy.ts, shared with the server: paused / muted or disabled section / quiet hours /
+ * pop-ups off / sound off — under the admin's notification configuration (config.ts). Two more rules are about the moment rather than the person:
  *   - a hidden tab shows nothing (the system notification or the list covers it);
  *   - a notification about the page the user is looking at right now tells them nothing new — the server
  *     already skips these, this catches the case where its record of the tab had lapsed.
  */
+import type { NotificationConfig } from '../config';
 import type { NotificationPayload } from '../contract';
 import { decideAlerts } from '../policy';
 import type { NotificationSettings } from '../settings';
@@ -29,6 +30,8 @@ export interface Alert {
 
 export interface AlertEnvironment {
     settings(): NotificationSettings;
+    /** The notification configuration in force (which section a type belongs to, whether it is switched off, whether sound is on). */
+    config(): NotificationConfig;
     /** Is the tab visible? */
     isVisible(): boolean;
     /** Is the user already on `link`? */
@@ -67,7 +70,7 @@ export function createAlertCenter(env: AlertEnvironment): AlertCenter {
             if (!env.isVisible()) return 'hidden';
             if (payload.link && env.isViewing(payload.link)) return 'viewing';
 
-            const decision = decideAlerts(env.settings(), payload.type, now);
+            const decision = decideAlerts(env.settings(), payload.type, now, env.config());
             if (!decision.popup && !decision.sound) return 'silent';
 
             if (decision.popup) env.showPopup(payload);

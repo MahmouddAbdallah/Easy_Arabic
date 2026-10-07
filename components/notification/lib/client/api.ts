@@ -11,9 +11,12 @@
  *     notification stays unread; the tab's entry expires on its own).
  */
 import axios from 'axios';
+import type { NotificationConfig } from '../config';
+import { normalizeConfig } from '../configParse';
 import {
     ACTIVE_CONTEXT_ENDPOINT,
     FCM_TOKEN_ENDPOINT,
+    NOTIFICATION_CONFIG_ENDPOINT,
     NOTIFICATION_HANDLED_ENDPOINT,
     NOTIFICATION_READ_ENDPOINT,
     NOTIFICATION_SETTINGS_ENDPOINT,
@@ -55,6 +58,27 @@ export function saveSettings(patch: NotificationSettingsPatch) {
 /** Same, for a change still waiting when the page is closing: it must not be lost with the page. */
 export function saveSettingsOnExit(patch: NotificationSettingsPatch): void {
     sendBeacon(NOTIFICATION_SETTINGS_ENDPOINT, patch, 'PATCH');
+}
+
+/**
+ * The notification configuration every signed-in user works with. Whatever comes back is run through
+ * parseConfig, so a response the app does not fully understand still yields a usable configuration.
+ */
+export async function fetchNotificationConfig(): Promise<NotificationConfig> {
+    const { data } = await axios.get(NOTIFICATION_CONFIG_ENDPOINT);
+    return normalizeConfig(data?.config);
+}
+
+/** The dashboard's read of the configuration: admins only (403 otherwise), never cached. `exists` is false while the built-in defaults are in force. */
+export async function fetchNotificationConfigForEditing(): Promise<{ config: NotificationConfig; exists: boolean }> {
+    const { data } = await axios.get(NOTIFICATION_CONFIG_ENDPOINT, { params: { manage: 1 } });
+    return { config: normalizeConfig(data?.config), exists: data?.exists === true };
+}
+
+/** Saves the whole configuration (admins only). `expectedRevision` is the revision it was edited from; a stale one is answered with 409. Resolves to the configuration as stored. */
+export async function saveNotificationConfigRequest(config: NotificationConfig, expectedRevision: number): Promise<NotificationConfig> {
+    const { data } = await axios.put(NOTIFICATION_CONFIG_ENDPOINT, { config, expectedRevision });
+    return normalizeConfig(data?.config);
 }
 
 /**

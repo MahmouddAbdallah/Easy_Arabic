@@ -3,10 +3,14 @@
  * the server (push) and by the browser (pop-up, sound), so the two can never disagree. Pure functions:
  * no server or browser imports, nothing to mock in a test.
  */
-import { NOTIFICATION_TYPE_CONFIG, type NotificationCategory, type NotificationType } from './contract';
-import { isValidTime, type NotificationSettings, type QuietHours } from './settings';
+import { DEFAULT_NOTIFICATION_CONFIG, categoryOfType, ownValue, typeDelivery, type NotificationConfig } from './config';
+import type { NotificationCategory, NotificationType } from './contract';
+import type { NotificationSettings } from './settings';
+import { isValidTime, type QuietHours } from './time';
 
-export const categoryOf = (type: NotificationType): NotificationCategory => NOTIFICATION_TYPE_CONFIG[type].category;
+/** The id of the section `type` belongs to under `config` (its route, else the fallback). */
+export const categoryOf = (type: NotificationType, config: NotificationConfig = DEFAULT_NOTIFICATION_CONFIG): NotificationCategory =>
+    categoryOfType(config, type)?.id ?? typeDelivery(config, type).category;
 
 const clockFormats = new Map<string, Intl.DateTimeFormat>();
 
@@ -48,14 +52,30 @@ export interface AlertDecision {
 
 const SILENT: AlertDecision = { push: false, popup: false, sound: false };
 
+/** Is `type`'s section on for the person? Off for everybody when the admin disabled it; mandatory ones cannot be muted. */
+export function isSectionOn(settings: NotificationSettings, type: NotificationType, config: NotificationConfig = DEFAULT_NOTIFICATION_CONFIG): boolean {
+    const section = categoryOfType(config, type);
+    if (!section) return true; // no usable section in the configuration: only the master switch applies
+    if (!section.enabled) return false;
+    if (!section.userCanMute) return true;
+    return ownValue(settings.categories, section.id) ?? section.defaultEnabled;
+}
+
 /**
- * How a notification of `type` may alert someone with these settings, at time `at`:
- *   paused, or its category muted     → no alert at all (it is still stored and counted)
- *   inside quiet hours                → no push and no sound; a pop-up is still fine
- *   otherwise                         → push; pop-up and sound as chosen
+ * How a notification of `type` may alert someone with these settings, at time `at`, under `config`:
+ *   paused, its section muted, or its section switched off   → no alert at all (it is still stored and counted)
+ *   inside quiet hours                                       → no push and no sound; a pop-up is still fine
+ *   otherwise                                                → push; pop-up and sound as chosen
+ * Sound additionally needs the configuration's sound to be on (config.sound.enabled).
  */
-export function decideAlerts(settings: NotificationSettings, type: NotificationType, at: number = Date.now()): AlertDecision {
-    if (!settings.enabled || !settings.categories[categoryOf(type)]) return SILENT;
+export function decideAlerts(
+    settings: NotificationSettings,
+    type: NotificationType,
+    at: number = Date.now(),
+    config: NotificationConfig = DEFAULT_NOTIFICATION_CONFIG
+): AlertDecision {
+    if (!settings.enabled || !isSectionOn(settings, type, config)) return SILENT;
+    const sound = settings.sound && config.sound.enabled;
     if (isQuietNow(settings.quietHours, at)) return { push: false, popup: settings.popups, sound: false };
-    return { push: true, popup: settings.popups, sound: settings.sound };
+    return { push: true, popup: settings.popups, sound };
 }

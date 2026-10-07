@@ -7,6 +7,7 @@ import { markNotificationHandled } from './lib/client/api';
 import type { NotificationPayload } from './lib/contract';
 import { TYPE_ICONS } from './typeIcons';
 
+/** How long a pop-up stays when the caller does not say (the notification configuration sets it: delivery.popupDurationMs). */
 const IN_APP_TOAST_MS = 6000;
 
 /**
@@ -15,7 +16,7 @@ const IN_APP_TOAST_MS = 6000;
  * A notification about the same thing as one already on screen (same tag, or the same stored notification)
  * replaces that toast instead of stacking another.
  */
-export function showNotificationToast(payload: NotificationPayload, open: (link?: string) => void) {
+export function showNotificationToast(payload: NotificationPayload, open: (link?: string) => void, durationMs: number = IN_APP_TOAST_MS) {
     toast.custom(
         (t) => (
             <NotificationToast
@@ -29,7 +30,7 @@ export function showNotificationToast(payload: NotificationPayload, open: (link?
                 onDismiss={() => toast.dismiss(t.id)}
             />
         ),
-        { id: payload.tag ?? payload.key ?? payload.id, duration: IN_APP_TOAST_MS }
+        { id: payload.tag ?? payload.key ?? payload.id, duration: durationMs }
     );
 }
 

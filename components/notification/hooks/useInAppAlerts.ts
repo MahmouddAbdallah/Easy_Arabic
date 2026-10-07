@@ -6,7 +6,8 @@ import { showNotificationToast } from '../NotificationToast';
 import { createAlertCenter, type AlertCenter } from '../lib/client/alerts';
 import { inboxStore } from '../lib/client/inboxStore';
 import { armAudioUnlock, playNotificationSound } from '../lib/client/sound';
-import { NOTIFICATION_CATEGORIES, NOTIFICATION_PAYLOAD_VERSION, type InAppNotification, type NotificationPayload } from '../lib/contract';
+import { visibleCategories, type NotificationConfig } from '../lib/config';
+import { NOTIFICATION_PAYLOAD_VERSION, type InAppNotification, type NotificationPayload } from '../lib/contract';
 import { canonicalLocation } from '../lib/location';
 import type { NotificationSettings } from '../lib/settings';
 
@@ -28,14 +29,15 @@ function toPayload(notification: InAppNotification): NotificationPayload {
 
 /**
  * Alerts for notifications that arrive while the app is open: a pop-up and a sound, as the person's
- * settings allow (see lib/client/alerts.ts for the rules). Returns `offer`, which the service-worker
- * bridge uses for pushes; the stored copies appearing in the live list are wired in here.
+ * settings allow (see lib/client/alerts.ts for the rules), under the admin's notification configuration
+ * (sections that exist or are switched off, the sound, how long a pop-up stays). Returns `offer`, which the
+ * service-worker bridge uses for pushes; the stored copies appearing in the live list are wired in here.
  *
  * The live list is only kept running while there is something to alert with — if pop-ups and sound are
  * both off, or everything is paused or muted, no Firestore listener is held for alerts at all (the bell's
  * own list still starts one when it is opened).
  */
-export function useInAppAlerts(userId: string | undefined, settings: NotificationSettings) {
+export function useInAppAlerts(userId: string | undefined, settings: NotificationSettings, config: NotificationConfig) {
     const router = useRouter();
 
     const settingsRef = useRef(settings);
@@ -43,15 +45,22 @@ export function useInAppAlerts(userId: string | undefined, settings: Notificatio
         settingsRef.current = settings;
     }, [settings]);
 
+    const configRef = useRef(config);
+    useEffect(() => {
+        configRef.current = config;
+    }, [config]);
+
     // The alert center remembers which notifications it has already shown, so it lives as long as the page does.
     const centerRef = useRef<AlertCenter | null>(null);
     useEffect(() => {
         centerRef.current = createAlertCenter({
             settings: () => settingsRef.current,
+            config: () => configRef.current,
             isVisible: () => document.visibilityState === 'visible',
             isViewing: (link) => canonicalLocation(link) === canonicalLocation(window.location.pathname + window.location.search),
-            showPopup: (payload) => showNotificationToast(payload, (link) => link && router.push(link)),
-            playSound: (id) => void playNotificationSound(id),
+            showPopup: (payload) =>
+                showNotificationToast(payload, (link) => link && router.push(link), configRef.current.delivery.popupDurationMs),
+            playSound: (id) => void playNotificationSound(id, configRef.current.sound),
             now: Date.now,
         });
         return () => {
@@ -61,7 +70,8 @@ export function useInAppAlerts(userId: string | undefined, settings: Notificatio
 
     const offerPush = useCallback((payload: NotificationPayload) => void centerRef.current?.offer({ payload, source: 'push' }), []);
 
-    const canAlert = settings.enabled && NOTIFICATION_CATEGORIES.some((category) => settings.categories[category]);
+    // Is there any section that could alert this person? (Sections the admin switched off cannot.)
+    const canAlert = settings.enabled && visibleCategories(config).some((category) => settings.categories[category.id] !== false);
     const wantsLiveList = Boolean(userId) && canAlert && (settings.popups || settings.sound);
 
     useEffect(() => {
@@ -76,7 +86,7 @@ export function useInAppAlerts(userId: string | undefined, settings: Notificatio
     }, [userId, wantsLiveList]);
 
     // Browsers allow sound only after the person has interacted with the page: get ready for their first click.
-    const wantsSound = Boolean(userId) && canAlert && settings.sound;
+    const wantsSound = Boolean(userId) && canAlert && settings.sound && config.sound.enabled;
     useEffect(() => {
         if (!wantsSound) return;
         return armAudioUnlock();

@@ -7,17 +7,23 @@ import { ActiveContextReporter } from './ActiveContextReporter';
 import { NotificationPermissionPrompt } from './NotificationPermissionPrompt';
 import { useInAppAlerts } from './hooks/useInAppAlerts';
 import { useNotificationSettingsState, type NotificationSettingsState } from './hooks/useNotificationSettingsState';
+import { useNotificationConfig } from './hooks/useNotificationConfig';
 import { usePermissionPrompt } from './hooks/usePermissionPrompt';
 import { usePushRegistration, type PushRegistration } from './hooks/usePushRegistration';
 import { useServiceWorkerBridge } from './hooks/useServiceWorkerBridge';
+import { DEFAULT_NOTIFICATION_CONFIG, type NotificationConfig } from './lib/config';
 
 const NotificationContext = createContext<PushRegistration | undefined>(undefined);
 const SettingsContext = createContext<NotificationSettingsState | undefined>(undefined);
+const ConfigContext = createContext<NotificationConfig>(DEFAULT_NOTIFICATION_CONFIG);
 
 /**
  * Notifications for the whole app. It only composes independent pieces:
  *   - usePushRegistration          this device as a push target: permission state and its FCM token;
- *   - useNotificationSettingsState the user's settings (one Firestore document, saved through the API);
+ *   - useNotificationConfig        the admin's configuration (sections, sound, which settings exist and their
+ *                                  defaults): one shared copy, set in the dashboard — NOT the user's settings;
+ *   - useNotificationSettingsState the user's settings (one Firestore document, saved through the API), resolved
+ *                                  against that configuration;
  *   - useInAppAlerts               pop-ups and sound for notifications that arrive while the app is open,
  *                                  whether they came as a push or as a new entry in the list;
  *   - useServiceWorkerBridge       hands pushes received by the service worker to the page, and performs
@@ -33,19 +39,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const userId = user?.id;
 
     const push = usePushRegistration(userId);
-    const settingsState = useNotificationSettingsState(userId);
-    const offerPush = useInAppAlerts(userId, settingsState.settings);
+    const { config } = useNotificationConfig(userId);
+    const settingsState = useNotificationSettingsState(userId, config);
+    const offerPush = useInAppAlerts(userId, settingsState.settings, config);
     useServiceWorkerBridge(offerPush);
     const prompt = usePermissionPrompt({ userId, push, notificationsEnabled: settingsState.settings.enabled });
 
     return (
         <NotificationContext.Provider value={push}>
             <SettingsContext.Provider value={settingsState}>
-                <Suspense fallback={null}>
-                    <ActiveContextReporter userId={userId} />
-                </Suspense>
-                {children}
-                <NotificationPermissionPrompt prompt={prompt} />
+                <ConfigContext.Provider value={config}>
+                    <Suspense fallback={null}>
+                        <ActiveContextReporter userId={userId} />
+                    </Suspense>
+                    {children}
+                    <NotificationPermissionPrompt prompt={prompt} />
+                </ConfigContext.Provider>
             </SettingsContext.Provider>
         </NotificationContext.Provider>
     );
@@ -93,11 +102,20 @@ export function useNotificationSettings() {
 }
 
 /**
- * Settings and push state when a NotificationProvider is present, `undefined` fields when not — for
- * components such as NotificationBody that work with or without it (their settings screen needs it).
+ * The notification configuration in force (what sections exist, the sound, the defaults): the admin's, as set in
+ * the dashboard, or the built-in defaults while there is none or outside a NotificationProvider.
+ */
+export function useNotificationConfiguration(): NotificationConfig {
+    return useContext(ConfigContext);
+}
+
+/**
+ * Settings, push state and configuration when a NotificationProvider is present, `undefined` settings and push
+ * when not — for components such as NotificationBody that work with or without it (their settings screen needs it).
  */
 export function useOptionalNotificationControls() {
     const push = useContext(NotificationContext);
     const settingsState = useContext(SettingsContext);
-    return useMemo(() => ({ push, settingsState }), [push, settingsState]);
+    const config = useContext(ConfigContext);
+    return useMemo(() => ({ push, settingsState, config }), [push, settingsState, config]);
 }

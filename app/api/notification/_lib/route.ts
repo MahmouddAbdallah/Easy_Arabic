@@ -15,11 +15,16 @@ import { forbidden, serverError, validationError } from "./responses";
 
 export type SessionUser = NonNullable<Awaited<ReturnType<typeof authorization>>["user"]>;
 
+export interface RouteOptions {
+    /** Only users with one of these roles get in (anyone else is answered like a signed-out visitor: 403). */
+    roles?: string[];
+}
+
 /** A route for signed-in users that takes no body. */
-export function authedRoute(handler: (user: SessionUser, req: NextRequest) => Promise<Response>) {
+export function authedRoute(handler: (user: SessionUser, req: NextRequest) => Promise<Response>, options: RouteOptions = {}) {
     return async (req: NextRequest): Promise<Response> => {
         try {
-            const { user } = await authorization();
+            const { user } = await authorization(options.roles);
             if (!user) return forbidden();
 
             return await handler(user, req);
@@ -32,12 +37,13 @@ export function authedRoute(handler: (user: SessionUser, req: NextRequest) => Pr
 /** A route for signed-in users whose JSON body must match `schema`. */
 export function authedJsonRoute<S extends z.ZodType>(
     schema: S,
-    handler: (user: SessionUser, body: z.output<S>) => Promise<Response>
+    handler: (user: SessionUser, body: z.output<S>) => Promise<Response>,
+    options: RouteOptions = {}
 ) {
     return authedRoute(async (user, req) => {
         const validation = schema.safeParse(await req.json().catch(() => null));
         if (!validation.success) return validationError(firstValidationMessage(validation.error));
 
         return handler(user, validation.data);
-    });
+    }, options);
 }

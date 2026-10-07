@@ -11,11 +11,15 @@
  *
  * It is also kept polite:
  *   - only a visible tab plays (a hidden tab's alert is the system notification, or the list);
- *   - at most one chime per MIN_GAP_MS, however many notifications arrive;
+ *   - at most one chime per `minGapMs`, however many notifications arrive;
  *   - with several tabs open, one tab plays per alert (Web Locks), not all of them.
+ *
+ * How it sounds — volume, waveform, the notes, how long they ring, the minimum gap, an audio file to play instead —
+ * is the admin's sound configuration (../config.ts → SoundConfig), passed in by the caller. Every parameter defaults
+ * to the original chime, so calling these with no configuration sounds exactly as before.
  */
+import { DEFAULT_SOUND_CONFIG, chimeGain, type SoundConfig } from '../config';
 
-const MIN_GAP_MS = 1_500;
 const CROSS_TAB_LOCK_MS = 2_000;
 
 let context: AudioContext | undefined;
@@ -64,31 +68,42 @@ export function armAudioUnlock(): () => void {
     return remove;
 }
 
-/** E5 then A5: two soft sine notes with a quick attack and a short decay. */
-function chime(ctx: AudioContext) {
+/** The configured notes (by default E5 then A5: two soft sine notes) with a quick attack and a short decay. */
+function chime(ctx: AudioContext, sound: SoundConfig) {
     const start = ctx.currentTime;
     const master = ctx.createGain();
-    master.gain.value = 0.16;
+    master.gain.value = chimeGain(sound.volume);
     master.connect(ctx.destination);
 
-    [
-        { frequency: 659.25, delay: 0 },
-        { frequency: 880, delay: 0.13 },
-    ].forEach(({ frequency, delay }) => {
+    const decay = sound.noteDurationMs / 1000;
+
+    sound.notes.forEach(({ frequency, delayMs }) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sine';
+        osc.type = sound.tone;
         osc.frequency.value = frequency;
 
-        const at = start + delay;
+        const at = start + delayMs / 1000;
         gain.gain.setValueAtTime(0.0001, at);
         gain.gain.exponentialRampToValueAtTime(1, at + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + decay);
 
         osc.connect(gain).connect(master);
         osc.start(at);
-        osc.stop(at + 0.45);
+        osc.stop(at + decay + 0.03);
     });
+}
+
+/** Plays the configured audio file at the configured volume. Resolves to whether the browser let it play. */
+async function playFile(url: string, volume: number): Promise<boolean> {
+    try {
+        const audio = new Audio(url);
+        audio.volume = Math.min(1, Math.max(0, volume / 100));
+        await audio.play();
+        return true;
+    } catch {
+        return false; // blocked by the browser, or the file could not be loaded
+    }
 }
 
 /**
@@ -110,34 +125,47 @@ function claim(id: string): Promise<boolean> {
 }
 
 /**
- * Plays the notification chime if it may play right now. Resolves to whether it did. `id` identifies the
- * alert so that only one of several open tabs plays it.
+ * Plays the notification sound if it may play right now. Resolves to whether it did. `id` identifies the
+ * alert so that only one of several open tabs plays it. `sound` is the configured sound; while its master
+ * switch is off nothing plays.
  */
-export async function playNotificationSound(id?: string): Promise<boolean> {
-    if (typeof document === 'undefined' || document.visibilityState !== 'visible') return false;
+export async function playNotificationSound(id?: string, sound: SoundConfig = DEFAULT_SOUND_CONFIG): Promise<boolean> {
+    if (!sound.enabled || typeof document === 'undefined' || document.visibilityState !== 'visible') return false;
 
     const now = Date.now();
-    if (now - lastPlayedAt < MIN_GAP_MS) return false;
+    if (now - lastPlayedAt < sound.minGapMs) return false;
 
-    const ctx = context;
-    if (!ctx) return false; // the person has not interacted with the page yet
-    if (ctx.state !== 'running') {
-        void ctx.resume().catch(() => {}); // may succeed for next time; never wait for it
-        return false;
+    // The person must have interacted with the page first, or the browser refuses (and complains in the console).
+    let ctx: AudioContext | undefined;
+    if (sound.customUrl) {
+        if (typeof navigator !== 'undefined' && navigator.userActivation && !navigator.userActivation.hasBeenActive) return false;
+    } else {
+        ctx = context;
+        if (!ctx) return false;
+        if (ctx.state !== 'running') {
+            void ctx.resume().catch(() => {}); // may succeed for next time; never wait for it
+            return false;
+        }
     }
 
     lastPlayedAt = now;
-    if (id && !(await claim(id))) return false;
+    if (sound.onePerAlertAcrossTabs && id && !(await claim(id))) return false;
 
-    chime(ctx);
-    return true;
+    if (ctx) {
+        chime(ctx, sound);
+        return true;
+    }
+    return playFile(sound.customUrl as string, sound.volume);
 }
 
 /**
- * Plays the chime for the settings screen's "Play sample" button. Called from a click, so it may also unlock
- * audio; it ignores the politeness rules above because the person asked to hear it.
+ * Plays `sound` for a "Play sample" button — the settings screen's and the dashboard's. Called from a click, so it
+ * may also unlock audio; it ignores the politeness rules above (and the master switch, so an admin can try a sound
+ * before turning it on) because the person asked to hear it.
  */
-export async function previewNotificationSound(): Promise<boolean> {
+export async function previewNotificationSound(sound: SoundConfig = DEFAULT_SOUND_CONFIG): Promise<boolean> {
+    if (sound.customUrl) return playFile(sound.customUrl, sound.volume);
+
     const ctx = createContext();
     if (!ctx) return false;
 
@@ -148,6 +176,6 @@ export async function previewNotificationSound(): Promise<boolean> {
     }
     if (ctx.state !== 'running') return false;
 
-    chime(ctx);
+    chime(ctx, sound);
     return true;
 }
