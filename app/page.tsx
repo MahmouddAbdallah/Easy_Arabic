@@ -9,6 +9,7 @@ import NotificationsShowcase from '@/components/landing/NotificationsShowcase'
 import { authorization } from '@/lib/verifyAuth'
 import { displayFont } from '@/lib/fonts'
 // import AdminHome from '@/components/home/AdminHome'
+
 import TeacherHome from '@/components/home/TeacherHome'
 import FamilyHome from '@/components/home/FamilyHome'
 import { redirect } from 'next/navigation'
