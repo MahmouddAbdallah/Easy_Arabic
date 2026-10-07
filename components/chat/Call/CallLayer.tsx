@@ -29,7 +29,7 @@ export function CallLayer() {
     return createPortal(
         <>
             {call.phase === "incoming" && <IncomingCallCard call={call} actions={actions} />}
-            {showScreen && <CallScreen call={call} actions={actions} />}
+            {showScreen && <CallScreen key={call.mode ?? "none"} call={call} actions={actions} />}
         </>,
         document.body
     );

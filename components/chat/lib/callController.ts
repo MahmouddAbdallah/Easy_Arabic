@@ -8,7 +8,12 @@
  * The server owns the truth about a call (./callMachine.ts); this class mirrors it. Two things tell it
  * that something changed: the Firestore "doorbell" (instant) and the API itself (heartbeats, a slow
  * poll while ringing, and a faster one if the doorbell is unreachable), so a missed doorbell only ever
- * costs a few seconds. The WebRTC details live in ./callEngine.ts.
+ * costs a few seconds. The WebRTC details live in ./callEngine.ts, how good the connection is and what video it
+ * can carry in ./callQuality.ts.
+ *
+ * A dropped connection is not the end of a call: the media is brought back by restarting ICE, retried with growing
+ * pauses, for CALL_RECONNECT_TIMEOUT_MS (longer once this browser is back online, or the other side is seen
+ * negotiating). Nothing is restarted while the browser is offline.
  */
 import axios from "axios";
 import { collection, doc, onSnapshot, query, where, type Unsubscribe } from "firebase/firestore";
@@ -17,6 +22,7 @@ import { firebaseClientDB } from "@/lib/config/firebase-client";
 import {
     CALL_CONNECT_TIMEOUT_MS,
     CALL_HEARTBEAT_MS,
+    CALL_RECONNECT_GRACE_MS,
     CALL_RECONNECT_TIMEOUT_MS,
     isRingingStatus,
     parseCallDoorbell,
@@ -42,6 +48,7 @@ import {
     type EngineConnectionState,
     type LocalMedia,
 } from "./callEngine";
+import type { ConnectionQuality, QualityLevel } from "./callQuality";
 import { callSounds, unlockCallSounds } from "./callSounds";
 import { getErrorMessage } from "./getErrorMessage";
 
@@ -87,6 +94,10 @@ export interface CallSessionState {
     cameraOff: boolean;
     remoteMuted: boolean;
     remoteCameraOff: boolean;
+    /** The other side stopped sending video because its connection is too weak (the voice carries on). */
+    remoteVideoPaused: boolean;
+    /** This browser stopped sending video for the same reason. */
+    videoPaused: boolean;
     canSwitchCamera: boolean;
     mirrorLocal: boolean;
     /** A video call without a working camera: the person is heard but not seen. */
@@ -95,6 +106,8 @@ export interface CallSessionState {
     remoteStream: MediaStream | null;
     /** Offline right now: the screen says so instead of looking frozen. */
     offline: boolean;
+    /** How good the connection is, or null before the first measurement. The details are in `getQuality()`. */
+    quality: QualityLevel | null;
     /** A message the screen shows inline (e.g. "microphone blocked" while the call is still ringing). */
     notice: string | null;
 }
@@ -113,12 +126,15 @@ export const IDLE_CALL_STATE: CallSessionState = {
     cameraOff: false,
     remoteMuted: false,
     remoteCameraOff: false,
+    remoteVideoPaused: false,
+    videoPaused: false,
     canSwitchCamera: false,
     mirrorLocal: true,
     videoUnavailable: false,
     localStream: null,
     remoteStream: null,
     offline: false,
+    quality: null,
     notice: null,
 };
 
@@ -146,6 +162,15 @@ const FALLBACK_IDLE_POLL_MS = 4000;
 const RING_END_GRACE_MS = 1000;
 /** A dropped connection often heals itself; ICE is only restarted after this. */
 const ICE_RESTART_DELAY_MS = 2000;
+/** A connection that is still down is retried, a little later each time: after 3 s, 6 s, 9 s, then every 10 s. */
+const RESTART_RETRY_STEP_MS = 3000;
+const RESTART_RETRY_MAX_MS = 10_000;
+/** "Reconnecting…" only shows once the connection has stayed down this long: a blip that heals itself isn't worth a flash. */
+const RECONNECTING_SHOWN_AFTER_MS = 1500;
+/** Seconds without a single packet, on a connection that still says "connected", before it counts as dropped. */
+const STALL_SECONDS = 8;
+/** TURN passwords last about an hour: a call older than this gets fresh servers before an ICE restart. */
+const ICE_SERVERS_MAX_AGE_MS = 30 * 60_000;
 
 const kindOf = (mode: CallMode) => (mode === "video" ? "video" : "voice");
 
@@ -196,6 +221,8 @@ export class CallController {
     /** Signals that arrived while ringing (the offer and early candidates), applied on accept. */
     private held: CallSignal[] = [];
     private iceServers: Promise<CallIceServer[]> | null = null;
+    /** When the servers the engine uses were fetched. */
+    private iceServersAt = 0;
     private syncing = false;
     private syncAgain = false;
     private outbound: Promise<void> = Promise.resolve();
@@ -209,12 +236,25 @@ export class CallController {
     private connectTimer: ReturnType<typeof setTimeout> | null = null;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private restartTimer: ReturnType<typeof setTimeout> | null = null;
+    private blipTimer: ReturnType<typeof setTimeout> | null = null;
     private dismissTimer: ReturnType<typeof setTimeout> | null = null;
     private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private pollEvery = 0;
     private titleTimer: ReturnType<typeof setInterval> | null = null;
     private originalTitle = "";
+
+    // Getting a dropped connection back.
+    private engineState: EngineConnectionState = "connecting";
+    /** The media is down right now (ICE says so, or nothing has arrived for a while). */
+    private linkDown = false;
+    private restartAttempt = 0;
+    private reconnectDeadline = 0;
+    private silentSeconds = 0;
+
+    // The connection reading changes every second, so it has its own subscription: the call screen isn't redrawn for it.
+    private quality: ConnectionQuality | null = null;
+    private readonly qualityListeners = new Set<() => void>();
 
     /* ---- store ---- */
 
@@ -224,6 +264,18 @@ export class CallController {
     };
 
     getSnapshot = (): CallSessionState => this.state;
+
+    subscribeQuality = (listener: () => void): (() => void) => {
+        this.qualityListeners.add(listener);
+        return () => this.qualityListeners.delete(listener);
+    };
+
+    getQuality = (): ConnectionQuality | null => this.quality;
+
+    private setQuality(quality: ConnectionQuality | null) {
+        this.quality = quality;
+        this.qualityListeners.forEach((listener) => listener());
+    }
 
     private setState(patch: Partial<CallSessionState>) {
         this.state = { ...this.state, ...patch };
@@ -259,19 +311,33 @@ export class CallController {
         };
         const setOnline = () => {
             this.setState({ offline: false });
-            if (this.callId) {
-                this.engine?.restartIce();
-                this.requestSync();
+            if (!this.callId) return;
+            this.requestSync();
+            this.beat(); // tell the server this browser is alive again before its clock runs out
+            if (this.linkDown) {
+                // Back online while the media is down: try right now instead of waiting for the next attempt.
+                this.extendReconnectDeadline();
+                this.scheduleRestart(0);
+            } else {
+                void this.engine?.restartIce(); // the route may have changed even though nothing has noticed yet
             }
         };
         const setOffline = () => this.setState({ offline: true });
+        const onVisibilityChange = () => {
+            // Coming back to a call (a phone unlocked, a tab revisited): report in, and don't wait out a retry delay.
+            if (document.visibilityState !== "visible" || !this.callId) return;
+            this.beat();
+            if (this.linkDown && !this.state.offline) this.scheduleRestart(0);
+        };
         window.addEventListener("pagehide", onPageHide);
         window.addEventListener("online", setOnline);
         window.addEventListener("offline", setOffline);
+        document.addEventListener("visibilitychange", onVisibilityChange);
         this.removeListeners = () => {
             window.removeEventListener("pagehide", onPageHide);
             window.removeEventListener("online", setOnline);
             window.removeEventListener("offline", setOffline);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
         };
         if (typeof navigator !== "undefined" && navigator.onLine === false) this.setState({ offline: true });
         this.updatePolling();
@@ -504,6 +570,7 @@ export class CallController {
     /* ---- the engine ---- */
 
     private createEngine(role: CallRole, mode: CallMode, iceServers: CallIceServer[], media: LocalMedia): CallEngine {
+        this.iceServersAt = Date.now();
         return new CallEngine({
             role,
             mode,
@@ -515,7 +582,9 @@ export class CallController {
                 onLocalStream: (stream) =>
                     this.setState({ localStream: stream, mirrorLocal: this.engine?.mirrorLocal ?? true }),
                 onRemoteStream: (stream) => this.setState({ remoteStream: stream }),
-                onRemoteMedia: ({ muted, cameraOff }) => this.setState({ remoteMuted: muted, remoteCameraOff: cameraOff }),
+                onRemoteMedia: ({ muted, cameraOff, videoPaused }) =>
+                    this.setState({ remoteMuted: muted, remoteCameraOff: cameraOff, remoteVideoPaused: videoPaused }),
+                onQuality: (quality) => this.onQuality(quality),
                 onDeviceLost: (kind) => {
                     toast.error(kind === "audio" ? "Your microphone was disconnected." : "Your camera was disconnected.", {
                         id: `call-device-${kind}`,
@@ -544,11 +613,11 @@ export class CallController {
     private onConnectionState(state: EngineConnectionState) {
         const callId = this.callId;
         if (!callId) return;
+        this.engineState = state;
 
         if (state === "connected") {
+            this.linkRestored();
             this.clearTimer("connectTimer");
-            this.clearTimer("reconnectTimer");
-            this.clearTimer("restartTimer");
 
             const first = this.state.connectedAt === null;
             const { phase } = this.state;
@@ -564,17 +633,111 @@ export class CallController {
             return;
         }
 
-        if (state === "disconnected" || state === "failed") {
-            // `disconnected` is often a blip that heals by itself; `failed` is not.
-            if (this.state.phase === "active") this.setState({ phase: "reconnecting" });
-            if (this.reconnectTimer === null && this.state.phase === "reconnecting") {
-                this.reconnectTimer = setTimeout(() => {
-                    this.reconnectTimer = null;
-                    this.failCall("connection_lost");
-                }, CALL_RECONNECT_TIMEOUT_MS);
+        // `disconnected` is often a blip that heals by itself; `failed` is not.
+        if (state === "disconnected" || state === "failed") this.linkLost(state === "failed" ? 0 : ICE_RESTART_DELAY_MS);
+    }
+
+    /* ---- getting a dropped connection back ---- */
+
+    /** The media stopped (ICE says so, or nothing has arrived for a while): show it, and keep trying to get it back. */
+    private linkLost(restartAfter: number) {
+        this.linkDown = true;
+
+        // Only a call that has been connected can be "reconnecting"; one that never was is bounded by its connect timeout.
+        if (this.state.connectedAt !== null) {
+            if (this.state.phase === "active") {
+                if (restartAfter === 0 || this.state.offline) {
+                    this.setState({ phase: "reconnecting" });
+                } else if (this.blipTimer === null) {
+                    this.blipTimer = setTimeout(() => {
+                        this.blipTimer = null;
+                        if (this.linkDown && this.state.phase === "active") this.setState({ phase: "reconnecting" });
+                    }, RECONNECTING_SHOWN_AFTER_MS);
+                }
             }
-            this.clearTimer("restartTimer");
-            this.restartTimer = setTimeout(() => this.engine?.restartIce(), state === "failed" ? 0 : ICE_RESTART_DELAY_MS);
+            if (this.reconnectTimer === null) this.armReconnectTimer(CALL_RECONNECT_TIMEOUT_MS);
+        }
+        if (this.restartTimer === null || restartAfter === 0) this.scheduleRestart(restartAfter);
+    }
+
+    /** The media is flowing again (or never stopped): every recovery attempt ends. */
+    private linkRestored() {
+        this.linkDown = false;
+        this.restartAttempt = 0;
+        this.silentSeconds = 0;
+        this.reconnectDeadline = 0;
+        (["reconnectTimer", "restartTimer", "blipTimer"] as const).forEach((timer) => this.clearTimer(timer));
+    }
+
+    private armReconnectTimer(ms: number) {
+        this.clearTimer("reconnectTimer");
+        this.reconnectDeadline = Date.now() + ms;
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            this.failCall("connection_lost");
+        }, ms);
+    }
+
+    /** Somebody is clearly still there (this browser is back online, the other one is negotiating): a little longer. */
+    private extendReconnectDeadline() {
+        if (this.reconnectTimer === null) return;
+        if (this.reconnectDeadline - Date.now() < CALL_RECONNECT_GRACE_MS) this.armReconnectTimer(CALL_RECONNECT_GRACE_MS);
+    }
+
+    private scheduleRestart(delay: number) {
+        this.clearTimer("restartTimer");
+        this.restartTimer = setTimeout(() => {
+            this.restartTimer = null;
+            void this.attemptRecovery();
+        }, delay);
+    }
+
+    /** One try at finding a new route. If the media is still down afterwards, another follows a little later. */
+    private async attemptRecovery() {
+        const engine = this.engine;
+        const callId = this.callId;
+        if (!engine || !callId) return;
+
+        // With the browser offline there is nothing to restart over: the `online` event brings the next attempt.
+        if (!this.state.offline) {
+            this.restartAttempt++;
+            await this.refreshIceServers(engine);
+            if (this.engine !== engine || this.callId !== callId) return;
+            await engine.restartIce();
+            if (this.engine !== engine || this.callId !== callId) return;
+        }
+        if (!this.linkDown) return;
+        this.scheduleRestart(Math.min(RESTART_RETRY_STEP_MS * Math.max(1, this.restartAttempt), RESTART_RETRY_MAX_MS));
+    }
+
+    /** A call can outlive its TURN passwords; an ICE restart with expired ones couldn't reach a relay. */
+    private async refreshIceServers(engine: CallEngine) {
+        if (this.iceServersAt === 0 || Date.now() - this.iceServersAt < ICE_SERVERS_MAX_AGE_MS) return;
+        const fresh = await callApi.refreshIceServers();
+        if (fresh && this.engine === engine) {
+            engine.updateIceServers(fresh);
+            this.iceServersAt = Date.now();
+        }
+    }
+
+    private onQuality(quality: ConnectionQuality) {
+        this.setQuality(quality);
+
+        const paused = quality.sending?.paused ?? false;
+        if (quality.level !== this.state.quality || paused !== this.state.videoPaused) {
+            this.setState({ quality: quality.level, videoPaused: paused });
+        }
+
+        // ICE can go on saying "connected" for a while after the media stopped (a phone that fell asleep, a route
+        // that died quietly). Seconds without a single packet are treated as a dropped connection.
+        if (quality.sample.silent) {
+            this.silentSeconds++;
+            if (this.silentSeconds >= STALL_SECONDS && !this.linkDown && this.state.phase === "active" && !this.state.offline) {
+                this.linkLost(0);
+            }
+        } else {
+            this.silentSeconds = 0;
+            if (this.linkDown && this.engineState === "connected") this.onConnectionState("connected");
         }
     }
 
@@ -732,6 +895,8 @@ export class CallController {
         const fresh = signals.filter((signal) => signal.seq > this.cursor).sort((a, b) => a.seq - b.seq);
         if (fresh.length === 0) return;
         this.cursor = fresh[fresh.length - 1].seq;
+        // The other side is renegotiating: it is there, and the recovery deserves the time to finish.
+        if (this.linkDown && fresh.some((signal) => signal.type !== "candidate")) this.extendReconnectDeadline();
 
         for (const signal of fresh) {
             // A callee that hasn't answered has no connection yet: the messages wait for it.
@@ -845,12 +1010,19 @@ export class CallController {
         this.lastRev = -1;
         this.held = [];
         this.iceServers = null;
+        this.iceServersAt = 0;
+        this.engineState = "connecting";
+        this.linkDown = false;
+        this.restartAttempt = 0;
+        this.reconnectDeadline = 0;
+        this.silentSeconds = 0;
+        if (this.quality !== null) this.setQuality(null);
         this.syncing = false;
         this.syncAgain = false;
         this.outbound = Promise.resolve();
         this.cameraBusy = false;
 
-        (["ringTimer", "connectTimer", "reconnectTimer", "restartTimer"] as const).forEach((timer) => this.clearTimer(timer));
+        (["ringTimer", "connectTimer", "reconnectTimer", "restartTimer", "blipTimer"] as const).forEach((timer) => this.clearTimer(timer));
         if (this.heartbeatTimer !== null) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = null;
         this.callUnsubscribe?.();
@@ -858,7 +1030,7 @@ export class CallController {
         callSounds.stopAll();
     }
 
-    private clearTimer(name: "ringTimer" | "connectTimer" | "reconnectTimer" | "restartTimer") {
+    private clearTimer(name: "ringTimer" | "connectTimer" | "reconnectTimer" | "restartTimer" | "blipTimer") {
         const timer = this[name];
         if (timer !== null) clearTimeout(timer);
         this[name] = null;
@@ -892,15 +1064,18 @@ export class CallController {
 
     private startHeartbeat() {
         if (this.heartbeatTimer !== null) return;
-        this.heartbeatTimer = setInterval(() => {
-            const callId = this.callId;
-            if (!callId) return;
-            const attempt = this.attempt;
-            callApi
-                .heartbeat(callId, this.cursor)
-                .then((reply) => attempt === this.attempt && this.applyReply(reply))
-                .catch((error) => attempt === this.attempt && this.onSyncError(error));
-        }, CALL_HEARTBEAT_MS);
+        this.heartbeatTimer = setInterval(() => this.beat(), CALL_HEARTBEAT_MS);
+    }
+
+    /** "I'm still here" to the server (its reply carries anything new too). Only once the call is answered. */
+    private beat() {
+        const callId = this.callId;
+        if (!callId || this.heartbeatTimer === null) return;
+        const attempt = this.attempt;
+        callApi
+            .heartbeat(callId, this.cursor)
+            .then((reply) => attempt === this.attempt && this.applyReply(reply))
+            .catch((error) => attempt === this.attempt && this.onSyncError(error));
     }
 
     /** The safety net under the doorbell: a slow poll while a call is being set up, a fast one without a doorbell. */

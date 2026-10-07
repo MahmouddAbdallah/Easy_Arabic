@@ -80,6 +80,19 @@ export const callApi = {
     /** The call this user is in right now, if any. */
     current: () => read({}),
 
+    /**
+     * Fresh servers for a call that has been running a long time (TURN passwords expire). Quick, and null when
+     * they can't be had, so the servers a call already has are never swapped for the public fallback.
+     */
+    async refreshIceServers(timeoutMs = 3_000): Promise<CallIceServer[] | null> {
+        try {
+            const { data } = await axios.get<CallIceResponse>(CALL_ICE_API_URL, { timeout: timeoutMs });
+            return data.iceServers.length > 0 ? data.iceServers : null;
+        } catch {
+            return null;
+        }
+    },
+
     /** Never fails: without the server's answer the public STUN servers are used. */
     async iceServers(): Promise<CallIceServer[]> {
         try {

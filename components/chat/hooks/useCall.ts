@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import type { CallMode, CallPeer } from "../lib/call";
 import { IDLE_CALL_STATE, type CallController, type CallSessionState } from "../lib/callController";
+import type { ConnectionQuality } from "../lib/callQuality";
 
 /** Set by <CallProvider>. One controller serves the whole page. */
 export const CallControllerContext = createContext<CallController | null>(null);
@@ -17,6 +18,15 @@ function useController(): CallController {
 export function useCallState(): CallSessionState {
     const controller = useController();
     return useSyncExternalStore(controller.subscribe, controller.getSnapshot, () => IDLE_CALL_STATE);
+}
+
+/**
+ * The detailed connection reading (about once a second). It lives apart from the call state so that only the
+ * component showing it redraws, not the whole call screen.
+ */
+export function useCallQuality(): ConnectionQuality | null {
+    const controller = useController();
+    return useSyncExternalStore(controller.subscribeQuality, controller.getQuality, () => null);
 }
 
 /**

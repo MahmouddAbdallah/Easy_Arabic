@@ -7,7 +7,9 @@
  *                  change) without the two offers colliding; the callee is the polite peer
  *   signaling out  ICE candidates are batched and only sent once `setSignalingReady(true)`
  *   signaling in   handled strictly one at a time, candidates wait for the remote description
- *   state channel  a tiny RTCDataChannel carries "muted" / "camera off" to the other person's screen
+ *   state channel  a tiny RTCDataChannel carries "muted" / "camera off" / "video paused" to the other person's screen
+ *   quality        getStats() once a second: a connection reading for the screen, and the video sender
+ *                  (resolution, frame rate, bitrate) kept within what the network can carry
  */
 import {
     MAX_SIGNALS_PER_REQUEST,
@@ -21,12 +23,25 @@ import {
     type CallSignal,
     type CallSignalInput,
 } from "./call";
+import { maxSendShortSide, openCameraStream, tuneVideoTrack, type CameraTarget } from "./callMedia";
+import {
+    QualityMeter,
+    QualitySampler,
+    VideoGovernor,
+    planFor,
+    videoLadder,
+    type CaptureSize,
+    type ConnectionQuality,
+    type QualitySample,
+} from "./callQuality";
 
 export type EngineConnectionState = "connecting" | "connected" | "disconnected" | "failed" | "closed";
 
 export interface RemoteMediaState {
     muted: boolean;
     cameraOff: boolean;
+    /** The other side stopped sending video because its connection is too weak for it (not a choice). */
+    videoPaused: boolean;
 }
 
 export interface CallEngineEvents {
@@ -38,6 +53,8 @@ export interface CallEngineEvents {
     /** A new stream holding the other person's current tracks. */
     onRemoteStream: (stream: MediaStream) => void;
     onRemoteMedia: (state: RemoteMediaState) => void;
+    /** A fresh reading of the connection, about once a second while the call is connected. */
+    onQuality: (quality: ConnectionQuality) => void;
     /** A device was unplugged mid-call and could not be replaced. */
     onDeviceLost: (kind: "audio" | "video") => void;
 }
@@ -114,7 +131,6 @@ export function getCameraErrorMessage(error: unknown): string {
 }
 
 const AUDIO: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-const VIDEO: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } };
 
 export interface LocalMedia {
     stream: MediaStream;
@@ -126,33 +142,31 @@ export interface LocalMedia {
 export async function openLocalMedia(mode: CallMode): Promise<LocalMedia> {
     const devices = navigator.mediaDevices;
     try {
-        try {
-            const stream = await devices.getUserMedia({
-                audio: AUDIO,
-                video: mode === "video" ? { ...VIDEO, facingMode: "user" } : false,
-            });
-            return { stream, videoUnavailable: false };
-        } catch (error) {
-            if (mode !== "video") throw error;
-            // A call without a working camera is still a call. If the microphone is the problem, this throws too.
-            return { stream: await devices.getUserMedia({ audio: AUDIO }), videoUnavailable: true };
+        if (mode === "video") {
+            try {
+                // The camera's real shape and best practical size: see ./callMedia.ts.
+                const stream = await openCameraStream(AUDIO);
+                stream.getVideoTracks().forEach((track) => tuneVideoTrack(track));
+                return { stream, videoUnavailable: false };
+            } catch {
+                // A call without a working camera is still a call. If the microphone is the problem, this throws too.
+                return { stream: await devices.getUserMedia({ audio: AUDIO }), videoUnavailable: true };
+            }
         }
+        return { stream: await devices.getUserMedia({ audio: AUDIO }), videoUnavailable: false };
     } catch (error) {
         throw new CallMediaError(error, mode);
     }
 }
 
-async function openTrack(kind: "audio" | "video", deviceId?: string): Promise<MediaStreamTrack> {
-    const stream = await navigator.mediaDevices.getUserMedia(
-        kind === "audio"
-            ? { audio: AUDIO }
-            : { video: { ...VIDEO, ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" }) } }
-    );
+async function openTrack(kind: "audio" | "video", camera?: CameraTarget): Promise<MediaStreamTrack> {
+    const stream = kind === "audio" ? await navigator.mediaDevices.getUserMedia({ audio: AUDIO }) : await openCameraStream(false, camera);
     const track = (kind === "audio" ? stream.getAudioTracks() : stream.getVideoTracks())[0];
     if (!track) {
         stream.getTracks().forEach((t) => t.stop());
         throw new Error(`No ${kind} track`);
     }
+    if (kind === "video") tuneVideoTrack(track);
     return track;
 }
 
@@ -162,11 +176,15 @@ async function openTrack(kind: "audio" | "video", deviceId?: string): Promise<Me
 
 /** Candidates arrive in bursts; sending them together keeps the number of requests down. */
 const CANDIDATE_BATCH_MS = 120;
+/** How often the connection is measured. */
+const STATS_INTERVAL_MS = 1000;
 
 interface ControlMessage {
     v: 1;
     muted: boolean;
     cameraOff: boolean;
+    /** Video switched off by the sender's own network (see VideoGovernor), as opposed to somebody turning the camera off. */
+    paused?: boolean;
 }
 
 export interface CallEngineOptions {
@@ -201,6 +219,22 @@ export class CallEngine {
     private cameraId: string | undefined;
     private closed = false;
     private lastState: EngineConnectionState | null = null;
+    /** The call has been connected at least once: from then on a stuck offer may be rolled back. */
+    private connectedOnce = false;
+
+    // Watching the connection, and keeping the video within what it can carry.
+    private monitor: ReturnType<typeof setInterval> | null = null;
+    private polling = false;
+    private readonly sampler = new QualitySampler();
+    private readonly meter = new QualityMeter();
+    private readonly governor = new VideoGovernor();
+    private readonly maxShortSide = maxSendShortSide();
+    /** Video is switched off for the network; the other screen is told. */
+    private videoPaused = false;
+    private encoderQueue: Promise<void> = Promise.resolve();
+    /** What was last written to the video sender, so an unchanged plan isn't written again. */
+    private encoderKey = "";
+    private audioPrioritised = false;
 
     // Negotiation (the "perfect negotiation" pattern).
     private makingOffer = false;
@@ -251,6 +285,10 @@ export class CallEngine {
             const state = this.connectionState();
             if (state === this.lastState) return;
             this.lastState = state;
+            if (state === "connected") {
+                this.connectedOnce = true;
+                this.startMonitor();
+            }
             this.events.onConnectionState(state);
         };
         this.pc.addEventListener("connectionstatechange", report);
@@ -342,6 +380,8 @@ export class CallEngine {
 
     private async applyDescription(description: CallSessionDescription) {
         const isOffer = description.type === "offer";
+        // An answer to an offer we have since rolled back (or already got an answer to) has nothing to apply to.
+        if (!isOffer && this.pc.signalingState !== "have-local-offer") return;
         // An offer that arrives while we are making one (or are not stable) is a collision.
         const readyForOffer = !this.makingOffer && (this.pc.signalingState === "stable" || this.settingRemoteAnswer);
         this.ignoreOffer = isOffer && !readyForOffer && !this.polite;
@@ -407,10 +447,33 @@ export class CallEngine {
         }
     }
 
-    /** The network changed or dropped: find a new route. Both sides may call this; collisions are handled. */
-    restartIce() {
+    /**
+     * The network changed or dropped: find a new route. Both sides may call this; collisions are handled.
+     * Safe to call again and again: an attempt whose offer never got an answer is replaced by a fresh one.
+     */
+    async restartIce(): Promise<void> {
         if (this.closed || typeof this.pc.restartIce !== "function") return;
-        this.pc.restartIce();
+
+        // An offer that never got its answer (it may never have reached the other side while the network was
+        // down) would block every later restart. Once the call has been connected, start over instead.
+        if (this.connectedOnce && this.pc.signalingState === "have-local-offer" && !this.makingOffer && !this.settingRemoteAnswer) {
+            try {
+                await this.pc.setLocalDescription({ type: "rollback" });
+            } catch {
+                /* nothing to roll back */
+            }
+        }
+        if (!this.closed) this.pc.restartIce();
+    }
+
+    /** Fresh servers for the next ICE restart: TURN passwords expire, and a call can outlive them. */
+    updateIceServers(iceServers: CallIceServer[]) {
+        if (this.closed) return;
+        try {
+            this.pc.setConfiguration({ ...this.pc.getConfiguration(), iceServers });
+        } catch (error) {
+            console.warn("[call] Couldn't update the ICE servers:", error);
+        }
     }
 
     private queue(signal: CallSignalInput, immediately = false) {
@@ -449,6 +512,128 @@ export class CallEngine {
         }
     }
 
+    /* ---- watching the connection, and keeping the video within what it can carry ---- */
+
+    private startMonitor() {
+        if (this.monitor !== null || this.closed) return;
+        this.monitor = setInterval(() => void this.poll(), STATS_INTERVAL_MS);
+        void this.poll(); // the first reading is only the baseline the next one is compared with
+        void this.applyEncoderSettings();
+    }
+
+    private stopMonitor() {
+        if (this.monitor !== null) clearInterval(this.monitor);
+        this.monitor = null;
+    }
+
+    private async poll() {
+        if (this.closed || this.polling) return;
+        this.polling = true;
+        try {
+            const report = await this.pc.getStats();
+            if (this.closed) return;
+            const now = Date.now();
+            const sample = this.sampler.sample(report.values(), now);
+            if (!sample) return;
+
+            this.adaptVideo(sample, now);
+            const { level, score } = this.meter.update(sample);
+            this.events.onQuality({ level, score, sample, sending: this.sendingState() });
+        } catch {
+            /* statistics are a nicety: a failed reading is skipped */
+        } finally {
+            this.polling = false;
+        }
+    }
+
+    /** The size the camera delivers right now: it changes when a phone is turned or the camera is switched. */
+    private captureSize(): CaptureSize | null {
+        const settings = this.local.getVideoTracks()[0]?.getSettings();
+        return settings?.width && settings.height ? { width: settings.width, height: settings.height } : null;
+    }
+
+    private sendingState(): ConnectionQuality["sending"] {
+        const capture = this.captureSize();
+        if (this.mode !== "video" || !capture) return null;
+        const ladder = videoLadder(capture, this.maxShortSide);
+        const index = Math.min(this.governor.tier, ladder.length - 1);
+        return { tier: ladder[index].id, paused: this.videoPaused, reduced: this.videoPaused || index > 0 };
+    }
+
+    private adaptVideo(sample: QualitySample, now: number) {
+        const capture = this.captureSize();
+        if (this.mode !== "video" || !capture) return; // nothing is being sent: nothing to adapt
+
+        const decision = this.governor.update(sample, videoLadder(capture, this.maxShortSide), capture, now);
+        if (decision.paused !== this.videoPaused) {
+            this.videoPaused = decision.paused;
+            this.sendMediaState();
+        }
+        void this.applyEncoderSettings();
+    }
+
+    private encoderPlanKey(): string {
+        const capture = this.captureSize();
+        const tier = capture ? Math.min(this.governor.tier, videoLadder(capture, this.maxShortSide).length - 1) : -1;
+        return `${tier}|${this.videoPaused}|${capture ? `${capture.width}x${capture.height}` : "none"}`;
+    }
+
+    /** Writes the current video plan (and, once, the audio priority) onto the senders. One write at a time. */
+    private applyEncoderSettings(): Promise<void> {
+        const key = this.encoderPlanKey();
+        if (key === this.encoderKey && (this.audioPrioritised || !this.connectedOnce)) return this.encoderQueue;
+        this.encoderKey = key;
+        this.encoderQueue = this.encoderQueue.then(() => this.writeEncoderSettings()).catch(() => undefined);
+        return this.encoderQueue;
+    }
+
+    private async writeEncoderSettings(): Promise<void> {
+        if (this.closed) return;
+
+        if (!this.audioPrioritised && this.connectedOnce) {
+            this.audioPrioritised = true; // one attempt is enough: not every browser takes these hints
+            const audio = this.transceiver("audio")?.sender;
+            const parameters = audio?.getParameters();
+            const encoding = parameters?.encodings?.[0];
+            if (audio && parameters && encoding) {
+                // Voice is what a call is for: when the network runs short, video gives way, not audio.
+                encoding.priority = "high";
+                encoding.networkPriority = "high";
+                try {
+                    await audio.setParameters(parameters);
+                } catch {
+                    /* not every browser takes these hints */
+                }
+            }
+        }
+
+        const sender = this.transceiver("video")?.sender;
+        const capture = this.captureSize();
+        const parameters = sender?.getParameters();
+        const encoding = parameters?.encodings?.[0];
+        if (!sender || !parameters || !encoding || !capture) {
+            this.encoderKey = ""; // not negotiated yet, or no camera: the next reading tries again
+            return;
+        }
+
+        if (this.videoPaused) {
+            encoding.active = false;
+        } else {
+            const ladder = videoLadder(capture, this.maxShortSide);
+            const plan = planFor(ladder[Math.min(this.governor.tier, ladder.length - 1)], capture);
+            encoding.active = true;
+            encoding.maxBitrate = plan.maxBitrate;
+            encoding.maxFramerate = plan.maxFramerate;
+            encoding.scaleResolutionDownBy = plan.scaleResolutionDownBy;
+        }
+        try {
+            await sender.setParameters(parameters);
+        } catch (error) {
+            this.encoderKey = "";
+            console.warn("[call] Couldn't tune the video sender:", error);
+        }
+    }
+
     /* ---- microphone and camera ---- */
 
     setMuted(muted: boolean) {
@@ -466,14 +651,17 @@ export class CallEngine {
             this.cameraOff = true;
             await this.swapTrack("video", null);
         } else {
-            const track = await openTrack("video", this.cameraId); // throws if the camera can't be opened: stays off
+            const track = await openTrack("video", this.cameraId ? { deviceId: this.cameraId } : undefined); // throws if the camera can't be opened: stays off
             await this.swapTrack("video", track);
             this.cameraOff = false;
         }
         this.sendMediaState();
     }
 
-    /** Next camera (front/back on a phone). The current one is released first: many phones can't open two. */
+    /**
+     * Next camera: a phone flips between its front and back camera, a computer goes through its webcams in
+     * turn. The current one is released first: many phones can't open two.
+     */
     async switchCamera(): Promise<void> {
         if (this.mode !== "video" || this.cameraOff || this.closed) return;
 
@@ -482,18 +670,37 @@ export class CallEngine {
         );
         if (cameras.length < 2) return;
 
-        const currentId = this.local.getVideoTracks()[0]?.getSettings().deviceId ?? this.cameraId;
+        const settings = this.local.getVideoTracks()[0]?.getSettings();
+        const currentId = settings?.deviceId ?? this.cameraId;
         const next = cameras[(cameras.findIndex((camera) => camera.deviceId === currentId) + 1) % cameras.length];
 
-        this.local.getVideoTracks().forEach((track) => track.stop());
-        try {
-            await this.swapTrack("video", await openTrack("video", next.deviceId));
-            this.cameraId = next.deviceId;
-        } catch (error) {
-            // Couldn't open the other camera: go back to the one that worked.
-            await this.swapTrack("video", await openTrack("video", currentId)).catch(() => this.events.onDeviceLost("video"));
-            throw error;
+        // Phones have several back lenses: flip between the directions instead of walking through every lens.
+        const targets: CameraTarget[] = [];
+        if (settings?.facingMode === "user" || settings?.facingMode === "environment") {
+            targets.push({ facing: settings.facingMode === "user" ? "environment" : "user", exact: true });
         }
+        targets.push({ deviceId: next.deviceId });
+
+        this.local.getVideoTracks().forEach((track) => track.stop());
+        let failure: unknown;
+        for (const target of targets) {
+            let track: MediaStreamTrack | null = null;
+            try {
+                track = await openTrack("video", target);
+                await this.swapTrack("video", track);
+                this.cameraId = track.getSettings().deviceId ?? ("deviceId" in target ? target.deviceId : this.cameraId);
+                return;
+            } catch (error) {
+                track?.stop();
+                failure = error;
+            }
+        }
+
+        // Couldn't open another camera: go back to the one that worked.
+        await this.swapTrack("video", await openTrack("video", currentId ? { deviceId: currentId } : undefined)).catch(() =>
+            this.events.onDeviceLost("video")
+        );
+        throw failure;
     }
 
     private transceiver(kind: "audio" | "video"): RTCRtpTransceiver | undefined {
@@ -519,6 +726,8 @@ export class CallEngine {
         }
         this.local = new MediaStream(next ? [...others, next] : others);
         this.events.onLocalStream(this.local);
+        // Another camera (or none) means another picture size: the video sender is set up for it.
+        if (kind === "video") void this.applyEncoderSettings();
     }
 
     /** A device that disappears mid-call (unplugged, taken by another app) is replaced if possible. */
@@ -528,7 +737,8 @@ export class CallEngine {
             if (this.closed || !this.local.getTracks().includes(track)) return;
             const kind = track.kind as "audio" | "video";
             try {
-                await this.swapTrack(kind, await openTrack(kind, kind === "video" ? this.cameraId : undefined));
+                const camera = kind === "video" && this.cameraId ? { deviceId: this.cameraId } : undefined;
+                await this.swapTrack(kind, await openTrack(kind, camera));
             } catch {
                 this.events.onDeviceLost(kind);
             }
@@ -539,7 +749,7 @@ export class CallEngine {
 
     private sendMediaState() {
         if (this.control.readyState !== "open") return;
-        const message: ControlMessage = { v: 1, muted: this.muted, cameraOff: this.cameraOff };
+        const message: ControlMessage = { v: 1, muted: this.muted, cameraOff: this.cameraOff, paused: this.videoPaused };
         try {
             this.control.send(JSON.stringify(message));
         } catch {
@@ -552,7 +762,11 @@ export class CallEngine {
         try {
             const message = JSON.parse(raw) as Partial<ControlMessage> | null;
             if (message?.v !== 1) return;
-            this.events.onRemoteMedia({ muted: message.muted === true, cameraOff: message.cameraOff === true });
+            this.events.onRemoteMedia({
+                muted: message.muted === true,
+                cameraOff: message.cameraOff === true,
+                videoPaused: message.paused === true,
+            });
         } catch {
             /* not ours */
         }
@@ -564,6 +778,7 @@ export class CallEngine {
     close() {
         if (this.closed) return;
         this.closed = true;
+        this.stopMonitor();
         if (this.flushTimer !== null) clearTimeout(this.flushTimer);
         this.flushTimer = null;
         this.outbox = [];

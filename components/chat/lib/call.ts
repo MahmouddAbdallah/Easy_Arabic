@@ -29,11 +29,20 @@ export const CALL_STALE_AFTER_MS = 60_000;
 export const CALL_USER_AWAY_MS = 30_000;
 /** After answering, the media must be flowing within this time or the call is given up. */
 export const CALL_CONNECT_TIMEOUT_MS = 30_000;
-/** A dropped connection gets this long to recover before the call ends. */
-export const CALL_RECONNECT_TIMEOUT_MS = 20_000;
+/**
+ * A dropped connection gets this long to recover before the call ends. It has to stay below what the server
+ * tolerates: a browser that reported nothing for CALL_STALE_AFTER_MS ends the call, and its last report can be a
+ * whole heartbeat old when the network goes, so only CALL_STALE_AFTER_MS - CALL_HEARTBEAT_MS is certain.
+ */
+export const CALL_RECONNECT_TIMEOUT_MS = 35_000;
+/** Once this browser is back online (or the other side is seen negotiating), a recovery gets at least this much longer. */
+export const CALL_RECONNECT_GRACE_MS = 15_000;
 
-/** Upper bounds that keep one call (and one request) small. */
-export const MAX_CALL_SIGNALS = 300;
+/**
+ * Upper bounds that keep one call (and one request) small. Every ICE restart (a network change, a recovery
+ * attempt) costs a few dozen signaling messages, and a long call on a mobile network can restart many times.
+ */
+export const MAX_CALL_SIGNALS = 600;
 export const MAX_SDP_LENGTH = 64_000;
 export const MAX_SIGNALS_PER_REQUEST = 40;
 

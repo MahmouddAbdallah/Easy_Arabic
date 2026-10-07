@@ -10,9 +10,10 @@ const VARIANTS = {
     accept: "bg-emerald-500 text-white hover:bg-emerald-600",
 } as const;
 
+// A phone held sideways has little height to spare: the buttons shrink and lose their captions.
 const SIZES = {
-    md: "size-14",
-    lg: "size-16",
+    md: "size-14 [@media(max-height:480px)]:size-12",
+    lg: "size-16 [@media(max-height:480px)]:size-14",
 } as const;
 
 interface ControlButtonProps {
@@ -59,7 +60,7 @@ export function ControlButton({
                 {children}
             </button>
             {!hideLabel && (
-                <span aria-hidden className="text-[11px] font-medium text-white/70">
+                <span aria-hidden className="text-[11px] font-medium text-white/70 [@media(max-height:480px)]:hidden">
                     {label}
                 </span>
             )}
