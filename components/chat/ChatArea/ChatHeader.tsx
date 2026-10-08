@@ -8,8 +8,20 @@ import { useCallActions, useCallSelector } from '../hooks/useCall';
 import UserStatusDisplay from '../UserStatusDisplay';
 import { useTypingStatus } from '../hooks/useTyping';
 import { useRouter } from 'next/navigation'
+import { cn } from 'cn'
+import type { Ref } from 'react'
+import { CHAT_SEARCH_PANEL_ID } from '../lib/chatSearch'
 
-const ChatHeader = () => {
+interface ChatHeaderProps {
+    /** The in-chat search is open. */
+    searchOpen?: boolean;
+    /** Opens the search, or closes it when it is already open. */
+    onToggleSearch?: () => void;
+    /** Lets the owner hand focus back to the button when the search closes. */
+    searchButtonRef?: Ref<HTMLButtonElement>;
+}
+
+const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: ChatHeaderProps) => {
     const { receiver, receiverId, chatId } = useChat();
     const { back } = useRouter();
     // Real-time "Typing..." of the other user; shown instead of Online/Offline while it lasts.
@@ -92,10 +104,22 @@ const ChatHeader = () => {
                     </Tooltip>
 
                     <Tooltip>
-                        <TooltipTrigger className=" h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                        <TooltipTrigger
+                            ref={searchButtonRef}
+                            type="button"
+                            aria-label={searchOpen ? "Close search" : "Search in chat"}
+                            aria-expanded={searchOpen}
+                            aria-controls={searchOpen ? CHAT_SEARCH_PANEL_ID : undefined}
+                            disabled={!chatId || !onToggleSearch}
+                            onClick={onToggleSearch}
+                            className={cn(
+                                callButton,
+                                searchOpen && "bg-muted text-foreground"
+                            )}
+                        >
                             <SearchIcon className="h-4 w-4" />
                         </TooltipTrigger>
-                        <TooltipContent>Search in Chat</TooltipContent>
+                        <TooltipContent>{searchOpen ? "Close search" : "Search in Chat"}</TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
 

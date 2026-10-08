@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
     collection,
+    endAt,
     getDocs,
     limit,
     onSnapshot,
@@ -13,6 +14,7 @@ import {
     startAt,
     type CollectionReference,
     type DocumentData,
+    type QueryConstraint,
     type QueryDocumentSnapshot,
     type Unsubscribe,
 } from "firebase/firestore";
@@ -35,6 +37,8 @@ interface Session {
     loadingMore: boolean;
     /** Older pages loaded so far; the next one gets this index. */
     pagesLoaded: number;
+    /** Settles when the older-messages load in flight (if any) is over, so a jump can wait its turn instead of failing. */
+    settled: Promise<void>;
     unsubscribers: Unsubscribe[];
 }
 
@@ -57,6 +61,20 @@ const withPage = (pages: MessageType[][], index: number, page: MessageType[]): M
 async function hasOlderMessages(messagesRef: MessagesRef, cursor: MessageDoc): Promise<boolean> {
     const probe = await getDocs(query(messagesRef, orderBy("time", "desc"), startAfter(cursor), limit(1)));
     return !probe.empty;
+}
+
+/**
+ * Is the message `(time, id)` inside the history loaded so far? The loaded part is contiguous and runs
+ * from the newest message down to `session.cursor`, in the order (time, id) descending: exactly the order
+ * Firestore returns, so two messages with the same timestamp are told apart by their id.
+ */
+function isLoaded(session: Session, target: { id: string; time: string }): boolean {
+    const oldest = session.cursor;
+    if (!oldest) return false;
+
+    const oldestTime: unknown = oldest.get("time");
+    if (typeof oldestTime !== "string") return false;
+    return target.time > oldestTime || (target.time === oldestTime && target.id >= oldest.id);
 }
 
 /**
@@ -91,6 +109,7 @@ export function useChatMessages(chatId: string | null, currentUserId: string | u
             hasMore: false,
             loadingMore: false,
             pagesLoaded: 0,
+            settled: Promise.resolve(),
             unsubscribers: [],
         };
         sessionRef.current = session;
@@ -151,16 +170,22 @@ export function useChatMessages(chatId: string | null, currentUserId: string | u
     }, [chatId, currentUserId]);
 
     /**
-     * Loads the 15 messages before the oldest one on screen and keeps them live.
-     * Resolves to true when a page was added, false when nothing was (nothing older, a failure,
+     * Loads older messages and keeps them live: the 15 before the oldest one on screen, or, with
+     * `untilTime`, EVERYTHING from there down to the messages sent at that time (one query for the whole
+     * gap, rather than a page per round trip).
+     * Resolves to the messages that were added, or null when nothing was (nothing older, a failure,
      * or a load already in progress).
      */
-    const loadMore = useCallback(async (): Promise<boolean> => {
+    const loadOlder = useCallback(async (untilTime?: string): Promise<MessageDoc[] | null> => {
         const session = sessionRef.current;
-        if (!session || !session.cursor || !session.hasMore || session.loadingMore) return false;
+        if (!session || !session.cursor || !session.hasMore || session.loadingMore) return null;
 
         session.loadingMore = true;
         setLoadingMore(true);
+        let release!: () => void;
+        session.settled = new Promise<void>((resolve) => {
+            release = resolve;
+        });
 
         const pageIndex = session.pagesLoaded;
         // `docs` is the page as of the latest snapshot. `onScreen` flips once the page has been added to the
@@ -176,13 +201,13 @@ export function useChatMessages(chatId: string | null, currentUserId: string | u
                 firstFailure = reject;
             });
 
+            // Same start either way (right before the oldest message loaded); only where it ends differs.
+            const olderThanLoaded: QueryConstraint[] = [orderBy("time", "desc"), startAfter(session.cursor)];
+            const range: QueryConstraint[] =
+                untilTime === undefined ? [limit(MESSAGES_PAGE_SIZE)] : [endAt(untilTime)];
+
             unsubscribe = onSnapshot(
-                query(
-                    session.messagesRef,
-                    orderBy("time", "desc"),
-                    startAfter(session.cursor),
-                    limit(MESSAGES_PAGE_SIZE)
-                ),
+                query(session.messagesRef, ...olderThanLoaded, ...range),
                 (snapshot) => {
                     if (session.cancelled) return;
                     const isFirst = page.docs === null;
@@ -206,21 +231,24 @@ export function useChatMessages(chatId: string | null, currentUserId: string | u
             session.unsubscribers.push(unsubscribe);
 
             await answered;
-            if (session.cancelled) return false;
+            if (session.cancelled) return null;
 
             const first = page.docs ?? [];
             if (first.length === 0) {
-                // Nothing there after all: there is no older history.
                 unsubscribe();
-                session.hasMore = false;
-                setHasMore(false);
-                return false;
+                // A page that comes back empty means there is no older history. A range that does is just
+                // a target that isn't there: that says nothing about what is older.
+                if (untilTime === undefined) {
+                    session.hasMore = false;
+                    setHasMore(false);
+                }
+                return null;
             }
 
             const more =
-                first.length === MESSAGES_PAGE_SIZE &&
+                (untilTime !== undefined || first.length === MESSAGES_PAGE_SIZE) &&
                 (await hasOlderMessages(session.messagesRef, first[first.length - 1]));
-            if (session.cancelled) return false;
+            if (session.cancelled) return null;
 
             // Commit in one go (one render): the page, whether more remains, and the next cursor.
             // `page.docs` is re-read because the page may have changed while the check above ran.
@@ -231,19 +259,56 @@ export function useChatMessages(chatId: string | null, currentUserId: string | u
             page.onScreen = true;
             setOlderPages((pages) => withPage(pages, pageIndex, toMessages(oldestFirst(docs), session.userId)));
             setHasMore(more);
-            return true;
+            return docs;
         } catch (error) {
             console.error("Error loading older messages: ", error);
             unsubscribe?.();
             if (!session.cancelled) {
                 toast.error("Couldn't load older messages. Please try again.", { id: "chat-load-older-error" });
             }
-            return false;
+            return null;
         } finally {
             session.loadingMore = false;
             if (!session.cancelled) setLoadingMore(false);
+            release();
         }
     }, []);
+
+    /**
+     * Loads the 15 messages before the oldest one on screen and keeps them live.
+     * Resolves to true when a page was added, false when nothing was (nothing older, a failure,
+     * or a load already in progress).
+     */
+    const loadMore = useCallback(async (): Promise<boolean> => (await loadOlder()) !== null, [loadOlder]);
+
+    /**
+     * Makes sure the message `target` is loaded (it may be months back, far outside the pages on screen),
+     * so it can be scrolled to. Costs exactly the messages between it and what was already loaded, which
+     * is what scrolling up page by page would have read, plus one page of context above it.
+     * Resolves to true once the message is loaded, false when it couldn't be reached.
+     */
+    const loadUntil = useCallback(
+        async (target: { id: string; time: string }): Promise<boolean> => {
+            const session = sessionRef.current;
+            if (!session) return false;
+
+            // Another load may already be on its way (and may bring the target with it): let it finish first.
+            for (;;) {
+                if (session.cancelled) return false;
+                if (isLoaded(session, target)) return true;
+                if (!session.loadingMore) break;
+                await session.settled;
+            }
+
+            const added = await loadOlder(target.time);
+            if (!added || !added.some((doc) => doc.id === target.id)) return false;
+
+            // Some history above the message, so it doesn't sit against the very top edge. Best effort.
+            if (session.hasMore) await loadOlder();
+            return true;
+        },
+        [loadOlder]
+    );
 
     // Oldest page first, then the live tail. Every range is already sorted, so no sorting is needed.
     const messages = useMemo(() => {
@@ -257,5 +322,5 @@ export function useChatMessages(chatId: string | null, currentUserId: string | u
         });
     }, [olderPages, latest]);
 
-    return { messages, loading, hasMore, loadingMore, loadMore };
+    return { messages, loading, hasMore, loadingMore, loadMore, loadUntil };
 }

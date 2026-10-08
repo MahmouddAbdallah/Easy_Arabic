@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_WAVEFORM_BARS } from "./attachments";
+import { CHAT_SEARCH_MAX_QUERY_LENGTH } from "./chatSearch";
 import { MAX_MESSAGE_LENGTH } from "./constants";
 import { REACTION_KEYS } from "./reactions";
 
 /**
- * Request schemas for PATCH /api/chat/messages and /api/chat/attachments.
+ * Request schemas for PATCH /api/chat/messages, GET /api/chat/messages/search and /api/chat/attachments.
  * The client only needs the inferred types (`import type`), so zod never reaches the browser bundle.
  */
 
@@ -125,10 +126,22 @@ export const DeleteUploadRequestSchema = z.object({
     resourceType: z.enum(["image", "video", "raw"]),
 });
 
+/**
+ * GET /api/chat/messages/search?receiverId=…&q=…&cursor=…: "find messages in my chat with `receiverId`".
+ * The chat is always the signed-in user's own chat with that person; `cursor` is whatever the previous
+ * response returned as `nextCursor` (the server validates it again).
+ */
+export const ChatSearchQuerySchema = z.object({
+    receiverId: firestoreId,
+    q: z.string().trim().min(1, "Type something to search for").max(CHAT_SEARCH_MAX_QUERY_LENGTH),
+    cursor: z.string().min(1).max(300).optional(),
+});
+
 export type MessageRequest = z.output<typeof MessageRequestSchema>;
 export type SendAttachmentInput = z.output<typeof SendAttachmentSchema>;
 export type SignUploadsRequest = z.output<typeof SignUploadsRequestSchema>;
 export type DeleteUploadRequest = z.output<typeof DeleteUploadRequestSchema>;
+export type ChatSearchQuery = z.output<typeof ChatSearchQuerySchema>;
 export type EditMessageRequest = z.output<typeof EditMessageSchema>;
 export type DeleteMessageRequest = z.output<typeof DeleteMessageSchema>;
 export type ReactMessageRequest = z.output<typeof ReactMessageSchema>;

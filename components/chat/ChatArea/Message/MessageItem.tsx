@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { BanIcon, CheckCheck } from "lucide-react";
 import { cn } from "cn";
 import Attachment from "../Attachment";
+import { findHighlights } from "../../lib/chatSearch";
 import { DELETED_MESSAGE_TEXT } from "../../lib/constants";
 import type { ReactionKey } from "../../lib/reactions";
 import type { MessageType } from "../../types";
 import { EditMessageForm } from "./EditMessageForm";
 import { MessageToolbar } from "./MessageToolbar";
 import { ReactionSummary } from "./ReactionSummary";
+import { HighlightedText } from "../Search/HighlightedText";
+
+const NO_TERMS: readonly string[] = [];
 
 interface MessageItemProps {
     message: MessageType;
@@ -23,9 +27,13 @@ interface MessageItemProps {
     onCancelEdit: () => void;
     onSaveEdit: (messageId: string, text: string) => void;
     onRequestDelete: (message: MessageType) => void;
+    /** Words of the search in progress (already in comparable form): where they occur in the text they are marked. */
+    highlightTerms?: readonly string[];
+    /** This is the message the search just jumped to: it gets a ring for a moment so the eye finds it. */
+    isFlashing?: boolean;
 }
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
     message,
     currentUserId,
     otherUserName,
@@ -36,6 +44,8 @@ export function MessageItem({
     onCancelEdit,
     onSaveEdit,
     onRequestDelete,
+    highlightTerms = NO_TERMS,
+    isFlashing = false,
 }: MessageItemProps) {
     const { isMe, deleted } = message;
     const [tapped, setTapped] = useState(false); // touch: tap the bubble to reveal the toolbar
@@ -45,6 +55,11 @@ export function MessageItem({
     const canInteract = !deleted && !isEditing;
     const hasAttachments = message.attachments.length > 0;
     const myReaction = message.reactions[currentUserId] ?? null;
+    // Only worked out while a search is showing words: otherwise every bubble would fold its text for nothing.
+    const highlights = useMemo(
+        () => (highlightTerms.length > 0 && message.text ? (findHighlights(message.text, highlightTerms) ?? []) : []),
+        [highlightTerms, message.text]
+    );
 
     // Tapping anywhere outside this message closes the touch toolbar.
     useEffect(() => {
@@ -64,6 +79,8 @@ export function MessageItem({
 
     const bubbleClass = cn(
         "p-3.5 md:p-4 rounded-2xl text-xs relative transition-all duration-200 shadow-sm",
+        // A ring takes no room, so flashing never moves the conversation.
+        isFlashing && "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
         deleted
             ? cn(
                 "bg-muted/40 text-muted-foreground border border-dashed border-border/60 shadow-none",
@@ -136,7 +153,7 @@ export function MessageItem({
                                         "leading-relaxed tracking-tight text-[12px] md:text-[13px] whitespace-pre-wrap wrap-break-word",
                                         hasAttachments && "mt-2"
                                     )}>
-                                        {message.text}
+                                        <HighlightedText text={message.text} ranges={highlights} />
                                     </p>
                                 )
                             )}
@@ -181,4 +198,4 @@ export function MessageItem({
             )}
         </div>
     );
-}
+});
