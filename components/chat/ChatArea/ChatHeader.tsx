@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ArrowLeftIcon, ImageIcon, InfoIcon, MoreVerticalIcon, PhoneIcon, SearchIcon, VideoIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, BroomSparkles, InfoIcon, MoreVerticalIcon, PhoneIcon, SearchIcon, VideoIcon } from 'lucide-react'
 import { useChat } from '../ChatProvider'
 import { useCallActions, useCallSelector } from '../hooks/useCall';
 import UserStatusDisplay from '../UserStatusDisplay';
@@ -135,8 +135,12 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: Cha
                         <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
                             <InfoIcon className="size-3.5 text-muted-foreground" /> Contact Info
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-border/40" />
                         <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
-                            <ImageIcon className="size-3.5 text-muted-foreground" /> Shared Media
+                            <BanIcon className="size-3.5 text-muted-foreground" /> Block
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
+                            <BroomSparkles className="size-3.5 text-muted-foreground" /> Clear Chat
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-border/40" />
                         <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg text-destructive focus:text-destructive">
