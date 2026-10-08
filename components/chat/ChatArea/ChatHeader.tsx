@@ -30,7 +30,7 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: Cha
     const inCall = useCallSelector((call) => call.phase !== 'idle');
     // `receiver` still holds the previous person for a moment after switching chats: only call who is on screen.
     const peer = receiverId && receiver?.id === receiverId ? { id: receiverId, name: receiver.name ?? 'User' } : null;
-    const callButton = "h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all disabled:pointer-events-none disabled:opacity-40";
+    const callButton = "size-9 text-muted-foreground hover:text-foreground rounded-xl transition-all disabled:pointer-events-none disabled:opacity-40";
     return (
         <div className="h-16 px-4 md:px-6 border-b border-border/40 flex items-center justify-between bg-card/20 backdrop-blur-md shrink-0">
             <div className="flex items-center gap-3">
@@ -41,7 +41,7 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: Cha
                     onClick={() => {
                         back();
                     }}
-                    className="md:hidden h-9 w-9 text-muted-foreground rounded-xl"
+                    className="md:hidden size-9 text-muted-foreground rounded-xl"
                 >
                     <ArrowLeftIcon className="h-5 w-5" />
                 </Button>
@@ -85,7 +85,7 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: Cha
                             className={callButton}
                         >
 
-                            <PhoneIcon className="h-4 w-4" />
+                            <PhoneIcon className="size-4" />
                         </TooltipTrigger>
                         <TooltipContent>Voice Call</TooltipContent>
                     </Tooltip>
@@ -98,7 +98,7 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: Cha
                             onClick={() => peer && startCall(peer, 'video')}
                             className={callButton}
                         >
-                            <VideoIcon className="h-4 w-4" />
+                            <VideoIcon className="size-4" />
                         </TooltipTrigger>
                         <TooltipContent>Video Call</TooltipContent>
                     </Tooltip>
@@ -117,26 +117,26 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef }: Cha
                                 searchOpen && "bg-muted text-foreground"
                             )}
                         >
-                            <SearchIcon className="h-4 w-4" />
+                            <SearchIcon className="size-4" />
                         </TooltipTrigger>
                         <TooltipContent>{searchOpen ? "Close search" : "Search in Chat"}</TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
 
                 <DropdownMenu>
-                    <DropdownMenuTrigger className="hidden h-9 w-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
+                    <DropdownMenuTrigger className="size-9 text-muted-foreground hover:text-foreground rounded-xl transition-all">
 
-                        <MoreVerticalIcon className="h-4 w-4" />
+                        <MoreVerticalIcon className="size-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         align="end"
-                        className="w-48 rounded-xl backdrop-blur-lg border-border/50"
+                        className="w-48 rounded-xl space-y-2 p-2 backdrop-blur-lg border-border/50"
                     >
                         <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
-                            <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" /> Contact Info
+                            <InfoIcon className="size-3.5 text-muted-foreground" /> Contact Info
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
-                            <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> Shared Media
+                            <ImageIcon className="size-3.5 text-muted-foreground" /> Shared Media
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-border/40" />
                         <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg text-destructive focus:text-destructive">
