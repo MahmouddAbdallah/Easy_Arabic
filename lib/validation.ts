@@ -151,6 +151,9 @@ export const passwordChangeSchema = z.object({
     newPassword: passwordSchema,
 });
 
+/** An admin sets someone else's password directly: no current password and no email token. */
+export const adminPasswordResetSchema = z.object({ newPassword: passwordSchema });
+
 export const lessonSchema = z.object({
     teacherId: z.string('teacherId is required'),
     familyId: z.string('familyId is required'),

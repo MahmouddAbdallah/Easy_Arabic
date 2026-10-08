@@ -49,6 +49,9 @@ export function TeacherDetailsHeaderSkeleton() {
                 <div className="flex flex-1 justify-center px-4 py-3 sm:flex-none">
                     <Skeleton className="h-5 w-28" />
                 </div>
+                <div className="flex flex-1 justify-center px-4 py-3 sm:flex-none">
+                    <Skeleton className="h-5 w-28" />
+                </div>
             </div>
             <Status label="Loading teacher profile…" />
         </section>

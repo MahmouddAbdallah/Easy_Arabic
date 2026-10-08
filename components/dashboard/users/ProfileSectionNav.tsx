@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, GraduationCap, Users } from 'lucide-react'
+import { BookOpen, GraduationCap, Settings, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type ProfileKind = 'teacher' | 'family'
@@ -32,10 +32,12 @@ const ProfileSectionNav = ({ kind, id, totalLessons, totalLinked }: ProfileSecti
     const { base, segment, label, icon, ariaLabel } = KINDS[kind]
     const basePath = `${base}/${id}`
     const onLinked = pathname.startsWith(`${basePath}/${segment}`)
+    const onSettings = pathname.startsWith(`${basePath}/settings`)
 
-    const items = [
-        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onLinked },
+    const items: Array<{ href: string; label: string; count?: number; icon: LucideIcon; active: boolean }> = [
+        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onLinked && !onSettings },
         { href: `${basePath}/${segment}`, label, count: totalLinked, icon, active: onLinked },
+        { href: `${basePath}/settings`, label: 'Settings', icon: Settings, active: onSettings },
     ]
 
     return (
@@ -55,14 +57,16 @@ const ProfileSectionNav = ({ kind, id, totalLessons, totalLinked }: ProfileSecti
                         >
                             <Icon className="size-4" />
                             {label}
-                            <span
-                                className={cn(
-                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
-                                    active ? 'bg-brand/15 text-brand' : 'bg-muted text-muted-foreground'
-                                )}
-                            >
-                                {count}
-                            </span>
+                            {count !== undefined && (
+                                <span
+                                    className={cn(
+                                        'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                                        active ? 'bg-brand/15 text-brand' : 'bg-muted text-muted-foreground'
+                                    )}
+                                >
+                                    {count}
+                                </span>
+                            )}
                         </Link>
                     </li>
                 ))}

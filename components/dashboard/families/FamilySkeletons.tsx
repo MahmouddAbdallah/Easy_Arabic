@@ -24,6 +24,7 @@ export function FamilyDetailsHeaderSkeleton() {
                 <div className="flex gap-1">
                     <Skeleton className="h-9 flex-1 sm:w-32 sm:flex-none" />
                     <Skeleton className="h-9 flex-1 sm:w-32 sm:flex-none" />
+                    <Skeleton className="h-9 flex-1 sm:w-32 sm:flex-none" />
                 </div>
             </div>
             <span className="sr-only">Loading family profile…</span>
