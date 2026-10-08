@@ -27,9 +27,13 @@
 import type { DocumentSnapshot, Firestore } from 'firebase-admin/firestore';
 import { ACTIVE_CONTEXT_TTL_MS } from '../contract';
 import { canonicalLocation } from '../location';
+import { chunk } from './chunk';
 import { firestore } from './firestore';
 
 const ACTIVE_CONTEXT_COLLECTION = 'activeNotificationContext';
+
+/** Presence documents per batched read in `usersViewing`. */
+const PRESENCE_READ_CHUNK = 500;
 
 interface Session {
     link: string;
@@ -93,4 +97,22 @@ export async function setActiveContext(userId: string, sessionId: string, link: 
 export function isViewing(snapshot: DocumentSnapshot, link: string, now: number = Date.now()): boolean {
     const target = canonicalLocation(link);
     return Object.values(liveSessions(snapshot.get('sessions'), now)).some((session) => session.link === target);
+}
+
+/**
+ * The users among `userIds` who have a live tab showing `link` right now. For callers that decide about a few
+ * people on their own (the chat's call ring); sendNotification() reads presence together with the settings in
+ * recipients.ts. Throws if Firestore fails — the caller decides what that means for it.
+ */
+export async function usersViewing(userIds: string[], link: string): Promise<Set<string>> {
+    const viewing = new Set<string>();
+    if (userIds.length === 0) return viewing;
+
+    const db = await firestore();
+    const now = Date.now();
+    const snapshots = await Promise.all(
+        chunk([...new Set(userIds)], PRESENCE_READ_CHUNK).map((group) => db.getAll(...group.map((userId) => presenceRef(db, userId))))
+    );
+    for (const snapshot of snapshots.flat()) if (isViewing(snapshot, link, now)) viewing.add(snapshot.id);
+    return viewing;
 }

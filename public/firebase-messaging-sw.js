@@ -52,19 +52,29 @@ async function handlePush(event) {
     const payload = readPayload(event);
     if (!payload) return;
 
-    // Only a *visible* page can show an in-app toast; background tabs can't be seen.
-    const visiblePages = (await getWindowClients()).filter((client) => client.visibilityState === 'visible');
-
-    if (visiblePages.length > 0) {
-        const replies = await Promise.all(
-            visiblePages.map((client) => askPage(client, { type: MESSAGE.RECEIVED, payload }))
-        );
-        // If a visible page has no listener (e.g. notifications aren't mounted on that route),
-        // nobody confirmed — fall through so the user still sees the notification.
-        if (replies.some(Boolean)) return;
-    }
-
+    if (await handedToPage(payload)) return;
     await showSystemNotification(payload);
+}
+
+/**
+ * Did a visible page of the app take this notification (to show it as an in-app toast)? Never rejects: if the
+ * handshake itself fails, the answer is "no" and the person gets a system notification — a doubled notification
+ * is better than a lost one, and a push handler that ends without showing anything makes the browser draw its
+ * own generic "this site was updated in the background" notice.
+ */
+async function handedToPage(payload) {
+    try {
+        // Only a *visible* page can show an in-app toast; background tabs can't be seen.
+        const visiblePages = (await getWindowClients()).filter((client) => client.visibilityState === 'visible');
+        if (visiblePages.length === 0) return false;
+
+        const replies = await Promise.all(visiblePages.map((client) => askPage(client, { type: MESSAGE.RECEIVED, payload })));
+        // If a visible page has no listener (e.g. notifications aren't mounted on that route),
+        // nobody confirmed — the caller falls through so the user still sees the notification.
+        return replies.some(Boolean);
+    } catch {
+        return false;
+    }
 }
 
 async function showSystemNotification(payload) {

@@ -54,7 +54,8 @@
  *
  * It NEVER throws. Invalid input, a missing Firebase config, a database hiccup or an FCM outage
  * all come back as `{ success: false, error }`, so a notification can never take down the
- * request that triggered it. Check `result.success` if you care; ignore it if you don't.
+ * request that triggered it. A big audience can fail in part (one group of in-app copies, a few devices):
+ * what did get through is still counted in `stored` / `sent`, and the error says how much did not. Check `result.success` if you care; ignore it if you don't.
  * On serverless hosts, wrap the call in `after(() => sendNotification(...))` (from "next/server")
  * to keep it off the response's critical path without the platform freezing it mid-flight.
  *
@@ -77,7 +78,7 @@ import { loadNotificationConfig } from './server/config';
 import { getDevicesForUsers } from './server/devices';
 import { notificationKey } from './server/identity';
 import { saveToInbox } from './server/inbox';
-import { loadMessaging, pushToDevices, type PushOutcome } from './server/push';
+import { loadMessaging, pushToDevices, type PushOutcome, type PushTarget } from './server/push';
 import { forgetSend, isRecentDuplicate, sendFingerprint } from './server/recentSends';
 import { loadRecipientState, type RecipientState } from './server/recipients';
 import { normalizeSettings } from './settings';
@@ -290,8 +291,6 @@ function buildPayload(input: ValidatedNotificationInput, grouping: { tag?: strin
     return payload;
 }
 
-const NO_OUTCOME: PushOutcome = { sent: 0, failed: 0, removedTokens: 0, errorCodes: [] };
-
 /** Push delivery: resolve device tokens, send through FCM (server/push.ts), forget dead tokens. */
 async function sendPush(
     input: ValidatedNotificationInput,
@@ -322,18 +321,14 @@ async function sendPush(
     const typeDefaults = typeDelivery(config, input.type);
     const delivery = { urgency: input.urgency ?? typeDefaults.urgency, ttlSeconds: input.ttlSeconds ?? typeDefaults.ttlSeconds };
 
-    // Two sends at most: devices that may make a sound, and devices of people who turned sound off.
-    const [audible, quiet] = await Promise.all([
-        devices.loud.length > 0 ? pushToDevices(messaging, devices.loud, payload, delivery) : NO_OUTCOME,
-        devices.silent.length > 0 ? pushToDevices(messaging, devices.silent, { ...payload, silent: true }, delivery) : NO_OUTCOME,
-    ]);
+    // Two kinds of device — those that may make a sound and those of people who turned sound off — go out together:
+    // push.ts packs them into the same FCM calls.
+    const targets: PushTarget[] = [
+        { tokens: devices.loud, payload },
+        { tokens: devices.silent, payload: { ...payload, silent: true } },
+    ];
+    const outcome: PushOutcome = await pushToDevices(messaging, targets, delivery);
 
-    const outcome = {
-        sent: audible.sent + quiet.sent,
-        failed: audible.failed + quiet.failed,
-        removedTokens: audible.removedTokens + quiet.removedTokens,
-        errorCodes: [...new Set([...audible.errorCodes, ...quiet.errorCodes])],
-    };
     const summary = { targeted, sent: outcome.sent, failed: outcome.failed, removedTokens: outcome.removedTokens };
     if (outcome.failed > 0) {
         const codes = outcome.errorCodes.join(', ');
@@ -345,15 +340,16 @@ async function sendPush(
 
 /**
  * The in-app copy for the notification list: created, or updated when the user already has this
- * notification. Independent of push, so it never throws.
+ * notification. Independent of push, so it never throws. When some users' copies could not be stored the others
+ * still count: `failedUsers` says how many were missed.
  */
 async function saveInAppCopies(userIds: string[], key: string, payload: NotificationPayload) {
     try {
-        const { created, updated } = await saveToInbox(userIds, key, payload);
-        return { stored: created + updated, updated, ok: true };
+        const { created, updated, failed } = await saveToInbox(userIds, key, payload);
+        return { stored: created + updated, updated, failedUsers: failed.length, ok: failed.length === 0 };
     } catch (error) {
         console.error('[notification] Could not save the in-app notification:', error);
-        return { stored: 0, updated: 0, ok: false };
+        return { stored: 0, updated: 0, failedUsers: userIds.length, ok: false };
     }
 }
 
@@ -366,28 +362,10 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
         return failure('INVALID_INPUT', message);
     }
     const input = parsed.data;
-
-    // The admin's configuration: cached, and it never throws (it falls back to what it last knew, then to the defaults).
-    const config = await loadNotificationConfig();
-
-    // 2. Build the payload once; every device (and the in-app copy) gets the same content.
-    //    - `identity` says which notifications are "the same one" (identity.ts). A notification that is stored
-    //      carries it as `key`, so a click can find and clear the stored copy.
-    //    - A type identified by its link (a conversation) also uses it as the device `tag`, so the device shows
-    //      one notification per conversation even when the caller passed no tag.
     const addressed = recipientUserIds(input);
-    const identity = addressed.length > 0 ? notificationKey(input) : undefined;
-    const key = input.persist ? identity : undefined;
-    const tag = input.tag ?? (NOTIFICATION_TYPE_CONFIG[input.type].identity === 'link' ? identity : undefined);
-    const payload = buildPayload(input, { tag, key }, config);
-    const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
-    if (payloadBytes > MAX_PAYLOAD_BYTES) {
-        const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
-        console.error(`[notification] ${message}`);
-        return failure('INVALID_INPUT', message);
-    }
 
-    // 3. An accidental repeat costs nothing: drop it before touching Firestore, the database or FCM.
+    // 2. An accidental repeat costs nothing: drop it before reading the configuration, building anything, or touching
+    //    Firestore, the database or FCM. (A fingerprint is a hash of the input; it needs nothing else.)
     const fingerprint = sendFingerprint({
         recipients: addressed.length > 0 ? addressed : [...(input.tokens ?? []), ...(input.token ? [input.token] : [])],
         type: input.type,
@@ -399,9 +377,37 @@ async function run(rawInput: SendNotificationInput): Promise<SendNotificationRes
     });
     if (isRecentDuplicate(fingerprint)) return result({ duplicate: true });
 
-    const outcome = await deliver(input, addressed, key, payload, config);
-    if (!outcome.success) forgetSend(fingerprint); // let the caller retry
-    return outcome;
+    try {
+        const outcome = await prepareAndDeliver(input, addressed);
+        if (!outcome.success) forgetSend(fingerprint); // let the caller retry
+        return outcome;
+    } catch (error) {
+        forgetSend(fingerprint);
+        throw error; // sendNotification() turns it into a failure result
+    }
+}
+
+async function prepareAndDeliver(input: ValidatedNotificationInput, addressed: string[]): Promise<SendNotificationResult> {
+    // The admin's configuration: cached, and it never throws (it falls back to what it last knew, then to the defaults).
+    const config = await loadNotificationConfig();
+
+    // 3. Build the payload once; every device (and the in-app copy) gets the same content.
+    //    - `identity` says which notifications are "the same one" (identity.ts). A notification that is stored
+    //      carries it as `key`, so a click can find and clear the stored copy.
+    //    - A type identified by its link (a conversation) also uses it as the device `tag`, so the device shows
+    //      one notification per conversation even when the caller passed no tag.
+    const identity = addressed.length > 0 ? notificationKey(input) : undefined;
+    const key = input.persist ? identity : undefined;
+    const tag = input.tag ?? (NOTIFICATION_TYPE_CONFIG[input.type].identity === 'link' ? identity : undefined);
+    const payload = buildPayload(input, { tag, key }, config);
+    const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    if (payloadBytes > MAX_PAYLOAD_BYTES) {
+        const message = `Notification is too large (${payloadBytes} bytes, max ${MAX_PAYLOAD_BYTES}). Shorten the text or data.`;
+        console.error(`[notification] ${message}`);
+        return failure('INVALID_INPUT', message);
+    }
+
+    return deliver(input, addressed, key, payload, config);
 }
 
 async function deliver(
@@ -426,14 +432,15 @@ async function deliver(
 
     const audience: PushAudience = { loud: [], silent: [] };
     const now = Date.now();
+    const defaults = normalizeSettings({}, config);
     for (const userId of reachable) {
-        const settings = recipients.get(userId)?.settings ?? normalizeSettings({}, config);
+        const settings = recipients.get(userId)?.settings ?? defaults;
         if (decideAlerts(settings, input.type, now, config).push) (settings.sound ? audience.loud : audience.silent).push(userId);
     }
     const muted = reachable.length - audience.loud.length - audience.silent.length;
 
     // 5. Push and in-app copy are independent: neither waits for, or fails because of, the other.
-    const noCopy = { stored: 0, updated: 0, ok: true };
+    const noCopy = { stored: 0, updated: 0, failedUsers: 0, ok: true };
     const [push, inApp] = await Promise.all([
         sendPush(input, audience, payload, config),
         key ? saveInAppCopies(reachable, key, payload) : noCopy,
@@ -441,7 +448,11 @@ async function deliver(
 
     const outcome = { ...push, stored: inApp.stored, updated: inApp.updated, suppressed, muted, disabled };
     if (!inApp.ok && push.success) {
-        return failure('INBOX_FAILED', 'The notification was sent but could not be saved to the in-app list.', outcome);
+        const message =
+            inApp.failedUsers >= reachable.length
+                ? 'The notification was sent but could not be saved to the in-app list.'
+                : `The notification was sent but could not be saved to the in-app list for ${inApp.failedUsers} of ${reachable.length} users.`;
+        return failure('INBOX_FAILED', message, outcome);
     }
     return outcome;
 }

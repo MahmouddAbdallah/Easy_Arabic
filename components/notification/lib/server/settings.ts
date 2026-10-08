@@ -14,7 +14,7 @@
  * resolving them against the notification configuration (../config.ts) happens at the moment of use, so a
  * configuration change applies to the very next send instead of waiting for this cache to expire.
  */
-import { FieldValue, type DocumentSnapshot } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
 import { NOTIFICATION_SETTINGS_COLLECTION } from '../contract';
 import { pickStoredSettings, type NotificationSettingsPatch } from '../settings';
 import { firestore } from './firestore';
@@ -24,8 +24,13 @@ const SETTINGS_CACHE_MAX = 5_000;
 
 const cache = new Map<string, { stored: NotificationSettingsPatch; at: number }>();
 
+/** The settings document of `userId`, for a caller that already holds the database (no async hop per user when reading many). */
+export function settingsRefOf(db: Firestore, userId: string) {
+    return db.collection(NOTIFICATION_SETTINGS_COLLECTION).doc(userId);
+}
+
 export async function settingsRef(userId: string) {
-    return (await firestore()).collection(NOTIFICATION_SETTINGS_COLLECTION).doc(userId);
+    return settingsRefOf(await firestore(), userId);
 }
 
 /** What this instance remembers `userId` chose, if it is still fresh. */

@@ -26,6 +26,7 @@
 import { FieldValue, type CollectionReference } from 'firebase-admin/firestore';
 import { NOTIFICATION_COLLECTION, type NotificationPayload } from '../contract';
 import { chunk } from './chunk';
+import { settleWithLimit } from './concurrency';
 import { firestore } from './firestore';
 import { notificationDocId } from './identity';
 import { readUnreadCounters, writeUnreadCounter } from './unreadCounter';
@@ -33,8 +34,23 @@ import { readUnreadCounters, writeUnreadCounter } from './unreadCounter';
 /** Firestore allows at most 500 writes per commit. */
 const MAX_WRITES = 500;
 
-/** Storing a notification is at most two writes: the notification itself and its recipient's counter. */
-const USERS_PER_COMMIT = MAX_WRITES / 2;
+/**
+ * Users stored per transaction. Storing a notification is at most two writes per user (the notification and its
+ * recipient's counter), so the ceiling is MAX_WRITES / 2 = 250. We stay well under it on purpose: a server-side
+ * transaction holds locks on everything it reads and writes until it commits, and a conflict on ONE of those
+ * documents makes the WHOLE transaction wait, abort and start over. A smaller group is a shorter commit, so the
+ * locks other notifications (a chat message to one of these users) wait for are held for less time, and a retry
+ * redoes less. The cost is a few more round trips, which — see COMMIT_CONCURRENCY — run side by side.
+ */
+const USERS_PER_COMMIT = 100;
+
+/**
+ * Transactions in flight at once for one send. The biggest audience sendNotification accepts (1000 users) is ten
+ * groups, so every group of it goes out together; the limit only matters if that ceiling is ever raised, and then it
+ * keeps one send from flooding the instance. Do not lower it without thought: with fewer slots than groups the
+ * groups queue in waves and a large send takes noticeably longer than it would with a few big transactions.
+ */
+const COMMIT_CONCURRENCY = 10;
 
 /** Marking notifications read is one write each, plus one for the counter. */
 const MARK_READ_PER_COMMIT = MAX_WRITES - 1;
@@ -53,30 +69,49 @@ export interface SaveToInboxResult {
     created: number;
     /** Users whose existing document for the same notification was updated instead. */
     updated: number;
+    /** Users whose copy could NOT be stored because their transaction failed; everybody else was stored. */
+    failed: string[];
 }
 
 /**
  * Stores the notification `key` for each user: a first send creates the document, a repeat updates it
  * in place — new content, `createdAt` refreshed so it moves back to the top of the list, unread again.
- * Fields the new content no longer has (`link`, `data`) are removed. Throws if the write fails.
+ * Fields the new content no longer has (`link`, `data`) are removed.
+ *
+ * A big audience is split into groups that commit independently (COMMIT_CONCURRENCY at a time), and a group that
+ * fails does not undo or hide the others: the result says exactly who was stored and who was not (`failed`), so the
+ * caller reports the truth instead of "nothing was saved" while most people were. Users are taken in a fixed (sorted)
+ * order, so two overlapping broadcasts ask for the same documents in the same order — the usual recipe against
+ * locking each other out in opposite directions. Throws only if Firestore cannot be reached at all.
  */
 export async function saveToInbox(userIds: string[], key: string, payload: NotificationPayload): Promise<SaveToInboxResult> {
-    const users = [...new Set(userIds)];
-    if (users.length === 0) return { created: 0, updated: 0 };
+    const users = [...new Set(userIds)].sort();
+    const total: SaveToInboxResult = { created: 0, updated: 0, failed: [] };
+    if (users.length === 0) return total;
 
     const collection = await notificationCollection();
+    const groups = chunk(users, USERS_PER_COMMIT);
 
-    // Each commit has its own users, so the commits do not wait for each other (at most 4 for 1000 users).
-    const outcomes = await Promise.all(chunk(users, USERS_PER_COMMIT).map((group) => saveGroup(collection, group, key, payload)));
+    const outcomes = await settleWithLimit(groups, COMMIT_CONCURRENCY, (group) => saveGroup(collection, group, key, payload));
 
-    return outcomes.reduce((total, outcome) => ({
-        created: total.created + outcome.created,
-        updated: total.updated + outcome.updated,
-    }));
+    let firstError: unknown;
+    outcomes.forEach((outcome, index) => {
+        if (outcome.status === 'fulfilled') {
+            total.created += outcome.value.created;
+            total.updated += outcome.value.updated;
+        } else {
+            firstError ??= outcome.reason;
+            total.failed.push(...groups[index]);
+        }
+    });
+    if (total.failed.length > 0) {
+        console.error(`[notification] Could not store the in-app copy for ${total.failed.length} of ${users.length} users:`, firstError);
+    }
+    return total;
 }
 
 /** One transaction for up to USERS_PER_COMMIT users (`group` has no duplicates). */
-function saveGroup(collection: CollectionReference, group: string[], key: string, payload: NotificationPayload): Promise<SaveToInboxResult> {
+function saveGroup(collection: CollectionReference, group: string[], key: string, payload: NotificationPayload): Promise<Pick<SaveToInboxResult, 'created' | 'updated'>> {
     const { type, title, body, link, data } = payload;
     const identity = { key, sendId: payload.id };
 
@@ -92,7 +127,7 @@ function saveGroup(collection: CollectionReference, group: string[], key: string
         const counters = bumped.length > 0 ? await readUnreadCounters(tx, bumped) : [];
         const counterOf = new Map(bumped.map((userId, index) => [userId, counters[index]]));
 
-        const attempt: SaveToInboxResult = { created: 0, updated: 0 };
+        const attempt = { created: 0, updated: 0 };
 
         existing.forEach((snapshot, index) => {
             const userId = group[index];
