@@ -1,5 +1,6 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { deleteBlog, getBlogForAdmin, updateBlog } from "@/components/blog/lib/blogs.server";
+import { deleteCommentsForBlog } from "@/components/blog/lib/comments.server";
 import { BlogApiError, handleRouteError, parseBody, requireAdmin } from "@/components/blog/lib/http.server";
 import { deleteBlogMedia } from "@/components/blog/lib/media.server";
 import { revalidateBlogPaths } from "@/components/blog/lib/revalidate.server";
@@ -51,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 }
 
-/** DELETE /api/blog/:id: removes the post, then (after the response) every file in its Cloudinary folder. */
+/** DELETE /api/blog/:id: removes the post, then (after the response) every file in its Cloudinary folder and every comment on it. */
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
     try {
         const auth = await requireAdmin(req);
@@ -63,6 +64,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
         revalidateBlogPaths(blog.slug);
         // The admin doesn't wait for Cloudinary.
         after(() => deleteBlogMedia(blogId));
+        after(() => deleteCommentsForBlog(blogId));
 
         return NextResponse.json({ success: true });
     } catch (error) {

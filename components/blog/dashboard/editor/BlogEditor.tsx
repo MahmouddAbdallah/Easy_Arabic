@@ -87,7 +87,7 @@ export function BlogEditor({ blog: initial, suggestions, onClose }: BlogEditorPr
                 onDelete={() => setConfirmDelete(true)}
             />
 
-            <div className="mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-352 px-4 py-6 sm:px-6 lg:px-8">
                 {backup && (
                     <div role="status" className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
                         <RotateCcw className="size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
@@ -147,14 +147,16 @@ export function BlogEditor({ blog: initial, suggestions, onClose }: BlogEditorPr
                         {view === "preview" && <PreviewPane blog={blog} fields={fields} doc={previewDoc} error={previewError} />}
                     </div>
 
-                    <BlogSettingsPanel
-                        blog={blog}
-                        fields={fields}
-                        setField={setField}
-                        regenerateSlug={editor.regenerateSlug}
-                        fieldErrors={fieldErrors}
-                        suggestions={suggestions}
-                    />
+                    <div className="lg:sticky lg:top-0">
+                        <BlogSettingsPanel
+                            blog={blog}
+                            fields={fields}
+                            setField={setField}
+                            regenerateSlug={editor.regenerateSlug}
+                            fieldErrors={fieldErrors}
+                            suggestions={suggestions}
+                        />
+                    </div>
                 </div>
             </div>
 

@@ -111,3 +111,63 @@ export type BlogMediaKind = keyof typeof MEDIA_RULES;
 
 /** 30 uploads per minute per admin. */
 export const MEDIA_RATE_LIMIT = { limit: 30, windowSeconds: 60 } as const;
+
+/* ---------------------------------------------------------------- Comments */
+
+/**
+ * Reader comments live in their own collection (one document per comment or reply), keyed to a post
+ * by `blogId`. Reads are equality-only and sorted in memory, so, like the posts, they need no
+ * composite index.
+ */
+export const BLOG_COMMENT_COLLECTION = "blogComments";
+
+/** Admin API: list, moderate and reply. */
+export const BLOG_COMMENTS_API_URL = `${BLOG_API_URL}/comments`;
+export const blogCommentApiUrl = (commentId: string) => `${BLOG_COMMENTS_API_URL}/${commentId}`;
+export const blogCommentRepliesApiUrl = (commentId: string) => `${BLOG_COMMENTS_API_URL}/${commentId}/replies`;
+export const BLOG_COMMENTS_PENDING_COUNT_API_URL = `${BLOG_COMMENTS_API_URL}/pending-count`;
+/** The one public write: a visitor submitting a comment on a published post. */
+export const blogPostCommentsApiUrl = (blogId: string) => `${BLOG_API_URL}/${blogId}/comments`;
+
+/** Dashboard page that moderates comments. */
+export const BLOG_COMMENTS_DASHBOARD_PATH = "/dashboard/blog/comments";
+
+export const COMMENT_LIMITS = {
+    name: 60,
+    email: 254,
+    body: 2000,
+    /** Fewer than this many characters is noise, not a comment. */
+    minBody: 2,
+    /** Links are shown as plain text, never clickable, but a pile of them is a spam tell. */
+    maxLinks: 2,
+} as const;
+
+/** Name shown on admin replies. The signed-in admin's own name is stored but never displayed. */
+export const COMMENT_SITE_NAME = "Easy Arabic";
+
+/** Most recent comments read per request for the dashboard / for one post (then filtered in memory). */
+export const COMMENT_ADMIN_SCAN_LIMIT = 500;
+export const COMMENT_PUBLIC_SCAN_LIMIT = 500;
+export const COMMENT_ADMIN_PAGE_SIZE = 10;
+
+/** Name of the hidden form field bots tend to fill in. Real visitors never see it. */
+export const COMMENT_HONEYPOT_FIELD = "website";
+
+/** Everything that makes posting a comment harder for a script than for a person. */
+export const COMMENT_ANTISPAM = {
+    /** A form submitted faster than this after the page rendered wasn't filled in by a person. */
+    minFillSeconds: 4,
+    /** The signed form token stops working after this long (reload the page to get a new one). */
+    tokenMaxAgeSeconds: 24 * 60 * 60,
+    /** Every request to the endpoint, valid or not, per IP. Generous: it only stops floods. */
+    attempts: { limit: 30, windowSeconds: 10 * 60 },
+    /** Valid-looking submissions per IP: a short burst limit and a daily cap. */
+    perIp: [
+        { limit: 3, windowSeconds: 10 * 60 },
+        { limit: 15, windowSeconds: 24 * 60 * 60 },
+    ],
+    /** One visitor can't fill the moderation queue: this many unreviewed comments per IP... */
+    maxPendingPerIp: 6,
+    /** ...and per post, after which new comments are refused until some are reviewed. */
+    maxPendingPerPost: 100,
+} as const;

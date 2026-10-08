@@ -29,7 +29,7 @@ export function SeoFields({ value, onChange, fallbackTitle, fallbackDescription,
         <div className="grid gap-4">
             {/* How the post may look in search results, using the same fallbacks the public page uses. */}
             <div aria-label="Search result preview" className="rounded-lg border border-border bg-background p-3">
-                <p className="truncate text-xs text-muted-foreground" dir="ltr">
+                <p className="line-clamp-2 break-all text-xs text-muted-foreground"                >
                     {blogPostPath(slug || "…")}
                 </p>
                 <p dir="auto" className="mt-0.5 line-clamp-1 text-base font-medium text-brand">

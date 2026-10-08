@@ -1,4 +1,4 @@
-import { BellRingIcon, GraduationCap, MessageSquare, PhoneCall, SquareText, UserPen, Users, type LucideIcon, } from "lucide-react";
+import { BellRingIcon, GraduationCap, MessageSquare, Newspaper, PhoneCall, UserPen, Users, type LucideIcon, } from "lucide-react";
 
 /**
  * Single source of truth for the dashboard's navigation. The sidebar, the navbar
@@ -9,6 +9,8 @@ import { BellRingIcon, GraduationCap, MessageSquare, PhoneCall, SquareText, User
 export interface NavSubItem {
     title: string;
     href: string;
+    /** Shows a live counter next to the sub-page. */
+    counter?: "blogComments";
 }
 
 export interface NavItem {
@@ -16,8 +18,8 @@ export interface NavItem {
     /** Landing page of the item. For groups this is the first sub-page. */
     href: string;
     icon: LucideIcon;
-    /** Shows a live unread counter next to the item. */
-    counter?: "chat";
+    /** Shows a live counter next to the item. On a group it is the total of what waits inside it. */
+    counter?: "chat" | "blogComments";
     subItems?: NavSubItem[];
 }
 
@@ -44,12 +46,13 @@ export const navigationItems: NavItem[] = [
         counter: "chat",
     },
     {
-        title: "Contact",
-        href: "/dashboard/contact",
-        icon: PhoneCall,
+        title: "Blog",
+        href: "/dashboard/blog",
+        icon: Newspaper,
+        counter: "blogComments",
         subItems: [
-            { title: "Messages", href: "/dashboard/contact" },
-            { title: "Contact Page", href: "/dashboard/contact/contact-info" },
+            { title: "Posts", href: "/dashboard/blog" },
+            { title: "Comments", href: "/dashboard/blog/comments", counter: "blogComments" },
         ],
     },
     {
@@ -58,9 +61,13 @@ export const navigationItems: NavItem[] = [
         icon: BellRingIcon,
     },
     {
-        title: "Blog",
-        href: "/dashboard/blog",
-        icon: SquareText,
+        title: "Contact",
+        href: "/dashboard/contact",
+        icon: PhoneCall,
+        subItems: [
+            { title: "Messages", href: "/dashboard/contact" },
+            { title: "Contact Page", href: "/dashboard/contact/contact-info" },
+        ],
     },
 ];
 

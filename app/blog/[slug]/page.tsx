@@ -36,5 +36,5 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const blogId = await resolvePublishedBlogId(decodeSlug(slug));
     if (!blogId) notFound();
 
-    return <Blog blogId={blogId} showRelated notFoundIfMissing />;
+    return <Blog blogId={blogId} showRelated showComments notFoundIfMissing />;
 }

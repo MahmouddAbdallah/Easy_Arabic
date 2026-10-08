@@ -43,11 +43,11 @@ function EditorLoader({ blogId, suggestions, onClose }: { blogId: string; sugges
 
     if (!current) {
         return (
-            <div aria-busy className="mx-auto w-full max-w-[88rem] space-y-4 p-4 sm:p-6 lg:p-8">
+            <div aria-busy className="mx-auto w-full max-w-352 space-y-4 p-4 sm:p-6 lg:p-8">
                 <div className="h-9 w-2/3 animate-pulse rounded-lg bg-muted" />
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                    <div className="h-[34rem] animate-pulse rounded-xl border border-border bg-muted/40" />
-                    <div className="hidden h-[34rem] animate-pulse rounded-xl border border-border bg-muted/40 xl:block" />
+                    <div className="h-136 animate-pulse rounded-xl border border-border bg-muted/40" />
+                    <div className="hidden h-136 animate-pulse rounded-xl border border-border bg-muted/40 xl:block" />
                 </div>
             </div>
         );

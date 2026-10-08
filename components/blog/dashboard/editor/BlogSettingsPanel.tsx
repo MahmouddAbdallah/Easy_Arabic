@@ -61,7 +61,7 @@ export function BlogSettingsPanel({ blog, fields, setField, regenerateSlug, fiel
                         aria-invalid={fieldErrors.slug?.length ? true : undefined}
                     />
                     <FieldError messages={fieldErrors.slug} />
-                    <p dir="ltr" className="truncate text-xs text-muted-foreground">
+                    <p className="line-clamp-2 break-all text-xs text-muted-foreground">
                         {blogPostPath(fields.slug || "…")}
                     </p>
                     {liveAddressChanged && (

@@ -6,17 +6,11 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Globe, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoIcon } from "@/components/icons";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getActiveSubHref, isItemActive, navigationItems, type NavItem } from "./navigation";
 import { useSidebarCollapsed } from "./useSidebarCollapsed";
+import { usePendingCommentCount } from "@/components/blog/dashboard/hooks/usePendingCommentCount";
 import { UNREAD_MESSAGES_COLLECTION, useUnreadCount } from "./useUnreadCount";
 
 interface SidebarProps {
@@ -43,8 +37,8 @@ function rowClass(active: boolean, collapsed: boolean, extra?: string) {
     return cn(ROW, active ? cn(ROW_ACTIVE, ROW_MARKER) : ROW_IDLE, collapsed && "justify-center px-0", extra);
 }
 
-/** Unread pill. In the collapsed rail it becomes a dot on the icon. */
-function Counter({ count, collapsed }: { count: number; collapsed: boolean }) {
+/** Unread pill. In the collapsed rail it becomes a dot on the icon. `noun` is what the number counts, for screen readers. */
+function Counter({ count, collapsed, noun = "unread" }: { count: number; collapsed: boolean; noun?: string }) {
     if (count <= 0) return null;
     const label = count > 99 ? "99+" : String(count);
     if (collapsed) {
@@ -58,7 +52,7 @@ function Counter({ count, collapsed }: { count: number; collapsed: boolean }) {
     return (
         <span
             className="ms-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-xs font-semibold tabular-nums text-destructive-foreground"
-            aria-label={`${count} unread`}
+            aria-label={`${count} ${noun}`}
         >
             {label}
         </span>
@@ -93,12 +87,14 @@ interface ItemProps {
     pathname: string;
     collapsed: boolean;
     chatUnread: number;
+    /** Comments waiting for review (the Blog group's counter). */
+    pendingComments: number;
     open: boolean;
     onToggle: () => void;
     onNavigate?: () => void;
 }
 
-function NavLeaf({ item, pathname, collapsed, chatUnread, onNavigate }: Omit<ItemProps, "open" | "onToggle">) {
+function NavLeaf({ item, pathname, collapsed, chatUnread, onNavigate }: Omit<ItemProps, "open" | "onToggle" | "pendingComments">) {
     const active = isItemActive(item, pathname);
     const Icon = item.icon;
     const count = item.counter === "chat" ? chatUnread : 0;
@@ -111,7 +107,7 @@ function NavLeaf({ item, pathname, collapsed, chatUnread, onNavigate }: Omit<Ite
                 aria-current={active ? "page" : undefined}
                 className={rowClass(active, collapsed)}
             >
-                <Icon className="size-[18px] shrink-0" aria-hidden />
+                <Icon className="size-4.5 shrink-0" aria-hidden />
                 <span className={cn("truncate", collapsed && "sr-only")}>{item.title}</span>
                 <Counter count={count} collapsed={collapsed} />
             </Link>
@@ -119,8 +115,10 @@ function NavLeaf({ item, pathname, collapsed, chatUnread, onNavigate }: Omit<Ite
     );
 }
 
-function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omit<ItemProps, "chatUnread">) {
+function NavGroup({ item, pathname, collapsed, pendingComments, open, onToggle, onNavigate }: Omit<ItemProps, "chatUnread">) {
     const activeSub = getActiveSubHref(item, pathname);
+    const countFor = (counter: "blogComments" | "chat" | undefined) => (counter === "blogComments" ? pendingComments : 0);
+    const groupCount = countFor(item.counter);
     const active = activeSub !== null;
     const Icon = item.icon;
     const subs = item.subItems ?? [];
@@ -134,7 +132,8 @@ function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omi
                     aria-label={item.title}
                     className={rowClass(active, true, "cursor-pointer aria-expanded:bg-muted aria-expanded:text-foreground")}
                 >
-                    <Icon className="size-[18px] shrink-0" aria-hidden />
+                    <Icon className="size-4.5 shrink-0" aria-hidden />
+                    <Counter count={groupCount} collapsed noun="pending" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right" align="start" sideOffset={10} className="w-52">
                     <DropdownMenuGroup>
@@ -149,6 +148,7 @@ function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omi
                                 )}
                             >
                                 {sub.title}
+                                <Counter count={countFor(sub.counter)} collapsed={false} noun="pending" />
                             </DropdownMenuItem>
                         ))}
                     </DropdownMenuGroup>
@@ -170,8 +170,10 @@ function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omi
                 aria-controls={panelId}
                 className={rowClass(highlightParent, false, cn("cursor-pointer", active && open && "text-foreground"))}
             >
-                <Icon className={cn("size-[18px] shrink-0", active && open && "text-brand")} aria-hidden />
+                <Icon className={cn("size-4.5 shrink-0", active && open && "text-brand")} aria-hidden />
                 <span className="flex-1 truncate text-start">{item.title}</span>
+                {/* While the group is open its sub-pages carry their own counters. */}
+                {!open && <Counter count={groupCount} collapsed={false} noun="pending" />}
                 <ChevronDown
                     aria-hidden
                     className={cn(
@@ -189,7 +191,7 @@ function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omi
                     open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                 )}
             >
-                <ul className="ms-[1.375rem] min-h-0 space-y-0.5 overflow-hidden border-s border-border ps-3">
+                <ul className="ms-5.5 min-h-0 space-y-0.5 overflow-hidden border-s border-border ps-3">
                     <li aria-hidden className="h-1" />
                     {subs.map((sub) => {
                         const subActive = sub.href === activeSub;
@@ -207,6 +209,7 @@ function NavGroup({ item, pathname, collapsed, open, onToggle, onNavigate }: Omi
                                     )}
                                 >
                                     <span className="truncate">{sub.title}</span>
+                                    <Counter count={countFor(sub.counter)} collapsed={false} noun="pending" />
                                 </Link>
                             </li>
                         );
@@ -224,6 +227,7 @@ export function Sidebar({ variant = "desktop", onNavigate, headerAction, classNa
     const pathname = usePathname();
     const [storedCollapsed, setStoredCollapsed] = useSidebarCollapsed();
     const chatUnread = useUnreadCount(UNREAD_MESSAGES_COLLECTION);
+    const pendingComments = usePendingCommentCount();
 
     const isDrawer = variant === "drawer";
     const collapsed = !isDrawer && storedCollapsed;
@@ -257,10 +261,10 @@ export function Sidebar({ variant = "desktop", onNavigate, headerAction, classNa
                     isDrawer
                         ? "flex h-full w-full"
                         : cn(
-                              "sticky top-0 hidden h-dvh shrink-0 border-e border-border lg:flex",
-                              collapsed ? "w-[4.5rem]" : "w-64",
-                              animateWidth && "transition-[width] duration-200 ease-out motion-reduce:transition-none"
-                          ),
+                            "sticky top-0 hidden h-dvh shrink-0 border-e border-border lg:flex",
+                            collapsed ? "w-18" : "w-64",
+                            animateWidth && "transition-[width] duration-200 ease-out motion-reduce:transition-none"
+                        ),
                     className
                 )}
             >
@@ -278,7 +282,7 @@ export function Sidebar({ variant = "desktop", onNavigate, headerAction, classNa
                         className="flex min-w-0 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                     >
                         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft ring-1 ring-brand/15">
-                            <LogoIcon className="h-[18px] w-[22px] fill-brand stroke-brand" />
+                            <LogoIcon className="h-4.5 w-5.5 fill-brand stroke-brand" />
                         </span>
                         {!collapsed && (
                             <span className="min-w-0 leading-tight">
@@ -307,6 +311,7 @@ export function Sidebar({ variant = "desktop", onNavigate, headerAction, classNa
                                         item={item}
                                         pathname={pathname}
                                         collapsed={collapsed}
+                                        pendingComments={pendingComments}
                                         open={isGroupOpen(item)}
                                         onToggle={() => toggleGroup(item)}
                                         onNavigate={onNavigate}
@@ -329,7 +334,7 @@ export function Sidebar({ variant = "desktop", onNavigate, headerAction, classNa
                 <div className="shrink-0 space-y-1 border-t border-border p-3">
                     <RailTooltip label="Back to website" enabled={collapsed}>
                         <Link href="/" onClick={onNavigate} className={rowClass(false, collapsed)}>
-                            <Globe className="size-[18px] shrink-0" aria-hidden />
+                            <Globe className="size-4.5 shrink-0" aria-hidden />
                             <span className={cn("truncate", collapsed && "sr-only")}>Back to website</span>
                         </Link>
                     </RailTooltip>
@@ -343,9 +348,9 @@ export function Sidebar({ variant = "desktop", onNavigate, headerAction, classNa
                                 className={rowClass(false, collapsed, "cursor-pointer")}
                             >
                                 {collapsed ? (
-                                    <PanelLeftOpen className="size-[18px] shrink-0" aria-hidden />
+                                    <PanelLeftOpen className="size-4.5 shrink-0" aria-hidden />
                                 ) : (
-                                    <PanelLeftClose className="size-[18px] shrink-0" aria-hidden />
+                                    <PanelLeftClose className="size-4.5 shrink-0" aria-hidden />
                                 )}
                                 {!collapsed && <span className="truncate">Collapse</span>}
                             </button>

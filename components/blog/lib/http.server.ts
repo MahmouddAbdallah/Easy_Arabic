@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authorization } from "@/lib/verifyAuth";
-import { forbiddenOrigin, isSameOrigin } from "@/lib/auth/request";
+import { forbiddenOrigin, isSameOrigin, readJsonBody } from "@/lib/auth/request";
 import type { userType } from "@/types/userTypes";
 import { BlogContentError } from "./content";
 
@@ -54,6 +54,20 @@ export async function requireAdmin(
     return { user };
 }
 
+/** `body` checked against `schema`: the parsed data, or the 400 response listing what is wrong. */
+function validateShape<S extends z.ZodType>(
+    schema: S,
+    body: unknown
+): { data: z.output<S>; response?: undefined } | { data?: undefined; response: NextResponse } {
+    const validation = schema.safeParse(body);
+    if (!validation.success) {
+        const fieldErrors = z.flattenError(validation.error).fieldErrors as Record<string, string[] | undefined>;
+        const first = Object.values(fieldErrors).flat().find(Boolean);
+        return { response: errorResponse("VALIDATION_ERROR", first ?? "Some fields are invalid.", 400, fieldErrors) };
+    }
+    return { data: validation.data };
+}
+
 /** The JSON body validated against `schema`, or the 400 response to return instead. */
 export async function parseBody<S extends z.ZodType>(
     req: Request,
@@ -65,14 +79,23 @@ export async function parseBody<S extends z.ZodType>(
     } catch {
         return { response: errorResponse("INVALID_JSON", "Request body must be valid JSON.", 400) };
     }
+    return validateShape(schema, body);
+}
 
-    const validation = schema.safeParse(body);
-    if (!validation.success) {
-        const fieldErrors = z.flattenError(validation.error).fieldErrors as Record<string, string[] | undefined>;
-        const first = Object.values(fieldErrors).flat().find(Boolean);
-        return { response: errorResponse("VALIDATION_ERROR", first ?? "Some fields are invalid.", 400, fieldErrors) };
+/**
+ * `parseBody` for endpoints anyone on the internet can call: the body is read with a size cap
+ * (16 KB) before it is parsed, so an oversized payload is refused without being processed. The raw
+ * value is returned too, so a caller can look at it (e.g. a honeypot field) before validating.
+ */
+export async function parsePublicBody<S extends z.ZodType>(
+    req: Request,
+    schema: S
+): Promise<{ raw: unknown; data: z.output<S>; response?: undefined } | { raw?: unknown; data?: undefined; response: NextResponse }> {
+    const raw = await readJsonBody(req);
+    if (raw === null) {
+        return { response: errorResponse("INVALID_JSON", "The request must be valid JSON under 16 KB.", 400) };
     }
-    return { data: validation.data };
+    return { raw, ...validateShape(schema, raw) };
 }
 
 /** Known Blog errors keep their code/status; anything else is logged and becomes a generic 500. */

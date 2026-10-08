@@ -99,6 +99,7 @@ function ImageBlock({ node }: { node: BlogNode }) {
     const src = asString(node.attrs?.src);
     if (!src || !isHttpsUrl(src)) return null;
     const srcSet = cloudinarySrcSet(src);
+    const width = asDimension(node.attrs?.width);
 
     return (
         <figure className="blog-figure">
@@ -107,10 +108,13 @@ function ImageBlock({ node }: { node: BlogNode }) {
             <img
                 src={cloudinaryImageVariant(src, 1200)}
                 srcSet={srcSet}
-                sizes={srcSet ? "(min-width: 768px) 720px, 100vw" : undefined}
+                // The article column is 632px wide: no point asking for more than that.
+                sizes={srcSet ? "(min-width: 672px) 632px, 100vw" : undefined}
                 alt={asString(node.attrs?.alt) ?? ""}
-                width={asDimension(node.attrs?.width)}
+                width={width}
                 height={asDimension(node.attrs?.height)}
+                // A small picture stays small instead of being stretched to the column.
+                style={width ? { maxWidth: `min(100%, ${width}px)` } : undefined}
                 loading="lazy"
                 decoding="async"
             />
@@ -123,6 +127,8 @@ function VideoBlock({ node }: { node: BlogNode }) {
     const src = asString(node.attrs?.src);
     if (!src || !isHttpsUrl(src)) return null;
     const poster = asString(node.attrs?.poster);
+    const width = asDimension(node.attrs?.width);
+    const height = asDimension(node.attrs?.height);
 
     return (
         <figure className="blog-figure">
@@ -131,8 +137,10 @@ function VideoBlock({ node }: { node: BlogNode }) {
                 playsInline
                 preload="metadata"
                 poster={poster && isHttpsUrl(poster) ? poster : undefined}
-                width={asDimension(node.attrs?.width)}
-                height={asDimension(node.attrs?.height)}
+                width={width}
+                height={height}
+                // Holds the video's real shape while it loads, so the page doesn't jump when it appears.
+                style={width && height ? { aspectRatio: `${width} / ${height}` } : undefined}
             >
                 <source src={src} />
                 <a href={src}>Download the video</a>

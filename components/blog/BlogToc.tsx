@@ -6,8 +6,8 @@ export function BlogToc({ headings }: { headings: BlogHeading[] }) {
     if (headings.length < TOC_MIN_HEADINGS) return null;
 
     return (
-        <nav aria-label="Table of contents" className="mb-10 rounded-2xl border border-border bg-card px-5 py-4">
-            <details open>
+        <nav aria-label="Table of contents" className="mb-8 rounded-xl border border-border bg-card px-5 py-3.5">
+            <details >
                 <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">On this page</summary>
                 <ol className="mt-3 space-y-1.5 text-[0.95rem] leading-snug">
                     {headings.map((heading) => (
