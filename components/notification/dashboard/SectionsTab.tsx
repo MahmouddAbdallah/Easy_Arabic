@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { CATEGORY_ICONS } from '../categoryIcons';
 import type { NotificationConfigEditor } from '../hooks/useNotificationConfigEditor';
 import { CONFIG_LIMITS, type CategoryConfig } from '../lib/config';

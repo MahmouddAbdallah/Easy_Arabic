@@ -1,5 +1,5 @@
 import { LogoIcon } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { textDirection } from "../lib/direction";
 import { formatPublicDate, initialOf } from "../lib/format";
 import type { PublicComment } from "../lib/comment-types";

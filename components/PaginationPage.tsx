@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUpdateQuery } from "@/hooks/useUpdateQuery";
 import { useSearchParams } from 'next/navigation';
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 
 interface PaginationPageProps {
   totalPages?: number | null;

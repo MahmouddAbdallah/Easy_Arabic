@@ -11,7 +11,7 @@ import { getInitials } from '@/components/dashboard/users/userDisplay';
 import { formatDateTime } from '@/lib/profile/format';
 import { PROFILE_FIELDS, PROFILE_FIELD_LABELS } from '@/lib/profile/rules';
 import type { AdminRequest, AdminRequestList, RequestStatus } from '@/lib/profile/service';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { ReviewRequestDialog } from './ReviewRequestDialog';
 
 export type StatusFilter = RequestStatus | null;

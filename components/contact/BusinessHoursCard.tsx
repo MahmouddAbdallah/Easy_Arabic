@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Clock3 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { DAY_NAMES, formatHoursRange, isOpenNow } from '@/lib/contact/helpers';
 import type { BusinessHourRecord } from '@/lib/contact/types';
 

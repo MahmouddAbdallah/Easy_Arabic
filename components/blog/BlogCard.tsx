@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { BLOG_BASE_PATH, blogPostPath } from "./lib/constants";
 import { formatPublicDate, formatReadingTime } from "./lib/format";
 import { getExcerpt, type BlogSummary } from "./lib/types";

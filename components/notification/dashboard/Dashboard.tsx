@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { LoaderCircle, RotateCcw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { useNotificationConfigEditor, type NotificationConfigEditor } from '../hooks/useNotificationConfigEditor';
 import { DeliveryTab } from './DeliveryTab';
 import { PreviewPanel } from './PreviewPanel';

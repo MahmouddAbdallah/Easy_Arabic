@@ -11,7 +11,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import type { ContactMessage } from "@/stores/admin/contacts";
 import { formatFullDate, formatListDate, getInitials, toPreview } from "./contactUtils";
 

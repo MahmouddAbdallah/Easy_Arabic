@@ -1,5 +1,5 @@
 import { ChevronDown, ListTree } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { BlogTocSidebar } from "./BlogTocSidebar";
 import { TOC_MIN_HEADINGS } from "./lib/constants";
 import type { BlogHeading } from "./lib/content";

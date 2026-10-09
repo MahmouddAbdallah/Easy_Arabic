@@ -3,7 +3,7 @@
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { BlogStatusFilter } from "@/components/blog/lib/types";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 
 const TABS: Array<{ value: BlogStatusFilter; label: string }> = [
     { value: "all", label: "All" },

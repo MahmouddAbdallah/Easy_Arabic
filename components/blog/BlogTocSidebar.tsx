@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { textDirection } from "./lib/direction";
 
 /** Plain data only (no post nodes), so it is cheap to hand from the server component to this one. */

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import type { BlogStatus } from "@/components/blog/lib/types";
 
 /** Draft / Published. Colour is never the only signal: the label is always there. */

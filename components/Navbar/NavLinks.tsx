@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BookOpen, Home, LayoutDashboard, Mail, MessageSquare, type LucideIcon } from "lucide-react"
 import UnReadMsgCount from "../chat/UnreadMsgCount"
-import { cn } from "@/lib/utils"
+import { cn } from 'cn'
 import type { userType } from "@/types/userTypes"
 import { focusRing } from "./styles"
 

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { CornerDownLeft, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { ContactStatus, MAX_KEYWORD_LENGTH } from "./contactUtils";
 import type { ContactQueryApi } from "./useContactQuery";
 

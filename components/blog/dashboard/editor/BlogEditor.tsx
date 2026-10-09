@@ -7,7 +7,7 @@ import { BlogContentError, sanitizeDocument } from "@/components/blog/lib/conten
 import { BLOG_LIMITS } from "@/components/blog/lib/constants";
 import type { BlogDoc, BlogRecord } from "@/components/blog/lib/types";
 import { displayFont } from "@/lib/fonts";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { DeleteBlogDialog } from "../dialogs/DeleteBlogDialog";
 import { DiscardChangesDialog } from "../dialogs/DiscardChangesDialog";
 import { useBlogEditor } from "../hooks/useBlogEditor";

@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { LogoIcon } from "../icons"
-import { cn } from "@/lib/utils"
+import { cn } from 'cn'
 import { focusRing } from "./styles"
 
 interface BrandProps {

@@ -8,7 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import NotificationBody from "@/components/notification/NotificationBody";
 import { UNREAD_COUNT_COLLECTION } from "@/components/notification/lib/contract";
-import { cn } from "@/lib/utils";
+import { cn } from "cn";
 import { useUnreadCount } from "../dashboard/Navbar/useUnreadCount";
 
 /**

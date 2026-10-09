@@ -4,7 +4,7 @@ import Link from "next/link"
 import { KeyRound, LoaderCircle, LogIn, LogOut, UserRound, X } from "lucide-react"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { displayFont } from "@/lib/fonts"
-import { cn } from "@/lib/utils"
+import { cn } from 'cn'
 import type { userType } from "@/types/userTypes"
 import { Brand } from "./Brand"
 import { NavLinks } from "./NavLinks"

@@ -1,5 +1,5 @@
 import { CheckCheck, FileText, Mic, Paperclip, Phone, Play, Video } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 /** Bar heights (%) of the example voice message's waveform. */
 const WAVEFORM = [35, 60, 45, 80, 55, 90, 50, 70, 40, 75, 60, 45, 65, 35, 55, 30];

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BLOG_LIMITS, blogPostPath } from "@/components/blog/lib/constants";
 import type { BlogSeo } from "@/components/blog/lib/types";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 
 interface SeoFieldsProps {
     value: BlogSeo;

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { BLOG_LIMITS, blogPostPath } from "@/components/blog/lib/constants";
 import { getExcerpt, type BlogRecord } from "@/components/blog/lib/types";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import type { EditorFields } from "../hooks/useBlogEditor";
 import { CoverImageField } from "./CoverImageField";
 import { SeoFields } from "./SeoFields";

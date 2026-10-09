@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import { Check, CornerDownRight, ExternalLink, EyeOff, Loader2, Mail, Reply, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import type { AdminComment, CommentStatus } from "@/components/blog/lib/comment-types";
 import { BLOG_BASE_PATH, COMMENT_SITE_NAME, blogPostPath } from "@/components/blog/lib/constants";
 import { initialOf } from "@/components/blog/lib/format";

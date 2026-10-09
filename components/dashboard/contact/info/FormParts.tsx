@@ -6,7 +6,7 @@ import { Loader2, RotateCcw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 /** Label + control + hint + inline error, laid out consistently across every form. */
 export function Field({

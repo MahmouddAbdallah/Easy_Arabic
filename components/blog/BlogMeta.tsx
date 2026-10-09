@@ -1,5 +1,5 @@
 import { CalendarDays, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { formatPublicDate, formatReadingTime, initialOf } from "./lib/format";
 
 interface BlogMetaProps {

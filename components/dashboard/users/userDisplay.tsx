@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 /** Up to two initials for an avatar fallback: "Amina Yusuf" → "AY". */
 export function getInitials(name?: string | null) {

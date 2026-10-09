@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import { themeBootstrapScript } from "@/lib/theme";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { authorization } from "@/lib/verifyAuth";
 import { AppProvider } from "@/components/AppContext";
 import { Toaster } from "react-hot-toast";

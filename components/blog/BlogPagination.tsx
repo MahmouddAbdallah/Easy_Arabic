@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 
 /** 1 … 4 5 [6] 7 8 … 20: the current page, its neighbours, and the ends. */
 export function pageWindow(current: number, total: number): Array<number | "gap"> {

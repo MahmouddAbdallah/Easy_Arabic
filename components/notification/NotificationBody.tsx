@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Bell, CheckCheck, LoaderCircle, Settings } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { useAppContext } from '../AppContext';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';

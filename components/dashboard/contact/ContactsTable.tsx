@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import PaginationPage from "@/components/PaginationPage";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { ContactMessage, useContactStore } from "@/stores/admin/contacts";
 import { ContactDetailsDialog } from "./ContactDetailsDialog";
 import { ContactRow } from "./ContactRow";

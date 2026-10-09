@@ -1,7 +1,7 @@
 import { Info, LockKeyhole } from 'lucide-react';
 import { PROFILE_LOCK_MONTHS, type ProfileEligibility } from '@/lib/profile/rules';
 import { formatDate } from '@/lib/profile/format';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 /** Explains, in plain words, whether the customer can edit directly and why / until when. */
 export function ProfileNotice({ eligibility }: { eligibility: ProfileEligibility }) {

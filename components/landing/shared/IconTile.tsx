@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 const SIZES = {
     sm: { box: 'p-2 rounded-lg', icon: 'size-4' },

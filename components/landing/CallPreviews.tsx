@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Mic, PhoneOff, Video } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 /** Bar heights (%) of the sound bars shown while someone is speaking on the voice call. */
 const LEVELS = [30, 55, 40, 75, 50, 85, 45, 65, 35, 55, 30];

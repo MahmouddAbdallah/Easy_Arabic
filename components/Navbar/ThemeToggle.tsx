@@ -2,7 +2,7 @@
 
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { focusRing, iconButtonClass } from './styles'
 
 interface ThemeToggleProps {

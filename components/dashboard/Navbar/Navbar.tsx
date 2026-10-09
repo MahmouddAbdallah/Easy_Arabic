@@ -5,7 +5,7 @@ import { Menu, Moon, Sun, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useTheme } from "@/lib/theme";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { Breadcrumbs } from "./Breadcrumbs";
 import { CommandMenu } from "./CommandMenu";
 import { NotificationsMenu } from "../../notification/NotificationsMenu";

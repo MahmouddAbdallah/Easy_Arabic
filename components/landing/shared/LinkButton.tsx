@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ComponentProps } from 'react';
 import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 /**
  * The landing page's button looks. Each tone picks a base shadcn variant plus the brand colours,

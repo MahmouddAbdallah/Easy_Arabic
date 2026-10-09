@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BookOpen, GraduationCap, Settings, Users, type LucideIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 type ProfileKind = 'teacher' | 'family'
 

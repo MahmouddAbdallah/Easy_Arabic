@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { CATEGORY_ICONS } from '../categoryIcons';
 import { Switch } from '../Switch';
 import { CATEGORY_ICON_NAMES, type CategoryIconName } from '../lib/config';

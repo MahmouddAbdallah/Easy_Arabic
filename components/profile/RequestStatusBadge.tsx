@@ -1,6 +1,6 @@
 import { Ban, CheckCircle2, Clock, XCircle, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import type { RequestStatus } from '@/lib/profile/service';
 
 const STATUS: Record<RequestStatus, { label: string; icon: LucideIcon; className: string }> = {

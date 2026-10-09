@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { Inbox } from 'lucide-react'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { getInitials, toPreview } from '@/components/dashboard/contact/contactUtils'
 import type { InboxMessage } from '@/lib/data/dashboard-overview'
 

@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { extractHeadings, nodeText } from "../lib/content";
 import { textDirection } from "../lib/direction";
 import { CALLOUT_VARIANTS, type BlogDoc, type BlogMark, type BlogNode, type CalloutVariant, type EmbedProvider } from "../lib/types";

@@ -1,6 +1,6 @@
 import { Bell, BookOpen, Check, MessageCircle, type LucideIcon } from 'lucide-react';
 import { LogoIcon } from '@/components/icons';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 interface ExampleNotification {
     icon: LucideIcon;

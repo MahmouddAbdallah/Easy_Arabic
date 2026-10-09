@@ -9,7 +9,7 @@ import { LogIn, Menu } from "lucide-react"
 
 import { useAppContext } from "@/components/AppContext"
 import { displayFont } from "@/lib/fonts"
-import { cn } from "@/lib/utils"
+import { cn } from 'cn'
 
 import { Brand } from "./Brand"
 import { MobileDrawer } from "./MobileDrawer"

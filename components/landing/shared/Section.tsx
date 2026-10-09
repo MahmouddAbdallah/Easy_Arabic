@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 interface SectionProps extends ComponentProps<'section'> {
     /** `tinted` gives a quiet teal band so neighbouring sections don't blur together. */

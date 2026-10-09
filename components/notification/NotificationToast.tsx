@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { markNotificationHandled } from './lib/client/api';
 import type { NotificationPayload } from './lib/contract';
 import { TYPE_ICONS } from './typeIcons';

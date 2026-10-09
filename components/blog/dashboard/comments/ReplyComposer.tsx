@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import type { AdminComment } from "@/components/blog/lib/comment-types";
 import { COMMENT_LIMITS, COMMENT_SITE_NAME } from "@/components/blog/lib/constants";
 import { replyToComment, setCommentStatus, toApiFailure } from "../lib/commentsApi";

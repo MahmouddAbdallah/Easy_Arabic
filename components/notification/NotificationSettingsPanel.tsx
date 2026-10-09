@@ -2,7 +2,7 @@
 
 import { useId, useState, type ReactNode } from 'react';
 import { ArrowLeft, BellOff, BellRing, Info, LoaderCircle, Moon, Play, TriangleAlert, Volume2, type LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { Button } from '../ui/button';
 import { Switch } from './Switch';
 import { CATEGORY_ICONS } from './categoryIcons';
@@ -160,8 +160,8 @@ function PushSection({ push }: { push: PushRegistration }) {
                     !on
                         ? 'Off on this device. Your other devices are not affected.'
                         : push.isActive
-                          ? 'On. You’ll be notified here even when the app is closed.'
-                          : 'Setting up this device…'
+                            ? 'On. You’ll be notified here even when the app is closed.'
+                            : 'Setting up this device…'
                 }
                 checked={on}
                 disabled={busy}

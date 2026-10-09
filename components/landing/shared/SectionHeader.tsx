@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 interface SectionHeaderProps {
     /** Id of the `<h2>`. Point the parent section's `aria-labelledby` at it. */

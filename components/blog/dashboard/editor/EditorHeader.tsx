@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink, Eye, Loader2, Pencil, Send, Trash2, Undo2 } fr
 import { Button, buttonVariants } from "@/components/ui/button";
 import { blogPostPath } from "@/components/blog/lib/constants";
 import type { BlogStatus } from "@/components/blog/lib/types";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 import { BlogStatusBadge } from "../BlogStatusBadge";
 import type { EditorAction } from "../hooks/useBlogEditor";
 

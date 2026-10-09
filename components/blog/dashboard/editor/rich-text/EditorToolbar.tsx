@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { CODE_LANGUAGES } from "@/components/blog/lib/highlight";
 import { CALLOUT_VARIANTS, type CalloutVariant } from "@/components/blog/lib/types";
-import { cn } from "@/lib/utils";
+import { cn } from 'cn'
 
 const CALLOUT_NAMES: Record<CalloutVariant, string> = { info: "Note", tip: "Tip", warning: "Warning", recommended: "Recommended" };
 

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils"
+import { cn } from 'cn'
 
 /** First + last initial ("Mahmoud Ragab" -> "MR"). Iterates code points so non-Latin names stay intact. */
 export function getInitials(name?: string | null): string {

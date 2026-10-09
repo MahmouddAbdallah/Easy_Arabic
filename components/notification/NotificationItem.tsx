@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 import { Button } from '../ui/button';
 import type { InAppNotification } from './lib/contract';
 import { TYPE_ICONS } from './typeIcons';

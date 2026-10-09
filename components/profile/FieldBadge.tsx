@@ -1,6 +1,6 @@
 import { Lock, Pencil, ShieldCheck, Eye, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn } from 'cn';
 
 export type FieldKind = 'editable' | 'locked' | 'admin' | 'readonly';
 
