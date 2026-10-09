@@ -65,7 +65,6 @@ export function ChatSidebar() {
                             />
                             <AvatarFallback className="text-xs font-semibold bg-muted">
                                 {user?.name?.slice(0, 2) || 'CN'}
-
                             </AvatarFallback>
                         </Avatar>
                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-background shadow-sm" />
