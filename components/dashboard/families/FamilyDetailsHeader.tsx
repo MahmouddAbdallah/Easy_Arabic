@@ -5,6 +5,7 @@ import StatTile from '@/components/dashboard/users/StatTile'
 import { getFamilyOverview } from '@/lib/data/home-data'
 import { getTeacherFamilies } from '@/lib/data/families'
 import { getLessons } from '@/lib/data/lessons'
+import { countPendingRequests } from '@/lib/planner/service'
 import { getUser } from '@/lib/data/users'
 
 const formatDay = (date: string | Date) =>
@@ -18,11 +19,12 @@ const formatTime = (date: string | Date) =>
  * layout can render instantly and stream this block behind a skeleton.
  */
 const FamilyDetailsHeader = async ({ familyId }: { familyId: string }) => {
-    const [{ data }, totalTeachers, totalLessons, overview] = await Promise.all([
+    const [{ data }, totalTeachers, totalLessons, overview, pendingRequests] = await Promise.all([
         getUser(familyId, ['id', 'name', 'email', 'phone', 'status', 'subject']),
         getTeacherFamilies({ filter: { where: [{ key: 'familyId', value: familyId }], justCount: true } }),
         getLessons({ filter: { where: [{ key: 'familyId', value: familyId }], justCount: true } }),
         getFamilyOverview(familyId),
+        countPendingRequests({ kind: 'family', id: familyId }),
     ])
 
     const teachersCount = totalTeachers?.count ?? 0
@@ -60,7 +62,7 @@ const FamilyDetailsHeader = async ({ familyId }: { familyId: string }) => {
                 <StatTile icon={GraduationCap} label="Teachers" value={String(teachersCount)} />
             </div>
 
-            <ProfileSectionNav kind="family" id={familyId} totalLessons={lessonsCount} totalLinked={teachersCount} />
+            <ProfileSectionNav kind="family" id={familyId} totalLessons={lessonsCount} totalLinked={teachersCount} pendingRequests={pendingRequests} />
         </section>
     )
 }

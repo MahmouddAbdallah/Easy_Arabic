@@ -14,7 +14,8 @@ import ErrorMsg from '../ErrorMsg';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
-import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
+import { ALL_STATUS_OPTIONS, DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
+import { hasNoTimeOfDay } from '@/lib/planner/time';
 import { LessonItem } from '@/types/lessonTypes';
 import { useLessonStore } from '@/stores/lessons';
 import SelectUserByRole from './SelectUserByRole';
@@ -137,7 +138,9 @@ const LessonForm: React.FC<LessonFormProps> = ({
                                         control={control}
                                         rules={{ required: 'Please select status' }}
                                         render={({ field }) => {
-                                            const item = STATUS_OPTIONS.find((i => i.value == field.value));
+                                            // A lesson the planner scheduled still shows its "Scheduled" status here until it is marked as held.
+                                            const statusOptions = field.value === 'SCHEDULED' ? ALL_STATUS_OPTIONS : STATUS_OPTIONS;
+                                            const item = statusOptions.find((i => i.value == field.value));
                                             const Icon = item?.icon
                                             return (
                                                 <Select onValueChange={field.onChange} value={field.value}>
@@ -152,7 +155,7 @@ const LessonForm: React.FC<LessonFormProps> = ({
                                                         </SelectValue>
                                                     </SelectTrigger>
                                                     <SelectContent className="rounded-md border-border/80">
-                                                        {STATUS_OPTIONS.map((item) => {
+                                                        {statusOptions.map((item) => {
                                                             const Icon = item.icon;
                                                             return (
                                                                 <SelectItem key={item.value} value={item.value} className="text-xs">
@@ -304,7 +307,17 @@ const LessonForm: React.FC<LessonFormProps> = ({
                                                     <Calendar
                                                         mode="single"
                                                         selected={field.value}
-                                                        onSelect={field.onChange}
+                                                        onSelect={(picked) => {
+                                                            // Keep a planner lesson's time of day when only the date changes
+                                                            // (older, date-only lessons stay date-only).
+                                                            const previous = field.value as Date | undefined;
+                                                            if (picked && previous instanceof Date && !Number.isNaN(previous.getTime()) && !hasNoTimeOfDay(previous)) {
+                                                                const withTime = new Date(picked);
+                                                                withTime.setHours(previous.getHours(), previous.getMinutes(), 0, 0);
+                                                                return field.onChange(withTime);
+                                                            }
+                                                            field.onChange(picked);
+                                                        }}
                                                         disabled={(date) => startOfDay(date) < subDays(startOfDay(new Date()), 3)}
                                                         className="p-3"
                                                     />

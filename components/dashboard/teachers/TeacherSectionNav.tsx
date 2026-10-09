@@ -1,13 +1,15 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Settings, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CalendarDays, Users } from 'lucide-react'
 import { cn } from 'cn'
 
 interface TeacherSectionNavProps {
     teacherId: string
     totalLessons: number
     totalFamilies: number
+    /** Requests from families waiting for an answer (shown on the Planner tab). */
+    pendingRequests?: number
 }
 
 /**
@@ -15,16 +17,16 @@ interface TeacherSectionNavProps {
  * middle-click and browser back/forward all work and the active state always
  * mirrors the URL (the old uncontrolled Tabs drifted out of sync on back).
  */
-const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies }: TeacherSectionNavProps) => {
+const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies, pendingRequests = 0 }: TeacherSectionNavProps) => {
     const pathname = usePathname()
     const basePath = `/dashboard/teachers/${teacherId}`
     const onFamilies = pathname.startsWith(`${basePath}/families`)
-    const onSettings = pathname.startsWith(`${basePath}/settings`)
+    const onPlanner = pathname.startsWith(`${basePath}/planner`)
 
-    const items: Array<{ href: string; label: string; count?: number; icon: LucideIcon; active: boolean }> = [
-        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onFamilies && !onSettings },
-        { href: `${basePath}/families`, label: 'families', count: totalFamilies, icon: Users, active: onFamilies },
-        { href: `${basePath}/settings`, label: 'Settings', icon: Settings, active: onSettings },
+    const items = [
+        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onFamilies && !onPlanner, hint: undefined },
+        { href: `${basePath}/families`, label: 'families', count: totalFamilies, icon: Users, active: onFamilies, hint: undefined },
+        { href: `${basePath}/planner`, label: 'Planner', count: pendingRequests, icon: CalendarDays, active: onPlanner, hint: `${pendingRequests} pending ${pendingRequests === 1 ? 'request' : 'requests'}` },
     ]
 
     return (
@@ -33,7 +35,7 @@ const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies }: TeacherSe
             className="w-full rounded-xl border border-border/60 bg-card p-1 shadow-xs sm:w-fit"
         >
             <ul className="flex gap-1">
-                {items.map(({ href, label, count, icon: Icon, active }) => (
+                {items.map(({ href, label, count, icon: Icon, active, hint }) => (
                     <li key={href} className="flex-1 sm:flex-none">
                         <Link
                             href={href}
@@ -47,16 +49,15 @@ const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies }: TeacherSe
                         >
                             <Icon className="h-4 w-4" />
                             {label}
-                            {count !== undefined && (
-                                <span
-                                    className={cn(
-                                        'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
-                                        active ? 'bg-brand/15 text-brand' : 'bg-muted text-muted-foreground'
-                                    )}
-                                >
-                                    {count}
-                                </span>
-                            )}
+                            <span
+                                className={cn(
+                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                                    active ? 'bg-brand/15 text-brand' : 'bg-muted text-muted-foreground'
+                                )}
+                                title={hint}
+                            >
+                                {count}
+                            </span>
                         </Link>
                     </li>
                 ))}

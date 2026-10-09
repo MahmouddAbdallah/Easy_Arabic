@@ -11,7 +11,7 @@ import { RotateCcw, CalendarIcon, Clock, ChevronDown, Award, Timer, Filter, Slid
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { DURATION_OPTIONS, REWARD_OPTIONS, STATUS_OPTIONS } from '@/components/lesson/LessonOptions';
+import { ALL_STATUS_OPTIONS, DURATION_OPTIONS, REWARD_OPTIONS } from '@/components/lesson/LessonOptions';
 import { clsx } from 'cn';
 import SelectUserByRole from '@/components/lesson/SelectUserByRole';
 import { useAppContext } from '../AppContext';
@@ -151,7 +151,7 @@ export const LessonsFilter = () => {
                       </SelectTrigger>
                       <SelectContent className="rounded-md border-border/80">
                         <SelectItem value="ALL" className="text-xs font-medium">All Statuses</SelectItem>
-                        {STATUS_OPTIONS.map((item) => {
+                        {ALL_STATUS_OPTIONS.map((item) => {
                           const Icon = item.icon;
                           return (
                             <SelectItem key={item.value} value={item.value} className="text-xs">

@@ -144,6 +144,8 @@ model Lesson {
   teacherId     String
   familyId      String
   student       String
+  // SCHEDULED (planned, future) | ATTENDED | ABSENT | CANCELLED. A free string on purpose:
+  // the planner (lib/planner) is what introduced SCHEDULED, the older lesson forms never used it.
   status        String
   classDate     TimestamptzString
   money         Int
@@ -173,6 +175,66 @@ model TeacherFamily {
   updatedAt TimestamptzString @default(now())
 
   @@unique([teacherId, familyId])
+}
+
+// ---------------------------------------------------------------------------
+// Lesson change requests (family -> teacher)
+//
+// A family never edits a lesson itself. It asks its teacher to cancel it or move it to
+// another time; nothing about the lesson changes until the teacher (or an admin) approves.
+// See lib/planner/.
+// ---------------------------------------------------------------------------
+enum LessonChangeType {
+  CANCEL
+  RESCHEDULE
+}
+
+enum LessonChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED // withdrawn by the family while still pending
+}
+
+model LessonChangeRequest {
+  id                 String              @id @default(uuid())
+  lessonId           String
+  // Snapshot of the lesson's teacher / family when the request was made. The family is the
+  // requester. They are re-checked against the live lesson before a decision is applied.
+  teacherId          String
+  familyId           String
+  type               LessonChangeType
+  status             LessonChangeStatus  @default(PENDING)
+
+  // The lesson's start when the request was made (a decision is refused if it has moved since)
+  // and, for RESCHEDULE only, the start the family asked for.
+  originalClassDate  TimestamptzString
+  requestedClassDate TimestamptzString?
+  // Free-text explanation from the family (optional).
+  reason             String?
+
+  // Review audit trail. All three stay NULL until the teacher / an admin decides.
+  reviewedById       String?
+  reviewedAt         TimestamptzString?
+  reviewerNote       String?
+
+  createdAt          TimestamptzString   @default(now())
+  updatedAt          TimestamptzString   @default(now())
+
+  lesson             Lesson              @relation(fields:[lessonId], references:[id], onDelete: Cascade, "LessonRequestLesson")
+  teacher            User                @relation(fields:[teacherId], references:[id], onDelete: Cascade, "LessonRequestTeacher")
+  family             User                @relation(fields:[familyId], references:[id], onDelete: Cascade, "LessonRequestFamily")
+  reviewer           User?               @relation(fields:[reviewedById], references:[id], onDelete: SetNull, "LessonRequestReviewer")
+
+  @@index([teacherId, status, createdAt])
+  @@index([familyId, status, createdAt])
+  @@index([lessonId, createdAt])
+  @@index([reviewedById])
+  // A lesson can have at most ONE pending request. Enforced by the database, so two
+  // simultaneous submissions cannot both succeed (the loser gets a unique violation).
+  @@index([lessonId], unique: true, where: "(status = 'PENDING')", name: "lessonChangeRequest_one_pending")
+  // A reschedule needs a target time, a cancellation must not carry one.
+  @@check(expression: "(\"type\" = 'RESCHEDULE') = (\"requestedClassDate\" IS NOT NULL)", name: "lesson_change_request_target_time")
 }
 
 model MoneyPerLesson {

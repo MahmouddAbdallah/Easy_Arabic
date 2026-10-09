@@ -15,6 +15,7 @@ import {
     Clock,
     Hourglass,
     History,
+    CalendarClock,
     LucideIcon
 } from "lucide-react";
 
@@ -36,6 +37,13 @@ export const REWARD_OPTIONS: OptionItem[] = [
     { value: 'TERRIBLE', label: 'Terrible', icon: Skull, color: 'text-red-600 bg-red-600/10 border-red-600/20' },
 ];
 
+/**
+ * Planned, not yet happened: only the planner creates these (lib/planner). It is deliberately NOT in
+ * STATUS_OPTIONS, so the "log a lesson" form can't hand-pick it (that would skip the planner's conflict checks).
+ */
+export const SCHEDULED_OPTION: OptionItem = { value: 'SCHEDULED', label: 'Scheduled', icon: CalendarClock, color: 'text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/20' };
+
+/** What a lesson's outcome can be set to. */
 export const STATUS_OPTIONS: OptionItem[] = [
     { value: 'ATTENDED', label: 'Attended', icon: UserCheck, color: 'text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/20' },
     { value: 'ABSENT', label: 'Absent', icon: UserX, color: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20' },
@@ -53,7 +61,9 @@ export const DURATION_OPTIONS: OptionItem[] = [
 ];
 
 export const REWARD_MAP = RecordFromOptions(REWARD_OPTIONS);
-export const STATUS_MAP = RecordFromOptions(STATUS_OPTIONS);
+/** Every status a lesson can be shown with (including SCHEDULED), e.g. for the list filter. */
+export const ALL_STATUS_OPTIONS: OptionItem[] = [SCHEDULED_OPTION, ...STATUS_OPTIONS];
+export const STATUS_MAP = RecordFromOptions(ALL_STATUS_OPTIONS);
 export const DURATION_MAP = RecordFromOptions(DURATION_OPTIONS);
 
 function RecordFromOptions(options: OptionItem[]): Record<string, OptionItem> {

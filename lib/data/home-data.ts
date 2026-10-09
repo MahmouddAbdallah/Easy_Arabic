@@ -1,4 +1,5 @@
 import { db } from "@/prisma/db";
+import { LESSON_STATUS } from "@/lib/planner/constants";
 
 export type RecentLessonRow = {
     id: string;
@@ -22,6 +23,12 @@ export type UpcomingLessonRow = {
 const monthStart = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 
 /**
+ * Lessons the planner has only SCHEDULED have not happened yet, so they are not "recent", not earnings and not
+ * attendance. Every figure below that describes lessons that took place skips them.
+ */
+const HAPPENED = (l: { status: { neq: (value: string) => any } }) => l.status.neq(LESSON_STATUS.SCHEDULED);
+
+/**
  * Platform-wide snapshot for the admin's authenticated home view.
  * Every number here is a live aggregate against the real tables —
  * nothing is hardcoded or sampled.
@@ -34,9 +41,10 @@ export const getAdminOverview = async () => {
         const [{ count: teacherCount }, { count: familyCount }, monthAgg, statusGroups, recent] = await Promise.all([
             db.orm.public.User.where({ role: "teacher" }).aggregate((a) => ({ count: a.count() })),
             db.orm.public.User.where({ role: "family" }).aggregate((a) => ({ count: a.count() })),
-            L.where((l) => l.classDate.gte(from)).aggregate((a) => ({ count: a.count(), money: a.sum("money") })),
-            L.where((l) => l.classDate.gte(from)).groupBy("status").aggregate((a) => ({ count: a.count() })),
-            L.select("id", "student", "status", "TeacherReward", "duration", "classDate")
+            L.where((l) => l.classDate.gte(from)).where(HAPPENED).aggregate((a) => ({ count: a.count(), money: a.sum("money") })),
+            L.where((l) => l.classDate.gte(from)).where(HAPPENED).groupBy("status").aggregate((a) => ({ count: a.count() })),
+            L.where(HAPPENED)
+                .select("id", "student", "status", "TeacherReward", "duration", "classDate")
                 .orderBy((l) => l.classDate.desc())
                 .limit(6)
                 .include("teacher", (t) => t.select("id", "name"))
@@ -72,10 +80,10 @@ export const getTeacherOverview = async (teacherId: string) => {
         const L = db.orm.public.Lesson;
 
         const [monthAgg, { count: familyCount }, recent] = await Promise.all([
-            L.where((l) => l.teacherId.eq(teacherId)).where((l) => l.classDate.gte(from))
+            L.where((l) => l.teacherId.eq(teacherId)).where((l) => l.classDate.gte(from)).where(HAPPENED)
                 .aggregate((a) => ({ count: a.count(), minutes: a.sum("duration"), money: a.sum("money") })),
             db.orm.public.TeacherFamily.where({ teacherId }).aggregate((a) => ({ count: a.count() })),
-            L.where((l) => l.teacherId.eq(teacherId))
+            L.where((l) => l.teacherId.eq(teacherId)).where(HAPPENED)
                 .select("id", "student", "status", "TeacherReward", "duration", "classDate")
                 .orderBy((l) => l.classDate.desc())
                 .limit(6)
@@ -107,16 +115,17 @@ export const getFamilyOverview = async (familyId: string) => {
         const nowIso = new Date().toISOString();
 
         const [monthAgg, { count: teacherCount }, recent, upcoming] = await Promise.all([
-            L.where((l) => l.familyId.eq(familyId)).where((l) => l.classDate.gte(from))
+            L.where((l) => l.familyId.eq(familyId)).where((l) => l.classDate.gte(from)).where(HAPPENED)
                 .aggregate((a) => ({ count: a.count() })),
             db.orm.public.TeacherFamily.where({ familyId }).aggregate((a) => ({ count: a.count() })),
-            L.where((l) => l.familyId.eq(familyId))
+            L.where((l) => l.familyId.eq(familyId)).where(HAPPENED)
                 .select("id", "student", "status", "TeacherReward", "duration", "classDate")
                 .orderBy((l) => l.classDate.desc())
                 .limit(6)
                 .include("teacher", (t) => t.select("id", "name"))
                 .all(),
-            L.where((l) => l.familyId.eq(familyId)).where((l) => l.classDate.gte(nowIso))
+            // A cancelled lesson is not "next". (Planner-scheduled lessons are exactly what belongs here.)
+            L.where((l) => l.familyId.eq(familyId)).where((l) => l.classDate.gte(nowIso)).where((l) => l.status.neq(LESSON_STATUS.CANCELLED))
                 .select("id", "student", "classDate", "duration")
                 .orderBy((l) => l.classDate.asc())
                 .limit(1)

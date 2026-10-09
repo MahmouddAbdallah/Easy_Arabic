@@ -5,6 +5,7 @@ import { getUser } from '@/lib/data/users'
 import { getMoney, getTeacherFamilies } from '@/lib/data/families'
 import { getLessons } from '@/lib/data/lessons'
 import { getTeacherOverview } from '@/lib/data/home-data'
+import { countPendingRequests } from '@/lib/planner/service'
 import TeacherRateBadge from '@/components/dashboard/teachers/MoneyPerLessonView'
 import TeacherSectionNav from '@/components/dashboard/teachers/TeacherSectionNav'
 import StatTile from '../users/StatTile'
@@ -13,12 +14,13 @@ import StatTile from '../users/StatTile'
  * layout can render instantly and stream this block behind a skeleton.
  */
 const TeacherDetailsHeader = async ({ teacherId }: { teacherId: string }) => {
-    const [{ data }, totalFamilies, totalLessons, { money }, overview] = await Promise.all([
+    const [{ data }, totalFamilies, totalLessons, { money }, overview, pendingRequests] = await Promise.all([
         getUser(teacherId, ['id', 'name', 'email', 'subject']),
         getTeacherFamilies({ filter: { where: [{ key: 'teacherId', value: teacherId }], justCount: true } }),
         getLessons({ filter: { where: [{ key: 'teacherId', value: teacherId }], justCount: true } }),
         getMoney(teacherId),
         getTeacherOverview(teacherId),
+        countPendingRequests({ kind: 'teacher', id: teacherId }),
     ])
 
     const familiesCount = totalFamilies?.count ?? 0
@@ -95,7 +97,7 @@ const TeacherDetailsHeader = async ({ teacherId }: { teacherId: string }) => {
                 />
             </div>
 
-            <TeacherSectionNav teacherId={teacherId} totalLessons={lessonsCount} totalFamilies={familiesCount} />
+            <TeacherSectionNav teacherId={teacherId} totalLessons={lessonsCount} totalFamilies={familiesCount} pendingRequests={pendingRequests} />
         </section>
     )
 }

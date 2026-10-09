@@ -34,6 +34,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ te
             );
         }
 
+        // A teacher may only touch THEIR OWN lessons. (The URL's teacherId only proves who is calling; it says
+        // nothing about who the lesson belongs to.) Someone else's lesson looks exactly like a missing one.
+        if (user.role === "teacher" && existingLesson.teacherId !== user.id) {
+            return NextResponse.json(
+                { success: false, error: { code: "NOT_FOUND", message: "Lesson not found" } },
+                { status: 404 }
+            );
+        }
+
         if (user.role === "teacher") {
             const lessonTime = new Date(existingLesson.classDate.toString()).getTime();
             const currentTime = Date.now();
@@ -100,6 +109,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ t
         const existingLesson = await db.orm.public.Lesson.where({ id: lessonId }).first();
 
         if (!existingLesson) {
+            return NextResponse.json(
+                { success: false, error: { code: "NOT_FOUND", message: "Lesson not found" } },
+                { status: 404 }
+            );
+        }
+
+        // A teacher may only touch THEIR OWN lessons. (The URL's teacherId only proves who is calling; it says
+        // nothing about who the lesson belongs to.) Someone else's lesson looks exactly like a missing one.
+        if (user.role === "teacher" && existingLesson.teacherId !== user.id) {
             return NextResponse.json(
                 { success: false, error: { code: "NOT_FOUND", message: "Lesson not found" } },
                 { status: 404 }

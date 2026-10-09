@@ -32,6 +32,10 @@
       "model": "Lesson",
       "namespace": "public"
     },
+    "lessonChangeRequest": {
+      "model": "LessonChangeRequest",
+      "namespace": "public"
+    },
     "moneyPerLesson": {
       "model": "MoneyPerLesson",
       "namespace": "public"
@@ -67,6 +71,40 @@
               {
                 "name": "email_verification",
                 "value": "email_verification"
+              }
+            ]
+          },
+          "LessonChangeStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "PENDING",
+                "value": "PENDING"
+              },
+              {
+                "name": "APPROVED",
+                "value": "APPROVED"
+              },
+              {
+                "name": "REJECTED",
+                "value": "REJECTED"
+              },
+              {
+                "name": "CANCELLED",
+                "value": "CANCELLED"
+              }
+            ]
+          },
+          "LessonChangeType": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "CANCEL",
+                "value": "CANCEL"
+              },
+              {
+                "name": "RESCHEDULE",
+                "value": "RESCHEDULE"
               }
             ]
           },
@@ -1221,6 +1259,234 @@
               },
               "namespaceId": "public",
               "table": "lesson"
+            }
+          },
+          "LessonChangeRequest": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "familyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "lessonId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "originalClassDate": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "reason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "requestedClassDate": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "reviewedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "reviewedById": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "reviewerNote": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "LessonChangeStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "teacherId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "type": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "LessonChangeType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "family": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "familyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "lesson": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "lessonId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Lesson",
+                  "namespace": "public"
+                }
+              },
+              "reviewer": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "reviewedById"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "teacher": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "teacherId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "familyId": {
+                  "column": "familyId"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "lessonId": {
+                  "column": "lessonId"
+                },
+                "originalClassDate": {
+                  "column": "originalClassDate"
+                },
+                "reason": {
+                  "column": "reason"
+                },
+                "requestedClassDate": {
+                  "column": "requestedClassDate"
+                },
+                "reviewedAt": {
+                  "column": "reviewedAt"
+                },
+                "reviewedById": {
+                  "column": "reviewedById"
+                },
+                "reviewerNote": {
+                  "column": "reviewerNote"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "teacherId": {
+                  "column": "teacherId"
+                },
+                "type": {
+                  "column": "type"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "lessonChangeRequest"
             }
           },
           "MoneyPerLesson": {
@@ -2618,6 +2884,261 @@
               },
               "uniques": []
             },
+            "lessonChangeRequest": {
+              "checks": [
+                {
+                  "expression": "\"status\" IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')",
+                  "name": "lessonChangeRequest_status_check_57fe5f48",
+                  "prefix": "lessonChangeRequest_status_check"
+                },
+                {
+                  "expression": "\"type\" IN ('CANCEL', 'RESCHEDULE')",
+                  "name": "lessonChangeRequest_type_check_963bfbc1",
+                  "prefix": "lessonChangeRequest_type_check"
+                },
+                {
+                  "expression": "(\"type\" = 'RESCHEDULE') = (\"requestedClassDate\" IS NOT NULL)",
+                  "name": "lesson_change_request_target_time_d55d47d9",
+                  "prefix": "lesson_change_request_target_time"
+                }
+              ],
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "familyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "lessonId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "originalClassDate": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "requestedClassDate": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "reviewedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "reviewedById": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "reviewerNote": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "PENDING"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "LessonChangeStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "teacherId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "LessonChangeType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "lessonId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "lessonChangeRequest"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "lesson"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "teacherId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "lessonChangeRequest"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "familyId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "lessonChangeRequest"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "reviewedById"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "lessonChangeRequest"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "familyId"
+                  ],
+                  "name": "lessonChangeRequest_familyId_idx_3d03045e",
+                  "prefix": "lessonChangeRequest_familyId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "familyId",
+                    "status",
+                    "createdAt"
+                  ],
+                  "name": "lessonChangeRequest_familyId_status_createdAt_idx_c042bda0",
+                  "prefix": "lessonChangeRequest_familyId_status_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "lessonId",
+                    "createdAt"
+                  ],
+                  "name": "lessonChangeRequest_lessonId_createdAt_idx_02cfe4b3",
+                  "prefix": "lessonChangeRequest_lessonId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "lessonId"
+                  ],
+                  "name": "lessonChangeRequest_one_pending_939e6d91",
+                  "prefix": "lessonChangeRequest_one_pending",
+                  "unique": true,
+                  "where": "(status = 'PENDING')"
+                },
+                {
+                  "columns": [
+                    "reviewedById"
+                  ],
+                  "name": "lessonChangeRequest_reviewedById_idx_e2835478",
+                  "prefix": "lessonChangeRequest_reviewedById_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "teacherId"
+                  ],
+                  "name": "lessonChangeRequest_teacherId_idx_bc266660",
+                  "prefix": "lessonChangeRequest_teacherId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "teacherId",
+                    "status",
+                    "createdAt"
+                  ],
+                  "name": "lessonChangeRequest_teacherId_status_createdAt_idx_ac45df54",
+                  "prefix": "lessonChangeRequest_teacherId_status_createdAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "moneyPerLesson": {
               "columns": {
                 "id": {
@@ -3170,6 +3691,22 @@
                 "email_verification"
               ]
             },
+            "LessonChangeStatus": {
+              "kind": "valueSet",
+              "values": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED"
+              ]
+            },
+            "LessonChangeType": {
+              "kind": "valueSet",
+              "values": [
+                "CANCEL",
+                "RESCHEDULE"
+              ]
+            },
             "ProfileChangeRequestStatus": {
               "kind": "valueSet",
               "values": [
@@ -3214,10 +3751,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "233c4560e22327d488bc7447fce330a896f033a4516f8dd7c86882045d55ddfc"
+    "storageHash": "851ec9ca754071220e54790d90a086ab97b8906add4b8d91070be1b022e2493b"
   },
   "execution": {
-    "executionHash": "6de0e48d3f1c59e2a0a61163438e2873fa03ff2d9ec9032b69d0ecd52f841793",
+    "executionHash": "4945c5f3e5dfcd9d07bacf34a1baf88f5a11669da161150473671eddb1aad93c",
     "mutations": {
       "defaults": [
         {
@@ -3273,6 +3810,17 @@
             "column": "id",
             "namespace": "public",
             "table": "lesson"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "lessonChangeRequest"
           }
         },
         {

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BookOpen, Home, LayoutDashboard, Mail, MessageSquare, type LucideIcon } from "lucide-react"
+import { BookOpen, CalendarDays, Home, LayoutDashboard, Mail, MessageSquare, type LucideIcon } from "lucide-react"
 import UnReadMsgCount from "../chat/UnreadMsgCount"
 import { cn } from 'cn'
 import type { userType } from "@/types/userTypes"
@@ -28,6 +28,7 @@ const getNavItems = (user: NavLinksProps['user']): NavItem[] => [
     { label: "Home", href: "/", icon: Home, visible: true },
     { label: "Contact", href: "/contact", icon: Mail, visible: !user },
     { label: "Lessons", href: "/lesson", icon: BookOpen, visible: !!user },
+    { label: "Planner", href: "/planner", icon: CalendarDays, visible: user?.role === 'teacher' || user?.role === 'family' },
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, visible: user?.role === 'admin' },
     { label: "Chat", href: "/chat", icon: MessageSquare, visible: !!user, unread: true },
 ]

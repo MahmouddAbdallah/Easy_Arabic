@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { userType } from '@/types/userTypes';
 import { LessonItem } from '@/types/lessonTypes';
-import { DURATION_OPTIONS, OptionItem, REWARD_OPTIONS, STATUS_OPTIONS } from './LessonOptions';
+import { ALL_STATUS_OPTIONS, DURATION_OPTIONS, OptionItem, REWARD_OPTIONS } from './LessonOptions';
 
 const findOption = (options: OptionItem[], value: string) => options.find((option) => option.value === value);
 
@@ -21,8 +21,9 @@ interface LessonRowProps {
 }
 
 const LessonRow = ({ lesson, role, canManage, onEdit, onDelete }: LessonRowProps) => {
-    const status = findOption(STATUS_OPTIONS, lesson.status);
-    const reward = findOption(REWARD_OPTIONS, lesson.TeacherReward);
+    const status = findOption(ALL_STATUS_OPTIONS, lesson.status);
+    // A scheduled lesson hasn't happened yet, so it has no reward to show (the column only holds the database default).
+    const reward = lesson.status === 'SCHEDULED' ? undefined : findOption(REWARD_OPTIONS, lesson.TeacherReward);
     const duration = findOption(DURATION_OPTIONS, `${lesson.duration}`);
 
     return (
