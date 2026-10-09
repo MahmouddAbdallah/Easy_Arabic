@@ -51,6 +51,7 @@ export function ChatSidebar() {
             setChats(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatItemType)));
         });
     }, [user?.id]);
+    console.log(user);
 
     return (
         <aside className="w-full border-r border-border/40 h-full flex flex-col bg-background/60 backdrop-blur-2xl select-none shrink-0 transition-all">
@@ -58,16 +59,17 @@ export function ChatSidebar() {
             <div className="h-16 px-4 border-b border-border/30 flex items-center justify-between bg-card/20 backdrop-blur-md">
                 <div className="flex items-center gap-3">
                     <div className="relative group cursor-pointer">
-                        <div className="absolute -inset-0.5 bg-linear-to-r from-primary to-purple-600 rounded-full blur opacity-40 group-hover:opacity-75 transition duration-300" />
+                        <div className="absolute -inset-0.5 bg-primary rounded-full blur opacity-40 group-hover:opacity-75 transition duration-300" />
                         <Avatar className="h-9 w-9 relative ring-1 ring-background/80 shadow-md">
                             <AvatarImage
-                                src={user?.imageUrl || user?.name || ''}
+                                src={user?.imageUrl}
                                 alt={user?.name || 'User Avatar'}
                             />
                             <AvatarFallback className="text-xs font-semibold bg-muted">
-                                {user?.name?.slice(0, 2) || 'CN'}
+                                {user?.name?.slice(0, 2) || 'MA'}
                             </AvatarFallback>
                         </Avatar>
+
                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-background shadow-sm" />
                     </div>
                     <div className="flex flex-col">

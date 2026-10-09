@@ -60,6 +60,7 @@ export const authorization = async (
                 'email',
                 'role',
                 'status',
+                'imageUrl',
                 'passwordLastChanged',
                 'phone',
             ).first();
@@ -87,7 +88,7 @@ export const authorization = async (
             return { error: { code: "INSUFFICIENT_PERMISSIONS", message: "You don't have permission to do that." } };
         }
 
-        return { user: user as any };
+        return { user: user as userType };
     } catch (err) {
         console.error("authorization(): unexpected failure —", err);
         return { error: { code: "SERVER_ERROR", message: "Something went wrong while checking your login." } };

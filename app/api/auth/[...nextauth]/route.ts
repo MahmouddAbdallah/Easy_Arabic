@@ -27,6 +27,15 @@ export const authOptions = {
                     return false;
                 }
                 let client = await findUserByEmail(user.email);
+                if (client) {
+                    const d = await db.orm.public.User.where({
+                        email: client.email
+                    }).update({
+                        imageUrl: user?.image as string || '',
+                    })
+                    console.log(d, user.image);
+
+                }
                 if (!client) {
                     const validation = signUpSchema.safeParse({
                         ...user,
