@@ -61,7 +61,7 @@ export function ChatSidebar() {
                         <div className="absolute -inset-0.5 bg-linear-to-r from-primary to-purple-600 rounded-full blur opacity-40 group-hover:opacity-75 transition duration-300" />
                         <Avatar className="h-9 w-9 relative ring-1 ring-background/80 shadow-md">
                             <AvatarImage
-                                src={user?.name || user?.name || ''}
+                                src={user?.imageUrl || user?.name || ''}
                                 alt={user?.name || 'User Avatar'}
                             />
                             <AvatarFallback className="text-xs font-semibold bg-muted">
