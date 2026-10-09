@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, } from "lucide-react";
+import { MoreVertical, SettingsIcon, Sparkles, UserIcon, } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SearchPeople from "./SearchPeople";
@@ -14,6 +14,7 @@ import { getUnreadCount, type UnreadCount } from "../lib/unread";
 import { isChatClearedFor, isChatHiddenFor } from "../lib/chatState";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export interface ChatItemType {
     id: string;
@@ -79,6 +80,26 @@ export function ChatSidebar() {
                         </span>
                     </div>
                 </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger
+                        className="h-8 w-8 flex justify-center cursor-pointer items-center text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-xl transition-all"
+                    >
+                        <MoreVertical className="h-4 w-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        className="w-52 rounded-xl backdrop-blur-lg border-border/50"
+                    >
+                        <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
+                            <UserIcon className="h-3.5 w-3.5 text-muted-foreground" /> Profile
+                            Info
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2.5 text-xs font-medium cursor-pointer rounded-lg">
+                            <SettingsIcon className="h-3.5 w-3.5 text-muted-foreground" /> App
+                            Preferences
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             {/* 2. Search & Filters */}
