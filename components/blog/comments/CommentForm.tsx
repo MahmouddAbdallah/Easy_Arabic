@@ -96,12 +96,14 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
 
     if (status.kind === "sent") {
         return (
-            <div role="status" className="rounded-2xl border border-brand/20 bg-brand-soft/60 p-5 sm:p-6">
-                <div className="flex items-start gap-3">
-                    <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0 text-brand" />
-                    <div className="space-y-3">
-                        <p className="font-medium text-foreground">{status.message}</p>
-                        <Button type="button" variant="outline" size="lg" onClick={() => setStatus({ kind: "idle" })}>
+            <div role="status" className="rounded-2xl border border-brand/20 bg-brand-soft/60 p-5 sm:p-7">
+                <div className="flex items-start gap-4">
+                    <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground">
+                        <CheckCircle2 className="size-5" />
+                    </span>
+                    <div className="min-w-0 space-y-4">
+                        <p className="pt-1.5 font-medium text-foreground">{status.message}</p>
+                        <Button type="button" variant="outline" className="h-11 px-5 text-sm" onClick={() => setStatus({ kind: "idle" })}>
                             Write another comment
                         </Button>
                     </div>
@@ -111,16 +113,16 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
     }
 
     return (
-        <form onSubmit={onSubmit} noValidate aria-labelledby={id("title")} className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-            <h3 id={id("title")} className="font-display text-xl font-bold tracking-tight text-foreground">
+        <form onSubmit={onSubmit} noValidate aria-labelledby={id("title")} className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7">
+            <h3 id={id("title")} className="font-display text-xl font-bold tracking-tight text-foreground md:text-2xl">
                 Leave a comment
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 Comments are reviewed before they appear. Your email is optional and is never shown.
             </p>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
+            <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
                     <Label htmlFor={id("name")}>
                         Name <span aria-hidden className="text-destructive">*</span>
                     </Label>
@@ -129,13 +131,14 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                         id={id("name")}
                         dir="auto"
                         autoComplete="name"
+                        placeholder="Enter your name or a nickname"
                         required
                         maxLength={COMMENT_LIMITS.name * 2}
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                         aria-invalid={Boolean(errors.name)}
                         aria-describedby={errors.name ? id("name-error") : undefined}
-                        className="h-10"
+                        className="h-11 px-3 md:text-base"
                     />
                     {errors.name && (
                         <p id={id("name-error")} className="text-sm text-destructive">
@@ -144,7 +147,7 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                     )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                     <Label htmlFor={id("email")}>
                         Email <span className="font-normal text-muted-foreground">(optional)</span>
                     </Label>
@@ -154,12 +157,15 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                         type="email"
                         dir="ltr"
                         autoComplete="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        placeholder="name@example.com (optional)"
                         maxLength={COMMENT_LIMITS.email}
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         aria-invalid={Boolean(errors.email)}
                         aria-describedby={errors.email ? id("email-error") : undefined}
-                        className="h-10"
+                        className="h-11 px-3 md:text-base"
                     />
                     {errors.email && (
                         <p id={id("email-error")} className="text-sm text-destructive">
@@ -169,7 +175,7 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                 </div>
             </div>
 
-            <div className="mt-4 space-y-1.5">
+            <div className="mt-5 space-y-2">
                 <Label htmlFor={id("body")}>
                     Comment <span aria-hidden className="text-destructive">*</span>
                 </Label>
@@ -179,11 +185,12 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                     dir="auto"
                     required
                     rows={5}
+                    placeholder="Share your thoughts, ask a question, or add something helpful…"
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     aria-invalid={Boolean(errors.body)}
                     aria-describedby={[errors.body ? id("body-error") : null, id("count")].filter(Boolean).join(" ")}
-                    className="min-h-32 resize-y"
+                    className="min-h-36 resize-y px-3 py-2.5 leading-relaxed md:text-base"
                 />
                 <div className="flex items-start justify-between gap-3">
                     <p id={id("body-error")} className="text-sm text-destructive">
@@ -193,7 +200,9 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                         id={id("count")}
                         className={cn("ms-auto shrink-0 text-xs tabular-nums text-muted-foreground", body.length > COMMENT_LIMITS.body && "font-medium text-destructive")}
                     >
-                        {body.length} / {COMMENT_LIMITS.body}
+                        <bdi dir="ltr">
+                            {body.length} / {COMMENT_LIMITS.body}
+                        </bdi>
                     </p>
                 </div>
             </div>
@@ -204,7 +213,7 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                 <input id={id("website")} name={COMMENT_HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" value={trap} onChange={(event) => setTrap(event.target.value)} />
             </div>
 
-            <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div aria-live="polite" className="min-h-5 text-sm">
                     {status.kind === "error" && (
                         <p role="alert" className="font-medium text-destructive">
@@ -212,7 +221,7 @@ export function CommentForm({ blogId, token }: CommentFormProps) {
                         </p>
                     )}
                 </div>
-                <Button type="submit" disabled={sending} className="h-10 px-5 text-sm sm:w-auto">
+                <Button type="submit" disabled={sending} className="h-11 bg-brand px-6 text-[0.9375rem] text-brand-foreground hover:bg-brand/90 sm:w-auto">
                     {sending ? <Loader2 aria-hidden className="animate-spin" /> : <Send aria-hidden className="rtl:-scale-x-100" />}
                     {sending ? "Sending…" : "Post comment"}
                 </Button>

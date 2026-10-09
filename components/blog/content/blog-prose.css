@@ -13,7 +13,7 @@
   --prose-gap: 1.25em;
   /* Tallest a picture or video may be in the article, so media never takes over the screen. */
   --media-max-height: min(30rem, 75vh);
-  color: var(--foreground);
+  color: color-mix(in oklab, var(--foreground) 90%, var(--background));
   font-size: 1.125rem;
   line-height: 1.75;
   overflow-wrap: break-word;
@@ -43,13 +43,14 @@
   line-height: 1.25;
   letter-spacing: -0.01em;
   text-wrap: balance;
+  color: var(--foreground);
   /* Leaves room under the sticky site header when jumping to a heading. */
   scroll-margin-top: 6rem;
 }
 
 .blog-prose h2 {
   font-size: 1.6em;
-  margin-top: 1.9em;
+  margin-top: 2.2em;
 }
 .blog-prose h3 {
   font-size: 1.3em;
@@ -61,6 +62,7 @@
 }
 .blog-prose :is(h2, h3, h4)[dir="rtl"] {
   line-height: 1.45;
+  letter-spacing: 0;
 }
 .blog-prose :is(h2, h3, h4) + * {
   margin-top: 0.6em;
@@ -86,6 +88,7 @@
 
 .blog-prose strong {
   font-weight: 700;
+  color: var(--foreground);
 }
 
 .blog-prose mark {

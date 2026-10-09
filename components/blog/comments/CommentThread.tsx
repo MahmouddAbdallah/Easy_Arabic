@@ -10,10 +10,13 @@ import type { PublicComment } from "../lib/comment-types";
  */
 const directionOf = (comment: PublicComment) => textDirection(comment.body) ?? textDirection(comment.authorName) ?? "ltr";
 
+/** The avatar (2.5rem) and its gap (0.75rem): the body text hangs under the name by this much on larger screens. */
+const HANG = "sm:ps-[3.25rem]";
+
 /** One comment or reply. Plain text only: newlines are kept, nothing is ever turned into markup or a link. */
 function CommentBody({ text }: { text: string }) {
     return (
-        <p dir={textDirection(text) ?? "ltr"} className="text-[1.0625rem] leading-7 break-words whitespace-pre-line text-foreground/90 [&[dir=rtl]]:leading-8">
+        <p dir={textDirection(text) ?? "ltr"} className="text-base leading-7 break-words whitespace-pre-line text-foreground/90 sm:text-[1.0625rem] [&[dir=rtl]]:leading-8">
             {text}
         </p>
     );
@@ -25,22 +28,22 @@ function CommentHeader({ comment, official }: { comment: PublicComment; official
             <span
                 aria-hidden
                 className={cn(
-                    "grid size-9 shrink-0 place-items-center rounded-full font-display text-base font-bold",
+                    "grid size-10 shrink-0 place-items-center rounded-full font-display text-lg font-bold",
                     official ? "bg-brand-soft ring-1 ring-brand/20" : "bg-muted text-foreground"
                 )}
             >
                 {official ? <LogoIcon className="h-[15px] w-[19px] fill-brand stroke-brand" /> : initialOf(comment.authorName)}
             </span>
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span dir="auto" className="truncate font-semibold text-foreground">
-                    {comment.authorName}
-                </span>
-                {official && (
-                    <span className="rounded-full bg-brand px-2 py-0.5 text-[0.7rem] leading-4 font-semibold tracking-wide text-primary-foreground uppercase">
-                        Admin
+            <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                    <span dir="auto" className="min-w-0 truncate font-semibold text-foreground">
+                        {comment.authorName}
                     </span>
-                )}
-                <time dateTime={comment.createdAt} className="text-sm text-muted-foreground">
+                    {official && (
+                        <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-xs leading-4 font-semibold text-brand-foreground">Admin</span>
+                    )}
+                </div>
+                <time dateTime={comment.createdAt} className="block text-[0.8125rem] text-muted-foreground">
                     {formatPublicDate(comment.createdAt)}
                 </time>
             </div>
@@ -51,18 +54,18 @@ function CommentHeader({ comment, official }: { comment: PublicComment; official
 /** The approved comments of a post: each comment, with the site's replies nested one level under it. */
 export function CommentThread({ comments }: { comments: PublicComment[] }) {
     return (
-        <ol className="divide-y divide-border">
+        <ol className="space-y-4">
             {comments.map((comment) => (
-                <li key={comment.id} id={`comment-${comment.id}`} dir={directionOf(comment)} className="scroll-mt-24 py-6 first:pt-0 last:pb-0">
+                <li key={comment.id} id={`comment-${comment.id}`} dir={directionOf(comment)} className="scroll-mt-24 rounded-2xl border border-border bg-card p-5 sm:p-6">
                     <article className="space-y-3">
                         <CommentHeader comment={comment} />
-                        <div className="sm:ps-12">
+                        <div className={HANG}>
                             <CommentBody text={comment.body} />
                         </div>
                     </article>
 
                     {comment.replies.length > 0 && (
-                        <ol className="mt-4 space-y-3 sm:ms-12">
+                        <ol className="mt-5 space-y-3 sm:ms-[3.25rem]">
                             {comment.replies.map((reply) => (
                                 <li
                                     key={reply.id}

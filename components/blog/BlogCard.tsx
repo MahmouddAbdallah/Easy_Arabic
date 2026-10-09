@@ -66,7 +66,7 @@ export function BlogCard({ blog, featured = false, priority = false, basePath = 
 
                 <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-1 pt-2 text-xs text-muted-foreground">
                     {blog.publishedAt && <time dateTime={blog.publishedAt}>{formatPublicDate(blog.publishedAt)}</time>}
-                    <span>{formatReadingTime(blog.readingTime)}</span>
+                    <span dir="ltr">{formatReadingTime(blog.readingTime)}</span>
                 </div>
             </div>
         </article>

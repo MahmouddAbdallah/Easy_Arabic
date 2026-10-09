@@ -32,7 +32,7 @@ empty draft to a published page, how comments are moderated, and why things work
 | **Public pages** | `/blog` (list, filters, pagination) and `/blog/<slug>` (one article) |
 | **Admin pages** | `/dashboard/blog` (posts and editor) and `/dashboard/blog/comments` (moderation) |
 | **Storage** | Firestore (`blogs`, `blogSlugs`, `blogComments`). Media in Cloudinary. |
-| **Rendering** | Server components, rendered on every request. The only client script on a public article is the code blocks' "Copy" button and the comment form. |
+| **Rendering** | Server components, rendered on every request. The only client scripts on a public article are the code blocks' "Copy" button, the comment form, and the small script that highlights the current section in the table-of-contents rail. |
 | **Languages** | Arabic and English, including mixed. Direction is detected per block, slugs may be Arabic. |
 | **Auth** | Reuses the project's own admin authorization. No separate login. |
 | **Mount point** | One constant, `BLOG_BASE_PATH` in `lib/constants.ts`. |
@@ -74,7 +74,8 @@ components/blog/
   BlogIndex.tsx          the public list page (filters, pagination)
   BlogCard.tsx           a post card
   BlogMeta.tsx           author, date, reading time
-  BlogToc.tsx            "On this page"
+  BlogToc.tsx            "On this page" (a collapsible card in the text on small screens, the rail on large ones)
+  BlogTocSidebar.tsx     the sticky rail itself (client component: it only adds the current-section highlight)
   BlogJsonLd.tsx         schema.org BlogPosting data
   BlogPagination.tsx
 
@@ -209,19 +210,35 @@ page instead of an empty one.
 
 `Blog.tsx` loads the published post and renders `BlogArticle`:
 
-- **Header:** back link, category, title, intro, author/date/reading time, and a short gold rule.
+- **Header:** back link and category, title, intro, and the byline (author on one side, date and
+  reading time on the other) between two hairlines, with a short gold segment on the top one.
 - **Cover image:** keeps its own proportions (clamped between 3:2 and 2.2:1 so it can never take over
   the screen or be badly cropped).
-- **Table of contents** for posts with three or more headings.
-- **Body**, then tags, then the comments section, then related posts.
+- **Table of contents** for posts with three or more headings. On large screens (`lg`, 1024px and up)
+  it is a sticky rail beside the text that follows the reader and marks the section being read. Below
+  that it is a collapsible "On this page" card above the text. The dashboard preview always uses the
+  card: it is narrow, and "sticky" cannot work inside its clipped box.
+- **Body**, then tags, then the comments section (in the same column as the text, so the rail stops
+  following the reader once the article ends), then related posts on a tinted band.
 - **Metadata and structured data** for search engines (`metadata.ts`, `BlogJsonLd.tsx`), using
   `APP_URL` for absolute links.
 
 ### Reading experience
 
-The article is one focused reading column (about 70 characters per line) with a clear hierarchy:
-title, then a lighter intro, then body. Rules that matter:
+The article is one focused reading column (42rem, about 65-70 characters per line) with a clear
+hierarchy: title, then a lighter intro, then body. On large screens a post with a table of contents
+gets a 14rem rail beside the column (42rem + 4rem gap + 14rem = 60rem). The header, cover and body are
+built on the same two widths (`COLUMN` and `WIDE` in `BlogArticle.tsx`), so their edges line up. Rules
+that matter:
 
+- **Direction.** The whole article takes the direction of its title: an Arabic post mirrors (byline,
+  tags, back link, and the rail moves to the left) while every block of the body still sets its own
+  direction. Everything layout-related uses logical properties (`ms-`, `ps-`, `border-s`, `inset-s-`),
+  never `left`/`right`. Two things are deliberately kept left-to-right because they are English: the
+  comments section's own words (an English sentence ending in a full stop shows the stop on the wrong
+  side in a right-to-left box; each comment and the form fields still pick their own direction), and
+  digit-first strings such as "7 min read" (wrapped in `<bdi dir="ltr">`, otherwise they read "min read
+  7"). Arabic headings get no letter-spacing, because negative tracking pulls joined letters apart.
 - **Typography** is defined once in `content/blog-prose.css` and shared with the editor, so the
   author sees the same thing visitors do.
 - **Arabic gets more line spacing** than Latin (about 1.95 vs 1.75 for body text). The rules key off
@@ -464,6 +481,21 @@ that route must also be rendered per request.
 ---
 
 ## Change history
+
+### Article page redesign (reading layout, rail, comments)
+
+Presentation only: no change to data, APIs, validation or comment behavior. The article page had been
+laid out at the full 1280px width, which put body text at 120+ characters per line; it is back to a
+42rem reading column. New: a sticky "On this page" rail with a current-section highlight on large
+screens (`BlogTocSidebar.tsx`, a small client component with no dependencies; the inline collapsible
+card is kept for small screens and the dashboard preview), a byline between hairlines with the gold
+accent, tags as a labelled row of touch-sized chips, a "Keep reading" band with a "View all posts" link,
+comments as cards (one per thread, admin replies nested), and a comment form with placeholders on every
+field, 44px inputs and a brand-coloured submit button. Arabic posts now mirror as a whole (see Reading
+experience). `blog-prose.css` changed in four small ways (softer body colour with full-strength
+headings, no letter-spacing on Arabic headings, a little more space above `h2`); the dashboard editor
+shares that file, so it picks the same changes up. `BlogCard` gained one attribute (`dir="ltr"` on the
+reading time) so related cards under an Arabic post read correctly.
 
 ### Reading experience and comment moderation
 
