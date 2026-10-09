@@ -5,7 +5,8 @@ import { MessageRequestSchema, type MessageRequest } from "@/components/chat/lib
 import { getAttachmentResourceType } from "@/components/chat/lib/attachments";
 import { getMessagePreview } from "@/components/chat/lib/constants";
 import { getChatId } from "@/components/chat/lib/chatId";
-import { deleteMessage, editMessage, markChatRead, reactToMessage, } from "@/components/chat/lib/messageOperations.server";
+import { assertNotBlocked, deleteMessage, editMessage, markChatRead, reactToMessage, } from "@/components/chat/lib/messageOperations.server";
+import { getUserTime, laterOf } from "@/components/chat/lib/chatState";
 import { destroyUploadedAssets, resolveAttachments } from "@/components/chat/lib/attachments.server";
 import { errorResponse, handleRouteError, parseBody, requireUser } from "@/components/chat/lib/http.server";
 import type { MessageAttachment } from "@/components/chat/types";
@@ -29,21 +30,10 @@ async function sendMessage(
     attachments: MessageAttachment[]
 ) {
     const chatId = getChatId(senderId, receiverId);
-    const now = new Date().toISOString();
+    const sentAt = new Date().toISOString();
 
     const chatRef = firebaseAdminDB.collection("chats").doc(chatId);
     const messagesRef = chatRef.collection("messages").doc();
-
-    const newMessage = {
-        id: messagesRef.id,
-        senderId,
-        receiverId,
-        text,
-        time: now,
-        status: "sent",
-        ...(attachments.length > 0 && { attachments }),
-        createdAt: FieldValue.serverTimestamp(),
-    };
 
     const displayLastMessage = getMessagePreview(text, attachments);
     const participants = [senderId, receiverId];
@@ -53,7 +43,27 @@ async function sendMessage(
         const chatSnap = await tx.get(chatRef);
         const receiverTotal = await readUnreadTotal(tx, receiverId);
 
-        tx.set(messagesRef, newMessage);
+        // A block made a moment ago is seen here, in the same transaction that would store the message.
+        assertNotBlocked(chatSnap, senderId, receiverId);
+
+        // A message is never older than a "clear chat" of either person. `sentAt` was taken before this
+        // transaction started, so a clear that committed in between could otherwise hide a message that
+        // was sent after it. (Only ever moves the time forward by a millisecond, and only in that race.)
+        const clearedAt = chatSnap.exists
+            ? laterOf(getUserTime(chatSnap.get("clearedAt"), senderId), getUserTime(chatSnap.get("clearedAt"), receiverId))
+            : null;
+        const now = clearedAt && sentAt <= clearedAt ? new Date(Date.parse(clearedAt) + 1).toISOString() : sentAt;
+
+        tx.set(messagesRef, {
+            id: messagesRef.id,
+            senderId,
+            receiverId,
+            text,
+            time: now,
+            status: "sent",
+            ...(attachments.length > 0 && { attachments }),
+            createdAt: FieldValue.serverTimestamp(),
+        });
         // Both branches below add exactly one unread message for the receiver.
         writeUnreadTotal(tx, receiverTotal, 1);
 

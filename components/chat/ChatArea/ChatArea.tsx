@@ -63,7 +63,7 @@ export function ChatArea() {
     const [jumping, setJumping] = useState(false);
     // A search jump left the reader somewhere in the past (shows "jump to latest" and stops new messages pulling them away).
     const [awayFromLatest, setAwayFromLatest] = useState(false);
-    const { receiver, receiverId, chatId } = useChat();
+    const { receiver, receiverId, chatId, conversation } = useChat();
     const { user } = useAppContext();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -79,7 +79,13 @@ export function ChatArea() {
     // Who "Call back" rings. `receiver` lags behind `receiverId` while a different chat is loading.
     const peer = receiverId && receiver?.id === receiverId ? { id: receiverId, name: receiver.name ?? "User" } : null;
     // The latest page of the conversation, kept live; older pages are added with `loadMore`.
-    const { messages, loading, hasMore, loadingMore, loadMore, loadUntil } = useChatMessages(chatId, currentUserId);
+    // Nothing is read before the chat document says where this user's history starts ("Clear chat" moves it).
+    const { messages, loading, hasMore, loadingMore, loadMore, loadUntil } = useChatMessages(chatId, currentUserId, {
+        enabled: conversation.ready,
+        clearedAt: conversation.clearedAt,
+    });
+    // When the newest message on screen was sent: "Clear chat" / "Delete chat" stop exactly there.
+    const newestMessageAt = messages[messages.length - 1]?.sentAt?.toISOString() ?? null;
     const search = useChatSearch({ chatId, receiverId, enabled: searchOpen });
     const { select: selectResult, step: stepResult } = search;
     // The current day, so "Today" turns into "Yesterday" by itself if the chat stays open past midnight.
@@ -263,6 +269,8 @@ export function ChatArea() {
                     searchOpen={searchOpen}
                     onToggleSearch={searchOpen ? closeSearch : openSearch}
                     searchButtonRef={searchButtonRef}
+                    canClear={messages.length > 0}
+                    newestMessageAt={newestMessageAt}
                 />
 
                 <div className="relative flex min-h-0 flex-1 flex-col">
@@ -276,7 +284,11 @@ export function ChatArea() {
                             ) : messages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 text-center text-xs text-muted-foreground/80">
                                     <p className="font-medium">No messages yet.</p>
-                                    <p className="text-[11px] opacity-70">Send a message to start the conversation!</p>
+                                    <p className="text-[11px] opacity-70">
+                                        {conversation.blocked
+                                            ? "Messages and calls are unavailable in this conversation."
+                                            : "Send a message to start the conversation!"}
+                                    </p>
                                 </div>
                             ) : (
                                 <>

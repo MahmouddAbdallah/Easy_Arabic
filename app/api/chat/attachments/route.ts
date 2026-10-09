@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { consume, rateLimitKey } from "@/lib/auth/rateLimit";
 import { getChatId } from "@/components/chat/lib/chatId";
 import { createUploadTickets, destroyUploadedAssets, isUploadOf } from "@/components/chat/lib/attachments.server";
+import { assertCanContact } from "@/components/chat/lib/messageOperations.server";
 import { DeleteUploadRequestSchema, SignUploadsRequestSchema } from "@/components/chat/lib/schemas";
 import { errorResponse, handleRouteError, parseBody, requireUser } from "@/components/chat/lib/http.server";
 
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
         if (parsed.response) return parsed.response;
 
         const { receiverId, files } = parsed.data;
+        // Upload rights into a conversation nobody can send to would only leave orphaned files behind.
+        await assertCanContact(user.id, receiverId);
         const results = createUploadTickets(user.id, getChatId(user.id, receiverId), files);
 
         return NextResponse.json({ success: true, results });

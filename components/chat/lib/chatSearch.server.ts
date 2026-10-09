@@ -20,6 +20,7 @@
 import { FieldPath, type DocumentData, type Query } from "firebase-admin/firestore";
 import { firebaseAdminDB } from "@/lib/config/firebase-admin";
 import { getMessageAttachments } from "./attachments";
+import { getUserTime } from "./chatState";
 import {
     CHAT_SEARCH_PAGE_SIZE,
     buildSnippet,
@@ -157,8 +158,13 @@ export async function searchChatMessages({ userId, chatId, query, cursor }: Sear
         throw new ChatApiError("NOT_A_PARTICIPANT", "You are not a participant in this chat.", 403);
     }
 
-    const newestFirst: Query = chatRef
-        .collection("messages")
+    // Messages the user cleared from their own chat are not theirs to find any more (the other person's copy is untouched).
+    const clearedAt = getUserTime(chatSnap.get("clearedAt"), userId);
+    const visible: Query = clearedAt
+        ? chatRef.collection("messages").where("time", ">", clearedAt)
+        : chatRef.collection("messages");
+
+    const newestFirst: Query = visible
         .orderBy("time", "desc")
         // Same direction as `time`, so no extra index is needed: it only makes the order total (and the cursor exact).
         .orderBy(FieldPath.documentId(), "desc")

@@ -8,6 +8,8 @@
 import { FieldPath, FieldValue, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { firebaseAdminDB } from "@/lib/config/firebase-admin";
 import { getMessageAttachments, hasAttachments } from "./attachments";
+import { getBlockStatus, getUserTime, isHiddenByClear } from "./chatState";
+import { getChatId } from "./chatId";
 import { DELETED_MESSAGE_PREVIEW, getMessagePreview } from "./constants";
 import type { ReactionKey } from "./reactions";
 import { getUnreadCount } from "./unread";
@@ -27,7 +29,7 @@ export class ChatApiError extends Error {
 }
 
 /** The chat must exist and the actor must be one of its participants. Returns the participants. */
-function assertParticipant(chatSnap: DocumentSnapshot, actorId: string): string[] {
+export function assertParticipant(chatSnap: DocumentSnapshot, actorId: string): string[] {
     if (!chatSnap.exists) {
         throw new ChatApiError("CHAT_NOT_FOUND", "Chat not found.", 404);
     }
@@ -38,6 +40,39 @@ function assertParticipant(chatSnap: DocumentSnapshot, actorId: string): string[
     }
 
     return participants as string[];
+}
+
+/**
+ * Nobody can message, react to or call somebody they blocked, or who blocked them. Reads the chat the
+ * caller already loaded, so it can run INSIDE the transaction that would write: a block made a moment
+ * earlier is seen, and the write never happens.
+ *
+ * The two refusals have different words on purpose: whoever blocked is told what to do about it, while
+ * the other person only learns that the conversation is unavailable.
+ */
+export function assertNotBlocked(chatSnap: DocumentSnapshot, actorId: string, otherId: string) {
+    if (!chatSnap.exists) return;
+
+    const { byMe, byOther } = getBlockStatus(chatSnap.get("blocks"), actorId, otherId);
+    if (byMe) {
+        throw new ChatApiError("YOU_BLOCKED_USER", "You blocked this person. Unblock them to continue.", 403);
+    }
+    if (byOther) {
+        throw new ChatApiError("CHAT_BLOCKED", "You can't contact this person right now.", 403);
+    }
+}
+
+const USER_ID = /^[A-Za-z0-9_-]{1,200}$/;
+
+/**
+ * The same check for code that has no transaction of its own (signing an upload): one read, then the same
+ * refusal. It is an early exit, not a guarantee; the write that really matters repeats it in its transaction.
+ */
+export async function assertCanContact(actorId: string, otherId: string) {
+    if (!USER_ID.test(otherId)) throw new ChatApiError("INVALID_RECEIVER", "This person doesn't exist.", 400);
+
+    const chatSnap = await firebaseAdminDB.collection("chats").doc(getChatId(actorId, otherId)).get();
+    assertNotBlocked(chatSnap, actorId, otherId);
 }
 
 /**
@@ -177,14 +212,25 @@ export async function reactToMessage({
             throw new ChatApiError("MESSAGE_DELETED", "This message was deleted.", 409);
         }
 
+        // Taking a reaction back is always fine; putting one on is contacting the other person.
+        if (reaction !== null) {
+            const otherId = participants.find((id) => id !== actorId);
+            if (otherId) assertNotBlocked(chatSnap, actorId, otherId);
+        }
+
         const current = message.reactions?.[actorId] ?? null;
         if (current === reaction) return;
 
         // A reaction to someone else's message is news for them: it counts as one unread event
         // for the message's author. Reacting to your own message doesn't, and taking a reaction
-        // back never lowers anyone's count.
+        // back never lowers anyone's count. Neither does a reaction to a message the author has
+        // cleared from their own chat: they can't see it, so there is nothing to be told about.
+        const hiddenForAuthor = isHiddenByClear(message.time, getUserTime(chatSnap.get("clearedAt"), message.senderId));
         const notifiesAuthor =
-            reaction !== null && message.senderId !== actorId && participants.includes(message.senderId);
+            reaction !== null &&
+            message.senderId !== actorId &&
+            participants.includes(message.senderId) &&
+            !hiddenForAuthor;
 
         // Reads must happen before writes inside a transaction.
         const authorTotal = notifiesAuthor ? await readUnreadTotal(tx, message.senderId) : null;

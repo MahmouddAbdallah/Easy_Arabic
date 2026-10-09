@@ -56,7 +56,8 @@ import {
     type NewCallInput,
 } from "./callMachine";
 import { getChatId } from "./chatId";
-import { ChatApiError } from "./messageOperations.server";
+import { isPlaceholderChat } from "./chatState";
+import { ChatApiError, assertNotBlocked } from "./messageOperations.server";
 import { newUnreadCounts, unreadIncrementUpdates, updateChat, type ChatUpdate } from "./unread.server";
 import { readUnreadTotal, writeUnreadTotal, type UnreadTotal } from "./unreadTotal.server";
 
@@ -311,7 +312,9 @@ async function loadCallee(userId: string) {
  */
 async function assertMayCall(caller: userType, callee: { id: string; role: string }, chatId: string) {
     if (caller.role === "admin") return;
-    if ((await chatRefOf(chatId).get()).exists) return;
+    // "They have talked before". A document that only holds a block is not a conversation.
+    const chat = await chatRefOf(chatId).get();
+    if (chat.exists && !isPlaceholderChat(chat.data())) return;
 
     const link =
         caller.role === "teacher"
@@ -392,6 +395,9 @@ export async function startCall({
         // Reads must happen before writes inside a transaction.
         const chat = await tx.get(chatRefOf(chatId));
         const [callerPointer, calleePointer] = await tx.getAll(presenceRef(caller.id), presenceRef(callee.id));
+
+        // A block made a moment ago is seen here, in the same transaction that would ring the phone.
+        assertNotBlocked(chat, caller.id, callee.id);
 
         if (await liveCallOf(tx, callerPointer)) {
             throw new ChatApiError("ALREADY_IN_CALL", "You're already in a call.", 409);

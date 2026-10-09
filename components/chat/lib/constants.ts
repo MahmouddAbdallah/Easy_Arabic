@@ -12,6 +12,9 @@ export const MESSAGES_PAGE_SIZE = 15;
  */
 export const COMPOSER_TOAST_POSITION = "top-center" as const;
 
+/** Block, unblock, clear and delete a conversation (POST). */
+export const CONVERSATIONS_API_URL = "/api/chat/conversations";
+
 /** Upload tickets (POST) and clean-up of unsent uploads (DELETE). */
 export const ATTACHMENTS_API_URL = "/api/chat/attachments";
 

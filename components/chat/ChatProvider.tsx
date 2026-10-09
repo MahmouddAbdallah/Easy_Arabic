@@ -1,8 +1,8 @@
 'use client';
 import { userType } from '@/types/userTypes';
 import axios from 'axios';
-import { useSearchParams } from 'next/navigation';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useAppContext } from '@/components/AppContext';
 import { ChatSidebar } from './Sidebar/ChatSidebar';
@@ -10,6 +10,9 @@ import { ChatArea } from './ChatArea/ChatArea';
 import { CallProvider } from './CallProvider';
 import NoChatSelected from './ChatArea/NoChatSelected';
 import { getChatId } from './lib/chatId';
+import { laterOf } from './lib/chatState';
+import { useConversationState, type ConversationStateHandle } from './hooks/useConversationState';
+import { useConversationActions, type ConversationActions } from './hooks/useConversationActions';
 
 
 interface ChatContextType {
@@ -17,6 +20,12 @@ interface ChatContextType {
     receiver: Partial<userType>
     /** chats/{chatId} between the current user and the receiver; null until both are known. */
     chatId: string | null;
+    /** The current user's side of the open chat: who blocked whom, and where their history starts. */
+    conversation: ConversationStateHandle;
+    /** Block / unblock / clear / delete for the open chat (one at a time). */
+    conversationActions: ConversationActions;
+    /** Chats this browser just deleted that Firestore hasn't reported yet: chatId -> deletedAt. The sidebar hides them at once. */
+    locallyDeleted: Readonly<Record<string, string>>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -28,6 +37,25 @@ export const ChatProvider: React.FC = () => {
     const { user } = useAppContext();
     const chatId = user?.id && receiverId ? getChatId(user.id, receiverId) : null;
     const [receiver, setReceiver] = useState<Partial<userType>>({})
+    const router = useRouter();
+    const pathname = usePathname();
+    const [locallyDeleted, setLocallyDeleted] = useState<Readonly<Record<string, string>>>({});
+
+    const conversation = useConversationState(chatId, user?.id, receiverId);
+    const markChatDeleted = useCallback((deletedChatId: string, deletedAt: string) => {
+        setLocallyDeleted((current) => ({ ...current, [deletedChatId]: laterOf(current[deletedChatId], deletedAt) ?? deletedAt }));
+    }, []);
+    // `receiver` still holds the previous person for a moment after switching chats: only name who is on screen.
+    const receiverName = receiverId && receiver?.id === receiverId ? receiver.name : undefined;
+    const conversationActions = useConversationActions({
+        chatId,
+        receiverId,
+        receiverName,
+        conversation,
+        onDeleted: markChatDeleted,
+        // The chat is gone from the list: back to "no chat selected" (and to the list on a phone).
+        onLeave: () => router.replace(pathname),
+    });
 
     useEffect(() => {
         if (!receiverId) return;
@@ -47,7 +75,10 @@ export const ChatProvider: React.FC = () => {
             value={{
                 receiverId,
                 receiver,
-                chatId
+                chatId,
+                conversation,
+                conversationActions,
+                locallyDeleted
             }}
         >
             <CallProvider>
