@@ -128,7 +128,12 @@ export async function PATCH(req: NextRequest) {
                 await sendMessage(actorId, request, attachments);
                 // Reached only once the message is stored: a block, a bad attachment or a failed
                 // transaction threw above. After the response, so the sender doesn't wait for it.
-                after(() => notifyNewMessage(actorId, user.name, request.receiverId));
+                after(() => notifyNewMessage(
+                    actorId,
+                    user.name,
+                    request.receiverId,
+                    request.text,
+                ));
                 break;
             }
             case "edit":

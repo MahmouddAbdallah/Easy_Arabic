@@ -19,7 +19,7 @@ import { sendNotification } from "@/components/notification/lib/sendNotification
 import { db } from "@/prisma/db";
 
 /** Tells `receiverId` that `senderId` (named `senderName`) just sent them a message. Nobody else hears about it. */
-export async function notifyNewMessage(senderId: string, senderName: string, receiverId: string): Promise<void> {
+export async function notifyNewMessage(senderId: string, senderName: string, receiverId: string, message: string): Promise<void> {
     // Nobody is notified about a message they wrote to themselves.
     if (senderId === receiverId) return;
 
@@ -44,6 +44,9 @@ export async function notifyNewMessage(senderId: string, senderName: string, rec
             type: "chat_message",
             title: senderName.slice(0, 100) || "Easy Arabic",
             body: "Sent you a message",
+            data: {
+                message
+            },
             link: `/chat?receiverId=${from}`,
             tag: `chat:${senderId}`,
         });

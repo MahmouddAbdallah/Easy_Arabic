@@ -90,6 +90,9 @@ export function NotificationToast({ payload, visible, onOpen, onDismiss }: Notif
                         <span dir="auto" className="line-clamp-2 block text-sm font-medium leading-relaxed text-muted-foreground/90">
                             {payload.body}
                         </span>
+                        <span>
+                            {payload?.data?.message}
+                        </span>
                     </span>
                 </button>
 
