@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { format, isSameDay } from 'date-fns'
-import { CalendarCheck, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Hourglass, Inbox } from 'lucide-react'
+import { CalendarCheck, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Hourglass, Inbox, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -30,6 +30,12 @@ interface PlannerViewProps {
     role: PlannerRole
     /** Admin only: whose planner to show (the dashboard pages). */
     subject?: PlannerSubject
+    /**
+     * Fit the height its parent gives it (md and up): a compact summary row, tabs and week controls on one line, and
+     * the calendar scrolling inside its own card. The parent must give it a height. Off by default, which keeps the
+     * original layout (the admin's dashboard pages); phones keep the original layout either way.
+     */
+    fillViewport?: boolean
 }
 
 type Tab = 'calendar' | 'requests'
@@ -48,12 +54,30 @@ const LEGEND = [
     { label: 'Request pending', swatch: 'border-gold/70 bg-card ring-2 ring-gold/70' },
 ]
 
+type Stat = { icon: LucideIcon; label: string; value: string; hint?: string; className?: string }
+
+/** The same facts as a StatTile in a third of the height, for the `fillViewport` layout. */
+const SummaryChip = ({ icon: Icon, label, value, hint, className }: Stat) => (
+    <div className={cn('flex min-w-0 items-center gap-3 rounded-xl bg-card px-3 py-2 ring-1 ring-foreground/10', className)}>
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">
+            <Icon className="size-4" aria-hidden />
+        </span>
+        <div className="min-w-0 leading-tight">
+            <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+            <p className="truncate text-sm font-bold tabular-nums text-foreground">
+                {value}
+                {hint && <span className="ms-1.5 text-xs font-normal text-muted-foreground">{hint}</span>}
+            </p>
+        </div>
+    </div>
+)
+
 /**
  * The planner for ONE person: a teacher's lessons with their families, a family's lessons with its teachers, or (for an
  * admin on the dashboard) whichever of those they opened. Everything is read through /api/planner, so what is on
  * screen is exactly what the server decided this person may see.
  */
-const PlannerView = ({ role, subject }: PlannerViewProps) => {
+const PlannerView = ({ role, subject, fillViewport = false }: PlannerViewProps) => {
     // Time-dependent state starts empty and is filled in after mount: the server's clock/zone must never decide
     // what "today" or "10:00" looks like in the browser.
     const [now, setNow] = useState<number | null>(null)
@@ -197,25 +221,91 @@ const PlannerView = ({ role, subject }: PlannerViewProps) => {
 
     const ready = now !== null && weekStart !== null
 
+    const stats: Stat[] = [
+        {
+            icon: CalendarCheck,
+            label: 'Next lesson',
+            value: ready ? (next ? format(parseInstant(next.startsAt)!, 'EEE, MMM d') : '—') : '…',
+            hint: ready ? (next ? `${format(parseInstant(next.startsAt)!, 'h:mm a')} · ${next[counterpart].name}` : 'Nothing scheduled ahead') : undefined,
+            className: 'col-span-2 md:col-span-1',
+        },
+        { icon: CalendarDays, label: 'This week', value: ready ? String(activeThisWeek) : '…', hint: activeThisWeek === 1 ? 'lesson' : 'lessons' },
+        {
+            icon: Hourglass,
+            label: 'Pending requests',
+            value: pendingCount === null ? '…' : String(pendingCount),
+            hint: role === 'family' ? 'Waiting for your teacher' : 'Waiting for an answer',
+        },
+    ]
+
+    const tabs = (
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className={cn(fillViewport && 'shrink-0')}>
+            <TabsList className="h-9">
+                <TabsTrigger value="calendar" className="gap-1.5 px-4 text-sm">
+                    <CalendarDays className="size-4" aria-hidden /> Calendar
+                </TabsTrigger>
+                <TabsTrigger value="requests" className="gap-1.5 px-4 text-sm">
+                    <Inbox className="size-4" aria-hidden /> Requests
+                    {pendingCount !== null && pendingCount > 0 && (
+                        <span className="rounded-full bg-gold/30 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-800 dark:text-amber-200">{pendingCount}</span>
+                    )}
+                </TabsTrigger>
+            </TabsList>
+        </Tabs>
+    )
+
+    const weekToolbar = (
+        <div className={cn('flex flex-wrap items-center justify-between gap-3', fillViewport && 'md:flex-1')}>
+            <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="icon" aria-label="Previous week" disabled={!ready} onClick={() => weekStart && setWeekStart(addLocalDays(weekStart, -7))}>
+                    <ChevronLeft className="size-4 rtl:rotate-180" aria-hidden />
+                </Button>
+                <Button variant="outline" size="icon" aria-label="Next week" disabled={!ready} onClick={() => weekStart && setWeekStart(addLocalDays(weekStart, 7))}>
+                    <ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
+                </Button>
+                <Button variant="outline" disabled={!ready || onThisWeek} onClick={() => goToWeek(new Date())}>
+                    Today
+                </Button>
+            </div>
+
+            <Popover>
+                <PopoverTrigger
+                    disabled={!ready}
+                    className="flex h-8 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50"
+                    aria-label={`Showing ${weekLabel}. Choose another date`}
+                >
+                    <CalendarDays className="size-4 text-brand" aria-hidden />
+                    {ready ? weekLabel : <Skeleton className="h-4 w-32" />}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto rounded-md border-border/80 p-0" align="end">
+                    <Calendar
+                        mode="single"
+                        selected={weekStart ?? undefined}
+                        defaultMonth={weekStart ?? undefined}
+                        onSelect={(picked) => picked && goToWeek(picked)}
+                        modifiers={{ hasLesson: lessonDays }}
+                        modifiersClassNames={{ hasLesson: 'font-bold underline decoration-brand decoration-2 underline-offset-4' }}
+                        className="p-3"
+                    />
+                    <p className="border-t border-border/60 px-3 py-2 text-[11px] text-muted-foreground">Underlined days have lessons.</p>
+                </PopoverContent>
+            </Popover>
+        </div>
+    )
+
+    const requestsPanel = <RequestsPanel role={role} subject={subject} refreshKey={refreshKey} onChanged={bump} initialFilter={requestFilter} />
+
     return (
-        <div className="space-y-6">
-            {/* Top: tiles + primary action */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="grid flex-1 grid-cols-2 gap-3 md:grid-cols-3">
-                    <StatTile
-                        icon={CalendarCheck}
-                        label="Next lesson"
-                        value={ready ? (next ? format(parseInstant(next.startsAt)!, 'EEE, MMM d') : '—') : '…'}
-                        hint={ready ? (next ? `${format(parseInstant(next.startsAt)!, 'h:mm a')} · ${next[counterpart].name}` : 'Nothing scheduled ahead') : undefined}
-                        className="col-span-2 md:col-span-1"
-                    />
-                    <StatTile icon={CalendarDays} label="This week" value={ready ? String(activeThisWeek) : '…'} hint={activeThisWeek === 1 ? 'lesson' : 'lessons'} />
-                    <StatTile
-                        icon={Hourglass}
-                        label="Pending requests"
-                        value={pendingCount === null ? '…' : String(pendingCount)}
-                        hint={role === 'family' ? 'Waiting for your teacher' : 'Waiting for an answer'}
-                    />
+        <div className={fillViewport ? 'flex flex-col gap-6 md:min-h-0 md:flex-1 md:gap-3' : 'space-y-6'}>
+            {/* Top: tiles + primary action. With `fillViewport`, md and up get the compact chips instead of the tall tiles. */}
+            <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between', fillViewport && 'md:shrink-0 md:items-center')}>
+                <div className={cn('grid flex-1 grid-cols-2 gap-3 md:grid-cols-3', fillViewport && 'md:grid-cols-[1.5fr_1fr_1.1fr]')}>
+                    {stats.map((stat) => (
+                        <Fragment key={stat.label}>
+                            <StatTile {...stat} className={cn(stat.className, fillViewport && 'md:hidden')} />
+                            {fillViewport && <SummaryChip {...stat} className="max-md:hidden" />}
+                        </Fragment>
+                    ))}
                 </div>
                 {role === 'teacher' && (
                     <Button onClick={() => setScheduleOpen(true)} className="w-full sm:w-auto">
@@ -224,59 +314,20 @@ const PlannerView = ({ role, subject }: PlannerViewProps) => {
                 )}
             </div>
 
-            <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-                <TabsList className="h-9">
-                    <TabsTrigger value="calendar" className="gap-1.5 px-4 text-sm">
-                        <CalendarDays className="size-4" aria-hidden /> Calendar
-                    </TabsTrigger>
-                    <TabsTrigger value="requests" className="gap-1.5 px-4 text-sm">
-                        <Inbox className="size-4" aria-hidden /> Requests
-                        {pendingCount !== null && pendingCount > 0 && (
-                            <span className="rounded-full bg-gold/30 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-800 dark:text-amber-200">{pendingCount}</span>
-                        )}
-                    </TabsTrigger>
-                </TabsList>
-            </Tabs>
+            {/* With `fillViewport` the tabs and the week controls share one row. */}
+            {fillViewport ? (
+                <div className={cn('flex flex-col gap-6 md:shrink-0 md:flex-row md:items-center md:gap-3', tab === 'calendar' && 'max-md:-mb-2')}>
+                    {tabs}
+                    {tab === 'calendar' && weekToolbar}
+                </div>
+            ) : (
+                tabs
+            )}
 
             {tab === 'calendar' ? (
-                <section aria-label="Weekly calendar" className="space-y-4">
+                <section aria-label="Weekly calendar" className={fillViewport ? 'flex flex-col gap-4 md:min-h-0 md:flex-1 md:gap-2' : 'space-y-4'}>
                     {/* Week toolbar */}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5">
-                            <Button variant="outline" size="icon" aria-label="Previous week" disabled={!ready} onClick={() => weekStart && setWeekStart(addLocalDays(weekStart, -7))}>
-                                <ChevronLeft className="size-4 rtl:rotate-180" aria-hidden />
-                            </Button>
-                            <Button variant="outline" size="icon" aria-label="Next week" disabled={!ready} onClick={() => weekStart && setWeekStart(addLocalDays(weekStart, 7))}>
-                                <ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
-                            </Button>
-                            <Button variant="outline" disabled={!ready || onThisWeek} onClick={() => goToWeek(new Date())}>
-                                Today
-                            </Button>
-                        </div>
-
-                        <Popover>
-                            <PopoverTrigger
-                                disabled={!ready}
-                                className="flex h-8 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50"
-                                aria-label={`Showing ${weekLabel}. Choose another date`}
-                            >
-                                <CalendarDays className="size-4 text-brand" aria-hidden />
-                                {ready ? weekLabel : <Skeleton className="h-4 w-32" />}
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto rounded-md border-border/80 p-0" align="end">
-                                <Calendar
-                                    mode="single"
-                                    selected={weekStart ?? undefined}
-                                    defaultMonth={weekStart ?? undefined}
-                                    onSelect={(picked) => picked && goToWeek(picked)}
-                                    modifiers={{ hasLesson: lessonDays }}
-                                    modifiersClassNames={{ hasLesson: 'font-bold underline decoration-brand decoration-2 underline-offset-4' }}
-                                    className="p-3"
-                                />
-                                <p className="border-t border-border/60 px-3 py-2 text-[11px] text-muted-foreground">Underlined days have lessons.</p>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+                    {!fillViewport && weekToolbar}
 
                     {error ? (
                         <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
@@ -286,17 +337,17 @@ const PlannerView = ({ role, subject }: PlannerViewProps) => {
                             </Button>
                         </div>
                     ) : !ready || (loading && !loaded) ? (
-                        <Skeleton className="h-130 w-full rounded-xl" aria-label="Loading your calendar" />
+                        <Skeleton className={cn('h-130 w-full rounded-xl', fillViewport && 'md:h-auto md:min-h-0 md:flex-1')} aria-label="Loading your calendar" />
                     ) : (
-                        <div className={cn('transition-opacity', loading && 'opacity-70')} aria-busy={loading}>
-                            <div className="hidden md:block">
-                                <WeekGrid days={days} lessons={weekLessons} counterpart={counterpart} now={now!} selectedId={selectedId} onSelect={(l) => setSelectedId(l.id)} />
+                        <div className={cn('transition-opacity', loading && 'opacity-70', fillViewport && 'md:flex md:min-h-0 md:flex-1 md:flex-col')} aria-busy={loading}>
+                            <div className={cn('hidden md:block', fillViewport && 'md:min-h-0 md:flex-1')}>
+                                <WeekGrid days={days} lessons={weekLessons} counterpart={counterpart} now={now!} selectedId={selectedId} onSelect={(l) => setSelectedId(l.id)} fill={fillViewport} />
                             </div>
                             <div className="md:hidden">
                                 <AgendaList days={days} lessons={weekLessons} counterpart={counterpart} now={now!} selectedId={selectedId} onSelect={(l) => setSelectedId(l.id)} />
                             </div>
                             {weekLessons.length === 0 && (
-                                <p className="mt-3 hidden text-center text-sm text-muted-foreground md:block">
+                                <p className={cn('mt-3 hidden text-center text-sm text-muted-foreground md:block', fillViewport && 'md:mt-2 md:shrink-0')}>
                                     No lessons this week.{' '}
                                     {role === 'teacher' ? 'Use “Schedule lessons” to add some.' : role === 'family' ? 'Your teacher adds lessons here.' : ''}
                                 </p>
@@ -304,7 +355,7 @@ const PlannerView = ({ role, subject }: PlannerViewProps) => {
                         </div>
                     )}
 
-                    <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground" aria-label="Legend">
+                    <ul className={cn('flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground', fillViewport && 'md:shrink-0')} aria-label="Legend">
                         {LEGEND.map(({ label, swatch }) => (
                             <li key={label} className="flex items-center gap-1.5">
                                 <span className={cn('size-3 rounded-sm border', swatch)} aria-hidden />
@@ -313,8 +364,11 @@ const PlannerView = ({ role, subject }: PlannerViewProps) => {
                         ))}
                     </ul>
                 </section>
+            ) : fillViewport ? (
+                // The planner card no longer grows with the page here, so a long list of requests scrolls on its own.
+                <div className="md:-m-1 md:min-h-0 md:flex-1 md:overflow-y-auto md:p-1">{requestsPanel}</div>
             ) : (
-                <RequestsPanel role={role} subject={subject} refreshKey={refreshKey} onChanged={bump} initialFilter={requestFilter} />
+                requestsPanel
             )}
 
             {now !== null && (

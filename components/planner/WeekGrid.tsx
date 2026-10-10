@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { format, isSameDay } from 'date-fns'
 import { Hourglass } from 'lucide-react'
 import { cn } from 'cn'
@@ -10,6 +10,10 @@ import { fmtDuration, fmtTime, fmtTimeRange } from './format'
 import { lessonTone } from './status'
 
 const HOUR_PX = 56
+// `fill` mode only: the hour height is fitted to the room available (so the day fits without scrolling when it can),
+// but never below what a one-hour lesson needs to show its student, time and teacher/family, nor absurdly tall.
+const MIN_HOUR_PX = 52
+const MAX_HOUR_PX = 96
 const GUTTER = 'w-14 shrink-0'
 const DEFAULT_FIRST_HOUR = 8
 const DEFAULT_LAST_HOUR = 22
@@ -24,6 +28,12 @@ interface WeekGridProps {
     now: number
     selectedId?: string | null
     onSelect: (lesson: PlannerLesson) => void
+    /**
+     * Fill the height its parent gives it instead of growing to the full day: a compact day header, an hour height
+     * fitted to the room, and the hours scrolling inside the card under a sticky header. The parent must give it a
+     * height. Off by default, which keeps the original look.
+     */
+    fill?: boolean
 }
 
 type Placed = { lesson: PlannerLesson; start: number; end: number }
@@ -42,12 +52,13 @@ const ariaFor = (lesson: PlannerLesson, counterpart: Counterpart, now: number) =
  * Lessons logged with the older form have a date but no time of day. They can't be placed on an hour, so they sit in a
  * "No time set" lane above the grid instead of pretending to start at midnight.
  */
-const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect }: WeekGridProps) => {
-    const { byDay, noTime, firstHour, lastHour } = useMemo(() => {
+const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect, fill = false }: WeekGridProps) => {
+    const { byDay, noTime, firstHour, lastHour, earliest } = useMemo(() => {
         const timed = new Map<number, Placed[]>()
         const noTime = new Map<number, PlannerLesson[]>()
         let minMinute = DEFAULT_FIRST_HOUR * 60
         let maxMinute = DEFAULT_LAST_HOUR * 60
+        let earliest: number | null = null // start (minutes into the day) of the week's first timed lesson
 
         days.forEach((_, i) => {
             timed.set(i, [])
@@ -68,78 +79,127 @@ const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect }: Wee
             const endMin = Math.min(24 * 60, startMin + lesson.duration) // a lesson never spills past midnight on screen
             minMinute = Math.min(minMinute, startMin)
             maxMinute = Math.max(maxMinute, endMin)
+            earliest = earliest === null ? startMin : Math.min(earliest, startMin)
             timed.get(dayIndex)!.push({ lesson, start: startMin, end: endMin })
         }
 
         const firstHour = Math.max(0, Math.floor(minMinute / 60))
         const lastHour = Math.min(24, Math.max(firstHour + 1, Math.ceil(maxMinute / 60)))
         const byDay = new Map([...timed].map(([i, placed]) => [i, layoutOverlapping(placed)]))
-        return { byDay, noTime, firstHour, lastHour }
+        return { byDay, noTime, firstHour, lastHour, earliest }
     }, [days, lessons])
 
+    // In `fill` mode the hours scroll inside the card, under a sticky header. Measure the room below that header.
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const headRef = useRef<HTMLDivElement>(null)
+    const [bodyHeight, setBodyHeight] = useState<number | null>(null)
+    useLayoutEffect(() => {
+        const scroller = scrollRef.current
+        if (!fill || !scroller) return
+        const head = headRef.current
+        const measure = () => setBodyHeight(Math.max(0, scroller.clientHeight - (head?.offsetHeight ?? 0)))
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(scroller)
+        if (head) observer.observe(head)
+        return () => observer.disconnect()
+    }, [fill])
+
     const hours = Array.from({ length: lastHour - firstHour }, (_, i) => firstHour + i)
-    const gridHeight = hours.length * HOUR_PX
+    const hourPx = fill && bodyHeight ? Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, Math.floor(bodyHeight / hours.length))) : HOUR_PX
+    const gridHeight = hours.length * hourPx
     const nowDate = new Date(now)
     const todayIndex = days.findIndex((day) => isSameDay(day, nowDate))
     const nowMinute = minutesIntoLocalDay(nowDate)
     const showNowLine = todayIndex !== -1 && nowMinute >= firstHour * 60 && nowMinute <= lastHour * 60
     const hasNoTimeLessons = [...noTime.values()].some((list) => list.length > 0)
 
-    return (
-        <div className="overflow-x-auto rounded-xl border border-border/60 bg-card shadow-xs">
-            <div className="min-w-[760px]">
-                {/* Day headers */}
-                <div className="flex border-b border-border/60 bg-muted/30">
-                    <div className={GUTTER} aria-hidden />
-                    {days.map((day, i) => {
-                        const today = i === todayIndex
-                        return (
-                            <div key={day.toISOString()} className="flex-1 border-s border-border/50 px-2 py-2.5 text-center">
-                                <p className={cn('text-[11px] font-semibold uppercase tracking-wide', today ? 'text-brand' : 'text-muted-foreground')}>
-                                    {format(day, 'EEE')}
-                                </p>
-                                <p
-                                    className={cn(
-                                        'mx-auto mt-0.5 flex size-7 items-center justify-center rounded-full text-sm font-semibold tabular-nums',
-                                        today ? 'bg-brand text-white' : 'text-foreground'
-                                    )}
-                                    aria-label={format(day, 'EEEE, MMMM d') + (today ? ' (today)' : '')}
-                                >
-                                    {format(day, 'd')}
-                                </p>
-                            </div>
-                        )
-                    })}
-                </div>
+    // When the day is taller than the card, open the week on the stretch of hours that shows the most lessons (the
+    // earliest such stretch) instead of always at 8 AM. Once per week (and when its first lesson changes), so a refresh
+    // after cancelling or rescheduling never yanks the scroll position.
+    const weekKey = `${days[0]?.getTime() ?? 0}:${earliest}`
+    const scrolledFor = useRef<string | null>(null)
+    useLayoutEffect(() => {
+        const scroller = scrollRef.current
+        if (!fill || !scroller || !bodyHeight || scrolledFor.current === weekKey) return
+        scrolledFor.current = weekKey
 
-                {/* Lessons with no time of day */}
-                {hasNoTimeLessons && (
-                    <div className="flex border-b border-border/60 bg-muted/10">
-                        <div className={cn(GUTTER, 'px-1.5 py-2 text-right text-[10px] font-medium leading-tight text-muted-foreground')}>No time set</div>
-                        {days.map((day, i) => (
-                            <div key={day.toISOString()} className="flex flex-1 flex-col gap-1 border-s border-border/50 p-1">
-                                {noTime.get(i)!.map((lesson) => {
-                                    const tone = lessonTone(lesson, now)
-                                    return (
-                                        <button
-                                            key={lesson.id}
-                                            type="button"
-                                            onClick={() => onSelect(lesson)}
-                                            aria-label={ariaFor(lesson, counterpart, now)}
-                                            className={cn(
-                                                'truncate rounded-md border px-1.5 py-1 text-start text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50',
-                                                tone.block,
-                                                selectedId === lesson.id && 'ring-2 ring-brand/60'
-                                            )}
-                                        >
-                                            {lesson.student}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        ))}
+        const spans = [...byDay.values()].flat()
+        const visibleMinutes = (bodyHeight / hourPx) * 60
+        let from = showNowLine ? nowMinute - visibleMinutes / 3 : firstHour * 60
+        let most = 0
+        for (const { start } of spans) {
+            const windowStart = start - 15
+            const shown = spans.filter((span) => span.start >= windowStart && span.end <= windowStart + visibleMinutes).length
+            if (shown > most || (shown === most && shown > 0 && windowStart < from)) {
+                most = shown
+                from = windowStart
+            }
+        }
+        scroller.scrollTop = Math.max(0, ((from - firstHour * 60) / 60) * hourPx)
+    }, [fill, bodyHeight, weekKey, byDay, firstHour, hourPx, nowMinute, showNowLine])
+
+    return (
+        <div ref={scrollRef} className={cn('rounded-xl border border-border/60 bg-card shadow-xs', fill ? 'h-full min-h-0 overflow-auto' : 'overflow-x-auto')}>
+            <div className="min-w-[760px]">
+                {/* Day headers + the "No time set" lane (they stay put while the hours scroll) */}
+                <div ref={headRef} className={cn(fill && 'sticky top-0 z-30 bg-card')}>
+                    <div className="flex border-b border-border/60 bg-muted/30">
+                        <div className={GUTTER} aria-hidden />
+                        {days.map((day, i) => {
+                            const today = i === todayIndex
+                            return (
+                                <div
+                                    key={day.toISOString()}
+                                    className={cn('flex-1 border-s border-border/50 text-center', fill ? 'flex items-center justify-center gap-1.5 px-1 py-1.5' : 'px-2 py-2.5')}
+                                >
+                                    <p className={cn('text-[11px] font-semibold uppercase tracking-wide', today ? 'text-brand' : 'text-muted-foreground')}>
+                                        {format(day, 'EEE')}
+                                    </p>
+                                    <p
+                                        className={cn(
+                                            'flex items-center justify-center rounded-full font-semibold tabular-nums',
+                                            fill ? 'size-6 text-[13px]' : 'mx-auto mt-0.5 size-7 text-sm',
+                                            today ? 'bg-brand text-white' : 'text-foreground'
+                                        )}
+                                        aria-label={format(day, 'EEEE, MMMM d') + (today ? ' (today)' : '')}
+                                    >
+                                        {format(day, 'd')}
+                                    </p>
+                                </div>
+                            )
+                        })}
                     </div>
-                )}
+
+                    {/* Lessons with no time of day */}
+                    {hasNoTimeLessons && (
+                        <div className="flex border-b border-border/60 bg-muted/10">
+                            <div className={cn(GUTTER, 'px-1.5 py-2 text-right text-[10px] font-medium leading-tight text-muted-foreground')}>No time set</div>
+                            {days.map((day, i) => (
+                                <div key={day.toISOString()} className="flex flex-1 flex-col gap-1 border-s border-border/50 p-1">
+                                    {noTime.get(i)!.map((lesson) => {
+                                        const tone = lessonTone(lesson, now)
+                                        return (
+                                            <button
+                                                key={lesson.id}
+                                                type="button"
+                                                onClick={() => onSelect(lesson)}
+                                                aria-label={ariaFor(lesson, counterpart, now)}
+                                                className={cn(
+                                                    'truncate rounded-md border px-1.5 py-1 text-start text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50',
+                                                    tone.block,
+                                                    selectedId === lesson.id && 'ring-2 ring-brand/60'
+                                                )}
+                                            >
+                                                {lesson.student}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 {/* Hour grid */}
                 <div className="flex">
@@ -148,7 +208,7 @@ const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect }: Wee
                             <span
                                 key={hour}
                                 className="absolute end-1.5 -translate-y-1/2 text-[10px] font-medium tabular-nums text-muted-foreground"
-                                style={{ top: i * HOUR_PX, display: i === 0 ? 'none' : undefined }}
+                                style={{ top: i * hourPx, display: i === 0 ? 'none' : undefined }}
                             >
                                 {format(new Date(2000, 0, 1, hour), 'h a')}
                             </span>
@@ -156,28 +216,38 @@ const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect }: Wee
                     </div>
 
                     {days.map((day, i) => (
-                        <div key={day.toISOString()} className="relative flex-1 border-s border-border/50" style={{ height: gridHeight }}>
+                        <div
+                            key={day.toISOString()}
+                            className={cn('relative flex-1 border-s border-border/50', fill && i === todayIndex && 'bg-brand-soft/40')}
+                            style={{ height: gridHeight }}
+                        >
                             {hours.map((hour, row) => (
-                                <div key={hour} className={cn('absolute inset-x-0 border-t', row === 0 ? 'border-transparent' : 'border-border/40')} style={{ top: row * HOUR_PX, height: HOUR_PX }} />
+                                <div key={hour} className={cn('absolute inset-x-0 border-t', row === 0 ? 'border-transparent' : 'border-border/40')} style={{ top: row * hourPx, height: hourPx }} />
                             ))}
 
                             {byDay.get(i)!.map(({ lesson, start, end, col, cols }) => {
                                 const tone = lessonTone(lesson, now)
-                                const top = ((start - firstHour * 60) / 60) * HOUR_PX
-                                const height = Math.max(((end - start) / 60) * HOUR_PX, 22)
-                                const compact = height < 44
+                                const top = ((start - firstHour * 60) / 60) * hourPx
+                                const height = Math.max(((end - start) / 60) * hourPx, 22)
+                                const name = label(lesson, counterpart)
+                                // How many 11px lines fit. Off `fill`, the original thresholds (a name is only shown from 70px up).
+                                const lines = fill ? (height < 36 ? 1 : height < 50 ? 2 : 3) : height < 44 ? 1 : height < 70 ? 2 : 3
+                                // Small blocks lead with the start time; from three lines the name leads and the time range gets its own line.
+                                const timeFirst = lines === 1 || (fill && lines === 2)
                                 return (
                                     <button
                                         key={lesson.id}
                                         type="button"
                                         onClick={() => onSelect(lesson)}
                                         aria-label={ariaFor(lesson, counterpart, now)}
-                                        title={`${lesson.student} · ${fmtTimeRange(lesson.startsAt, lesson.endsAt)} · ${fmtDuration(lesson.duration)}`}
+                                        title={`${lesson.student} · ${fmtTimeRange(lesson.startsAt, lesson.endsAt)} · ${fmtDuration(lesson.duration)}${fill ? ` · ${name}` : ''}`}
                                         className={cn(
                                             'absolute overflow-hidden rounded-md border px-1.5 text-start text-[11px] leading-tight transition-colors focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50',
-                                            compact ? 'py-0.5' : 'py-1',
+                                            (fill ? height < 54 : lines === 1) ? 'py-0.5' : 'py-1',
                                             tone.block,
-                                            tone.muted && tone.key !== 'cancelled' && 'opacity-90',
+                                            // `fill`: what is still ahead gets an accent edge, what is done steps back (but "Needs update" does not).
+                                            fill && (tone.key === 'upcoming' || tone.key === 'live') && 'border-s-[3px] border-s-brand',
+                                            tone.muted && tone.key !== 'cancelled' && (fill && tone.key !== 'awaiting' ? 'opacity-75' : 'opacity-90'),
                                             lesson.pendingRequest && 'ring-2 ring-gold/70',
                                             selectedId === lesson.id && 'z-10 ring-2 ring-brand'
                                         )}
@@ -190,15 +260,20 @@ const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect }: Wee
                                     >
                                         <span className="flex items-start justify-between gap-1">
                                             <span className="min-w-0 truncate font-semibold">
-                                                {compact ? `${fmtTime(lesson.startsAt)} · ${lesson.student}` : lesson.student}
+                                                {timeFirst ? `${fmtTime(lesson.startsAt)} · ${lesson.student}` : lesson.student}
+                                                {fill && lines === 1 && <span className="font-normal opacity-80"> · {name}</span>}
                                             </span>
                                             {lesson.pendingRequest && <Hourglass className="mt-0.5 size-3 shrink-0" aria-hidden />}
                                         </span>
-                                        {!compact && (
-                                            <>
-                                                <span className="block truncate opacity-90">{fmtTimeRange(lesson.startsAt, lesson.endsAt)}</span>
-                                                {height >= 70 && <span className="block truncate opacity-80">{label(lesson, counterpart)}</span>}
-                                            </>
+                                        {fill && lines === 2 ? (
+                                            <span className="block truncate opacity-90">{name}</span>
+                                        ) : (
+                                            lines >= 2 && (
+                                                <>
+                                                    <span className="block truncate opacity-90">{fmtTimeRange(lesson.startsAt, lesson.endsAt)}</span>
+                                                    {lines === 3 && <span className="block truncate opacity-80">{name}</span>}
+                                                </>
+                                            )
                                         )}
                                     </button>
                                 )
@@ -207,7 +282,7 @@ const WeekGrid = ({ days, lessons, counterpart, now, selectedId, onSelect }: Wee
                             {showNowLine && i === todayIndex && (
                                 <div
                                     className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
-                                    style={{ top: ((nowMinute - firstHour * 60) / 60) * HOUR_PX }}
+                                    style={{ top: ((nowMinute - firstHour * 60) / 60) * hourPx }}
                                     aria-hidden
                                 >
                                     <span className="-ms-1 size-2 rounded-full bg-rose-500" />

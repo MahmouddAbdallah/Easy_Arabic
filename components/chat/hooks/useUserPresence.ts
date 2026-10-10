@@ -10,9 +10,11 @@ export interface UserPresence {
     online: boolean;
     /** When the user last changed between online and offline (ms since epoch), if ever. */
     lastChanged: number | null;
+    /** The status can't be read (the database refused or dropped the listener): no answer is coming. */
+    failed: boolean;
 }
 
-const UNKNOWN: UserPresence = { known: false, online: false, lastChanged: null };
+const UNKNOWN: UserPresence = { known: false, online: false, lastChanged: null, failed: false };
 
 // Realtime Database keys can't contain . # $ [ ] or /; ids in this app never do, anything else isn't addressable.
 const SAFE_KEY = /^[A-Za-z0-9_-]+$/;
@@ -37,10 +39,14 @@ export function useUserPresence(userId: string | null | undefined, enabled = tru
                         known: true,
                         online: status?.state === "online",
                         lastChanged: typeof status?.last_changed === "number" ? status.last_changed : null,
+                        failed: false,
                     },
                 });
             },
-            (error) => console.error("Error listening to the presence of a user: ", error)
+            (error) => {
+                console.error("Error listening to the presence of a user: ", error);
+                setPresence({ userId, value: { ...UNKNOWN, failed: true } });
+            }
         );
     }, [userId, enabled]);
 

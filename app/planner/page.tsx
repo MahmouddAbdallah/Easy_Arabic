@@ -13,19 +13,19 @@ export default async function PlannerPage() {
     if (user.role === "admin") return redirect("/dashboard");
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-            <div className="pb-2 border-b border-border/60">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+        <>
+            <div className="border-b border-border/60 pb-2 md:flex md:shrink-0 md:items-baseline md:gap-3">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2 md:shrink-0">
                     <CalendarDays className="h-6 w-6 text-primary" aria-hidden />
                     <span>Planner</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 md:mt-0 md:min-w-0 md:truncate">
                     {user.role === "teacher"
                         ? "Schedule lessons for your families and answer their requests to cancel or move a lesson."
                         : "See your upcoming and past lessons. Need a change? Ask your teacher from here."}
                 </p>
             </div>
-            <PlannerView role={user.role === "teacher" ? "teacher" : "family"} />
-        </div>
+            <PlannerView role={user.role === "teacher" ? "teacher" : "family"} fillViewport />
+        </>
     );
 }

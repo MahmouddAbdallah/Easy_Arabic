@@ -83,7 +83,7 @@ const ReceiverInfo = ({
             <div className="relative shrink-0">
                 <Avatar className="h-12 w-12 rounded-full border border-border/40 shadow-sm transition-transform duration-300 group-hover:scale-105">
                     <AvatarImage
-                        src={receiver?.name || receiver?.name || ''}
+                        src={receiver?.imageUrl || ''}
                         alt={receiver?.name || 'User Avatar'}
                         className="object-cover"
                     />

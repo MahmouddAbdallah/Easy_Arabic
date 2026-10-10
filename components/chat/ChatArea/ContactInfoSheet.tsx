@@ -1,14 +1,12 @@
 "use client";
 
-import type { ComponentType, ReactNode } from "react";
-import toast from "react-hot-toast";
-import { format, isToday, isYesterday } from "date-fns";
+import type { ComponentType } from "react";
+import { format } from "date-fns";
 import {
     BadgeCheckIcon,
     BanIcon,
     BroomSparkles,
     CalendarDaysIcon,
-    CopyIcon,
     Loader2Icon,
     MailIcon,
     PhoneIcon,
@@ -28,62 +26,10 @@ import { cn } from "cn";
 import { useChat } from "../ChatProvider";
 import { useUserPresence } from "../hooks/useUserPresence";
 import type { CallMode } from "../lib/call";
+import { formatLastSeen } from "../lib/presence";
+import { getRoleLabel } from "../lib/roles";
+import { InfoRow } from "../shared/InfoRow";
 import type { ConfirmableAction } from "./ConversationActionDialog";
-
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", teacher: "Teacher", family: "Family" };
-
-/** "today at 3:45 PM", "yesterday at 9:02 AM", or "Oct 7, 2026". */
-function formatLastSeen(timestamp: number): string {
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return "";
-    if (isToday(date)) return `today at ${format(date, "p")}`;
-    if (isYesterday(date)) return `yesterday at ${format(date, "p")}`;
-    return format(date, "PP");
-}
-
-async function copyToClipboard(value: string, label: string) {
-    try {
-        await navigator.clipboard.writeText(value);
-        toast.success(`${label} copied.`, { id: "chat-contact-copy" });
-    } catch {
-        toast.error("Couldn't copy to the clipboard.", { id: "chat-contact-copy" });
-    }
-}
-
-interface InfoRowProps {
-    Icon: ComponentType<{ className?: string }>;
-    label: string;
-    children: ReactNode;
-    /** Makes the row copyable. */
-    copyValue?: string;
-}
-
-function InfoRow({ Icon, label, children, copyValue }: InfoRowProps) {
-    return (
-        <div className="flex items-center gap-3 px-1 py-2.5">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted/60 text-muted-foreground">
-                <Icon className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
-                <div className="truncate text-sm font-medium text-foreground select-text">{children}</div>
-            </div>
-            {copyValue && (
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Copy ${label.toLowerCase()}`}
-                    title={`Copy ${label.toLowerCase()}`}
-                    onClick={() => void copyToClipboard(copyValue, label)}
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    <CopyIcon />
-                </Button>
-            )}
-        </div>
-    );
-}
 
 interface QuickActionProps {
     Icon: ComponentType<{ className?: string }>;
@@ -143,17 +89,17 @@ export function ContactInfoSheet({
 
     const createdAt = person?.createdAt ? new Date(person.createdAt) : null;
     const memberSince = createdAt && !Number.isNaN(createdAt.getTime()) ? format(createdAt, "PP") : null;
-    const role = person?.role ? (ROLE_LABEL[person.role] ?? person.role) : null;
+    const role = getRoleLabel(person?.role);
 
     const presenceLabel = isTyping
         ? "Typing..."
         : presence.online
-          ? "Online"
-          : presence.known && presence.lastChanged
-            ? `Last seen ${formatLastSeen(presence.lastChanged)}`
-            : presence.known
-              ? "Offline"
-              : "";
+            ? "Online"
+            : presence.known && presence.lastChanged
+                ? `Last seen ${formatLastSeen(presence.lastChanged)}`
+                : presence.known
+                    ? "Offline"
+                    : "";
 
     const dangerButton =
         "h-auto w-full justify-start gap-3 rounded-xl px-3 py-2.5 text-sm font-medium disabled:opacity-40";
