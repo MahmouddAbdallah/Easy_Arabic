@@ -86,7 +86,7 @@ const SignInForm = () => {
                         placeholder="you@example.com"
                         autoComplete="email"
                         aria-invalid={!!errors.email}
-                        className="pl-9"
+                        className="py-2 pl-9"
                         {...register('email', { required: 'Email is required' })}
                     />
                 </div>
@@ -113,7 +113,7 @@ const SignInForm = () => {
                         placeholder="••••••••"
                         autoComplete="current-password"
                         aria-invalid={!!errors.password}
-                        className="pl-9 pr-10"
+                        className="py-2 pl-9 pr-10"
                         {...register('password', { required: 'Password is required' })}
                     />
                     <button

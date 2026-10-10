@@ -94,6 +94,7 @@ const VerifyEmail = ({ token }: { token?: string }) => {
                         type="email"
                         placeholder="you@example.com"
                         autoComplete="email"
+                        className='py-1'
                         aria-invalid={!!errors.email}
                         aria-describedby={errors.email ? 'email-error' : undefined}
                         {...register('email', {

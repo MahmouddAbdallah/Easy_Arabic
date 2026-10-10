@@ -82,6 +82,7 @@ const SignUpForm = () => {
                     type="text"
                     placeholder="John Doe"
                     autoComplete="name"
+                    className='py-1'
                     aria-invalid={!!errors.name}
                     maxLength={100}
                     {...register('name', { required: 'Name is required', validate: (v) => v.trim().length > 0 || 'Name is required' })}
@@ -99,6 +100,7 @@ const SignUpForm = () => {
                     type="email"
                     placeholder="you@example.com"
                     autoComplete="email"
+                    className='py-1'
                     aria-invalid={!!errors.email}
                     {...register('email', {
                         required: 'Email is required',
@@ -135,7 +137,7 @@ const SignUpForm = () => {
                         placeholder="At least 8 characters"
                         autoComplete="new-password"
                         aria-invalid={!!errors.password}
-                        className="pr-10"
+                        className="py-2 pr-10"
                         {...register('password', {
                             required: 'Password is required',
                             minLength: { value: 8, message: 'Password must be at least 8 characters' },
@@ -167,7 +169,7 @@ const SignUpForm = () => {
                         placeholder="Re-enter your password"
                         autoComplete="new-password"
                         aria-invalid={!!errors.confirmPassword}
-                        className="pr-10"
+                        className="py-2 pr-10"
                         {...register('confirmPassword', {
                             required: 'Please confirm your password',
                             validate: (val) => watchPassword === val || 'Passwords do not match',

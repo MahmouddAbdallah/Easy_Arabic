@@ -120,7 +120,10 @@ const LessonForm: React.FC<LessonFormProps> = ({
             <CardContent className="py-5 sm:py-6">
                 <FormProvider {...method}>
                     <form onSubmit={onSubmit} className="space-y-5">
-                        <SelectUserByRole isFilter={false} />
+                        <SelectUserByRole
+                            isFilter={false}
+                            role={'family'}
+                        />
 
                         <div className="space-y-1.5">
                             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

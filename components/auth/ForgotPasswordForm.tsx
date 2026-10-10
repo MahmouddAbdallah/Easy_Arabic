@@ -56,7 +56,7 @@ const ForgotPasswordForm = () => {
                             autoComplete="email"
                             aria-invalid={!!errors.email}
                             aria-describedby={errors.email ? 'email-error' : undefined}
-                            className="pl-9"
+                            className="py-2 pl-9"
                             {...register('email', {
                                 required: 'Email is required',
                                 pattern: { value: EMAIL_PATTERN, message: 'Enter a valid email address' },

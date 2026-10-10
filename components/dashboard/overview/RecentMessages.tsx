@@ -35,7 +35,7 @@ export default function RecentMessages({ messages, unread }: RecentMessagesProps
 
             <CardContent className="flex-1">
                 {messages === null ? (
-                    <p className="py-10 text-center text-sm text-muted-foreground">
+                    <p className="py-20 text-center text-sm text-muted-foreground">
                         Messages couldn&apos;t be loaded. Refresh the page to try again.
                     </p>
                 ) : messages.length === 0 ? (

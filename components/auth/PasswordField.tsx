@@ -41,7 +41,7 @@ export default function PasswordField({
                     autoComplete={autoComplete}
                     aria-invalid={!!error}
                     aria-describedby={describedBy}
-                    className="pr-10"
+                    className="py-2 pr-10"
                     {...registration}
                 />
                 <button
