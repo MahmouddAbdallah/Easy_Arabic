@@ -148,7 +148,7 @@ model Lesson {
   // the planner (lib/planner) is what introduced SCHEDULED, the older lesson forms never used it.
   status        String
   classDate     TimestamptzString
-  money         Int
+  money         Float
   duration      Int //['15', '30', '45', '60', '75', '90', '120'] 
   TeacherReward TeacherReward     @default(GOOD)
   createdAt     TimestamptzString @default(now())
@@ -197,14 +197,14 @@ enum LessonChangeStatus {
 }
 
 model LessonChangeRequest {
-  id                 String              @id @default(uuid())
+  id                 String             @id @default(uuid())
   lessonId           String
   // Snapshot of the lesson's teacher / family when the request was made. The family is the
   // requester. They are re-checked against the live lesson before a decision is applied.
   teacherId          String
   familyId           String
   type               LessonChangeType
-  status             LessonChangeStatus  @default(PENDING)
+  status             LessonChangeStatus @default(PENDING)
 
   // The lesson's start when the request was made (a decision is refused if it has moved since)
   // and, for RESCHEDULE only, the start the family asked for.
@@ -218,13 +218,13 @@ model LessonChangeRequest {
   reviewedAt         TimestamptzString?
   reviewerNote       String?
 
-  createdAt          TimestamptzString   @default(now())
-  updatedAt          TimestamptzString   @default(now())
+  createdAt          TimestamptzString  @default(now())
+  updatedAt          TimestamptzString  @default(now())
 
-  lesson             Lesson              @relation(fields:[lessonId], references:[id], onDelete: Cascade, "LessonRequestLesson")
-  teacher            User                @relation(fields:[teacherId], references:[id], onDelete: Cascade, "LessonRequestTeacher")
-  family             User                @relation(fields:[familyId], references:[id], onDelete: Cascade, "LessonRequestFamily")
-  reviewer           User?               @relation(fields:[reviewedById], references:[id], onDelete: SetNull, "LessonRequestReviewer")
+  lesson             Lesson             @relation(fields:[lessonId], references:[id], onDelete: Cascade, "LessonRequestLesson")
+  teacher            User               @relation(fields:[teacherId], references:[id], onDelete: Cascade, "LessonRequestTeacher")
+  family             User               @relation(fields:[familyId], references:[id], onDelete: Cascade, "LessonRequestFamily")
+  reviewer           User?              @relation(fields:[reviewedById], references:[id], onDelete: SetNull, "LessonRequestReviewer")
 
   @@index([teacherId, status, createdAt])
   @@index([familyId, status, createdAt])

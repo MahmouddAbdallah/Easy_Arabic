@@ -1154,7 +1154,7 @@
               "money": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/int4@1",
+                  "codecId": "pg/float8@1",
                   "kind": "scalar"
                 }
               },
@@ -2780,8 +2780,8 @@
                   "nullable": false
                 },
                 "money": {
-                  "codecId": "pg/int4@1",
-                  "nativeType": "int4",
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
                   "nullable": false
                 },
                 "status": {
@@ -3751,7 +3751,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "851ec9ca754071220e54790d90a086ab97b8906add4b8d91070be1b022e2493b"
+    "storageHash": "8bb2b6d17d5e7d82df9aaf407dc45bb6d9e1476487d3b01b362d17e9ef10606d"
   },
   "execution": {
     "executionHash": "4945c5f3e5dfcd9d07bacf34a1baf88f5a11669da161150473671eddb1aad93c",
