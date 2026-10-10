@@ -46,7 +46,7 @@ const ProfileSectionNav = ({ kind, id, totalLessons, totalLinked, pendingRequest
 
     return (
         <nav aria-label={ariaLabel} className="w-full rounded-xl border border-border/60 bg-card p-1 shadow-xs sm:w-fit">
-            <ul className="flex gap-1">
+            <ul className="flex gap-1 w-full  max-md:overflow-x-auto">
                 {items.map(({ href, label, count, icon: Icon, active, hint }) => (
                     <li key={href} className="flex-1 sm:flex-none">
                         <Link
