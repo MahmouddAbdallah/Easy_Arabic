@@ -14,9 +14,6 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Easy Arabic",
   description: `Easy Arabic`,
-  icons: {
-    icon: "./favicon.png"
-  }
 };
 export const dynamic = 'force-dynamic';
 
