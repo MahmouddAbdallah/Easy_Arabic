@@ -10,6 +10,7 @@ import { getUserTime, laterOf } from "@/components/chat/lib/chatState";
 import { destroyUploadedAssets, resolveAttachments } from "@/components/chat/lib/attachments.server";
 import { errorResponse, handleRouteError, parseBody, requireUser } from "@/components/chat/lib/http.server";
 import type { MessageAttachment } from "@/components/chat/types";
+import { notifyNewMessage } from "@/components/chat/lib/messageNotifications.server";
 import { newUnreadCounts, unreadIncrementUpdates, updateChat, } from "@/components/chat/lib/unread.server";
 import { readUnreadTotal, writeUnreadTotal } from "@/components/chat/lib/unreadTotal.server";
 
@@ -125,6 +126,9 @@ export async function PATCH(req: NextRequest) {
                     request.attachments ?? []
                 );
                 await sendMessage(actorId, request, attachments);
+                // Reached only once the message is stored: a block, a bad attachment or a failed
+                // transaction threw above. After the response, so the sender doesn't wait for it.
+                after(() => notifyNewMessage(actorId, user.name, request.receiverId));
                 break;
             }
             case "edit":
