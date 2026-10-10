@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { findUserByEmail } from "@/lib/auth/users";
 import { consume, rateLimitKey } from "@/lib/auth/rateLimit";
 import { sendAccountExistsEmail } from "@/lib/auth/email";
+import { notifyAdminsOfNewCustomer } from "@/lib/auth/notifications";
 import { errorResponse, forbiddenOrigin, getClientIp, invalidBody, isSameOrigin, readJsonBody, tooManyRequests } from "@/lib/auth/request";
 import { db } from "@/prisma/db";
 import { setSessionCookie } from "@/lib/auth/session";
@@ -53,6 +54,9 @@ export async function POST(req: NextRequest) {
                 phone: data.phone,
                 password: passwordHash,
             });
+            // Reached only once the account exists: a lost race throws above, and an existing
+            // email returned earlier, so exactly one admin notification per new customer.
+            after(() => notifyAdminsOfNewCustomer(user.id, user.name));
             // after(async () => {
             //     const token = await issueToken(user.id, 'email_verification', authConfig.tokens.emailVerificationTtlSeconds);
             //     await sendVerificationEmail(user.email, token);

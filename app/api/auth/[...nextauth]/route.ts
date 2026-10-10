@@ -1,9 +1,11 @@
+import { after } from "next/server";
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import type { Account, User } from "next-auth";
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
 import { findUserByEmail } from "@/lib/auth/users";
+import { notifyAdminsOfNewCustomer } from "@/lib/auth/notifications";
 import { db } from "@/prisma/db";
 import { setSessionCookie } from "@/lib/auth/session";
 import { firstValidationMessage, signUpSchema } from "@/lib/validation";
@@ -51,7 +53,7 @@ export const authOptions = {
                         return false;
                     }
                     const data = validation.data;
-                    client = await db.orm.public.User.create({
+                    const created = await db.orm.public.User.create({
                         name: data.name,
                         email: data.email,
                         imageUrl: data.imageUrl,
@@ -60,6 +62,9 @@ export const authOptions = {
                             10
                         ),
                     });
+                    client = created;
+                    // Only a brand-new Google account gets here; a returning user took the branch above.
+                    after(() => notifyAdminsOfNewCustomer(created.id, created.name));
                 }
                 await setSessionCookie(client);
                 return true;

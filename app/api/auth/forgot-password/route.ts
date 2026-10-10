@@ -6,6 +6,7 @@ import { issueToken } from "@/lib/auth/tokens";
 import { consume, rateLimitKey } from "@/lib/auth/rateLimit";
 import { sendPasswordResetEmail } from "@/lib/auth/email";
 import { errorResponse, forbiddenOrigin, getClientIp, invalidBody, isSameOrigin, readJsonBody, tooManyRequests } from "@/lib/auth/request";
+import { notifyAdminsOfForgotPassword } from "@/lib/auth/notifications";
 
 const GENERIC = { message: "If an account exists for that email, we've sent instructions to reset the password." };
 
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
                 const ttl = authConfig.tokens.passwordResetTtlSeconds;
                 const token = await issueToken(user.id, 'password_reset', ttl);
                 await sendPasswordResetEmail(user.email, token, Math.round(ttl / 60));
+                notifyAdminsOfForgotPassword(user.id, user.name)
             } catch (error) {
                 console.error('forgot-password background task failed:', error instanceof Error ? error.message : error);
             }
