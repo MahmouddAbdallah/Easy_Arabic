@@ -11,6 +11,7 @@ import {
     type CallSignalInput,
     type ClientEndReason,
 } from "./call";
+import { sanitizeIceServers } from "./callIce";
 import type { CallRequestInput } from "./callSchemas";
 
 /** The browser's side of /api/chat/calls: one function per action, typed end to end. */
@@ -24,6 +25,9 @@ const RETRY_DELAYS_MS = [400, 1200];
 const FALLBACK_ICE_SERVERS: CallIceServer[] = [
     { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
 ];
+
+/** The servers a browser can safely be given: an entry it would refuse must not be able to stop every call from starting. */
+const usableIceServers = (servers: CallIceServer[]): CallIceServer[] => sanitizeIceServers(servers).servers;
 
 /** No response at all: offline, timeout, dropped connection. */
 const isNetworkError = (error: unknown) => axios.isAxiosError(error) && !error.response;
@@ -87,7 +91,8 @@ export const callApi = {
     async refreshIceServers(timeoutMs = 3_000): Promise<CallIceServer[] | null> {
         try {
             const { data } = await axios.get<CallIceResponse>(CALL_ICE_API_URL, { timeout: timeoutMs });
-            return data.iceServers.length > 0 ? data.iceServers : null;
+            const servers = usableIceServers(data.iceServers);
+            return servers.length > 0 ? servers : null;
         } catch {
             return null;
         }
@@ -97,7 +102,8 @@ export const callApi = {
     async iceServers(): Promise<CallIceServer[]> {
         try {
             const { data } = await axios.get<CallIceResponse>(CALL_ICE_API_URL, { timeout: 8_000 });
-            return data.iceServers.length > 0 ? data.iceServers : FALLBACK_ICE_SERVERS;
+            const servers = usableIceServers(data.iceServers);
+            return servers.length > 0 ? servers : FALLBACK_ICE_SERVERS;
         } catch {
             return FALLBACK_ICE_SERVERS;
         }

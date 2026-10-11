@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import {
     LoaderCircleIcon,
     MaximizeIcon,
@@ -9,6 +9,9 @@ import {
     MinimizeIcon,
     PhoneOffIcon,
     PictureInPicture2Icon,
+    ScreenShareIcon,
+    ScreenShareOffIcon,
+    SlidersHorizontalIcon,
     SwitchCameraIcon,
     TriangleAlertIcon,
     VideoIcon,
@@ -27,12 +30,16 @@ import {
     usePictureInPicture,
     type VideoSize,
 } from "../hooks/useCallVideo";
+import { useAudioOutput } from "../hooks/useMediaDevices";
+import { PANEL_TOGGLE_ATTRIBUTE } from "../hooks/usePanelDismiss";
 import { formatDuration } from "../lib/attachments";
 import type { CallEndedKind, CallSessionState } from "../lib/callController";
+import { canShareScreen } from "../lib/callMedia";
 import { AdaptiveVideo } from "./AdaptiveVideo";
 import { CallAvatar } from "./CallAvatar";
 import { ConnectionDetails, ConnectionIndicator } from "./ConnectionIndicator";
 import { ControlButton } from "./ControlButton";
+import { DEVICE_MENU_ID, DeviceMenu } from "./DeviceMenu";
 import { SelfView } from "./SelfView";
 
 const ENDED_TEXT: Record<CallEndedKind, string> = {
@@ -73,7 +80,10 @@ function connectionNotice(call: CallSessionState, isVideo: boolean, name: string
         return isVideo ? { text: call.offline ? "Waiting for network…" : "Reconnecting…", busy: true } : null;
     }
     if (call.phase !== "active") return null;
-    if (isVideo && call.videoPaused && !call.cameraOff) return { text: "Weak connection — your video is paused", busy: false };
+    const sendingPicture = !call.cameraOff || call.sharingScreen;
+    if (isVideo && call.videoPaused && sendingPicture) {
+        return { text: call.sharingScreen ? "Weak connection — your screen share is paused" : "Weak connection — your video is paused", busy: false };
+    }
     if (isVideo && call.remoteVideoPaused && !call.remoteCameraOff) return { text: `Weak connection — ${name}'s video is paused`, busy: false };
     if (call.quality === "poor") return { text: "Weak connection", busy: false };
     return null;
@@ -113,16 +123,20 @@ function HeaderButton({
     label,
     onClick,
     pressed,
+    panel,
     children,
 }: {
     label: string;
     onClick: () => void;
     pressed?: boolean;
+    /** The button opens a floating panel: whether it is open, and its id. */
+    panel?: { open: boolean; id: string };
     children: ReactNode;
 }) {
     return (
         <button
             type="button"
+            {...(panel ? { [PANEL_TOGGLE_ATTRIBUTE]: "", "aria-expanded": panel.open, "aria-controls": panel.open ? panel.id : undefined } : null)}
             aria-label={label}
             aria-pressed={pressed}
             title={label}
@@ -147,7 +161,10 @@ function FullPreview({ stream, mirror }: { stream: MediaStream | null; mirror: b
 
 interface CallScreenProps {
     call: CallSessionState;
-    actions: Pick<CallActions, "toggleMute" | "toggleCamera" | "switchCamera" | "endCall" | "dismissEnded">;
+    actions: Pick<
+        CallActions,
+        "toggleMute" | "toggleCamera" | "switchCamera" | "toggleScreenShare" | "selectMicrophone" | "selectCamera" | "endCall" | "dismissEnded"
+    >;
 }
 
 /** The call itself: voice or video, from "Calling…" to the final "Call ended". */
@@ -165,8 +182,12 @@ export function CallScreen({ call, actions }: CallScreenProps) {
     const { ref: remoteRef, blocked: soundBlocked, resume: resumeSound, size: remoteSize } = useAttachedVideo(call.remoteStream);
     const [videoLive, setVideoLive] = useState(false);
     const [controlsHovered, setControlsHovered] = useState(false);
-    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [panel, setPanel] = useState<"connection" | "devices" | null>(null);
     const fullscreen = useFullscreen(panelRef);
+    const output = useAudioOutput(remoteRef);
+    const canShare = useMemo(() => isVideo && canShareScreen(), [isVideo]);
+    const togglePanel = (next: "connection" | "devices") => setPanel((open) => (open === next ? null : next));
+    const closePanel = useCallback(() => setPanel(null), []);
 
     // Their picture only replaces the avatar once frames are actually playing, and not while their camera is off
     // (or their connection is too weak to carry it).
@@ -181,8 +202,9 @@ export function CallScreen({ call, actions }: CallScreenProps) {
     const pip = usePictureInPicture(remoteRef, isVideo && phase === "active");
     // Over a picture the controls step aside after a few seconds; any touch, move or key brings them back.
     const indicatorLevel = reconnecting ? "lost" : phase === "active" ? call.quality : null;
-    const detailsShown = detailsOpen && indicatorLevel !== null;
-    const idle = useIdleControls(isVideo && phase === "active" && showRemoteVideo && !detailsShown && !controlsHovered && !soundBlocked);
+    const detailsShown = panel === "connection" && indicatorLevel !== null;
+    const devicesShown = panel === "devices" && !ended;
+    const idle = useIdleControls(isVideo && phase === "active" && showRemoteVideo && !detailsShown && !devicesShown && !controlsHovered && !soundBlocked);
     const panelStyle = isVideo ? ({ "--call-aspect": windowAspect(remoteSize).toFixed(4) } as CSSProperties) : undefined;
 
     useEffect(() => {
@@ -199,6 +221,26 @@ export function CallScreen({ call, actions }: CallScreenProps) {
     };
     const hoverControls = (hovered: boolean) => (event: { pointerType: string }) => {
         if (event.pointerType === "mouse") setControlsHovered(hovered);
+    };
+    // M mutes, V turns the camera on and off, S shares the screen: the same keys as the buttons' tooltips say.
+    const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        idle.wake();
+        if (ended || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+        if ((event.target as HTMLElement).closest("input, select, textarea, [contenteditable='true']")) return;
+        switch (event.key.toLowerCase()) {
+            case "m":
+                if (phase !== "starting") actions.toggleMute();
+                break;
+            case "v":
+                if (isVideo && phase !== "starting") actions.toggleCamera();
+                break;
+            case "s":
+                if (canShare && phase === "active") actions.toggleScreenShare();
+                break;
+            default:
+                return;
+        }
+        event.preventDefault();
     };
 
     return (
@@ -217,7 +259,7 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                 style={panelStyle}
                 onPointerMove={idle.wake}
                 onPointerDown={idle.wake}
-                onKeyDown={idle.wake}
+                onKeyDown={onKeyDown}
                 onFocus={idle.wake}
                 className={cn(
                     "relative isolate flex h-dvh w-full flex-col overflow-hidden bg-zinc-950 text-white outline-none",
@@ -238,6 +280,7 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                         stream={call.remoteStream}
                         size={remoteSize}
                         visible={showRemoteVideo}
+                        alwaysContain={call.remoteSharing}
                         onPlaying={() => setVideoLive(true)}
                         onEmptied={() => setVideoLive(false)}
                         // While the link is down the last picture stays, dimmed and soft, instead of looking alive.
@@ -287,6 +330,13 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                                 <p aria-live="polite" className="text-sm text-white/80 tabular-nums drop-shadow">
                                     {status}
                                 </p>
+                                {call.remoteSharing && (
+                                    <p className="mt-1.5">
+                                        <Pill>
+                                            <ScreenShareIcon aria-hidden /> Sharing their screen
+                                        </Pill>
+                                    </p>
+                                )}
                             </>
                         )}
                     </div>
@@ -297,7 +347,16 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                             </Pill>
                         )}
                         {(phase === "active" || reconnecting) && (
-                            <ConnectionIndicator level={indicatorLevel} open={detailsShown} onToggle={() => setDetailsOpen((open) => !open)} />
+                            <ConnectionIndicator level={indicatorLevel} open={detailsShown} onToggle={() => togglePanel("connection")} />
+                        )}
+                        {!ended && call.localStream && (
+                            <HeaderButton
+                                label="Audio and video settings"
+                                panel={{ open: devicesShown, id: DEVICE_MENU_ID }}
+                                onClick={() => togglePanel("devices")}
+                            >
+                                <SlidersHorizontalIcon aria-hidden />
+                            </HeaderButton>
                         )}
                         {pip.supported && isVideo && showRemoteVideo && !ended && (
                             <HeaderButton
@@ -350,26 +409,43 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                     </div>
                 )}
 
-                {isVideo && !ended && !previewing && phase !== "starting" && (
+                {isVideo && !ended && !previewing && !call.sharingScreen && phase !== "starting" && (
                     <SelfView stream={call.localStream} mirror={call.mirrorLocal} cameraOff={call.cameraOff} boundsRef={panelRef} />
                 )}
 
-                <div role="status" className="pointer-events-none absolute top-[calc(env(safe-area-inset-top,0px)_+_4rem)] left-1/2 z-30 -translate-x-1/2">
-                    {notice && !ended && (
-                        <div
-                            key={notice.text}
-                            className="animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none"
-                            aria-hidden={notice.busy || undefined}
-                        >
-                            <Pill tone="warning">
-                                {notice.busy ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : <TriangleAlertIcon aria-hidden />}
-                                {notice.text}
-                            </Pill>
+                <div className="pointer-events-none absolute top-[calc(env(safe-area-inset-top,0px)_+_4rem)] left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
+                    <div role="status">
+                        {notice && !ended && (
+                            <div
+                                key={notice.text}
+                                className="animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none"
+                                aria-hidden={notice.busy || undefined}
+                            >
+                                <Pill tone="warning">
+                                    {notice.busy ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : <TriangleAlertIcon aria-hidden />}
+                                    {notice.text}
+                                </Pill>
+                            </div>
+                        )}
+                    </div>
+                    {/* Always on screen while sharing, even when the other controls have faded away: nobody should forget it. */}
+                    {call.sharingScreen && !ended && (
+                        <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-emerald-500/90 py-1.5 pr-1.5 pl-4 text-sm font-medium text-white shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none">
+                            <ScreenShareIcon className="size-4 shrink-0" aria-hidden />
+                            <span>You&apos;re sharing your screen</span>
+                            <button
+                                type="button"
+                                onClick={actions.toggleScreenShare}
+                                className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-900 outline-none transition-colors hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-600"
+                            >
+                                Stop sharing
+                            </button>
                         </div>
                     )}
                 </div>
 
-                {detailsShown && <ConnectionDetails level={indicatorLevel} onClose={() => setDetailsOpen(false)} />}
+                {detailsShown && <ConnectionDetails level={indicatorLevel} relayAvailable={call.relayAvailable} onClose={closePanel} />}
+                {devicesShown && <DeviceMenu call={call} actions={actions} output={output} onClose={closePanel} />}
 
                 {soundBlocked && (
                     <button
@@ -393,6 +469,7 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                     >
                         <ControlButton
                             label={call.muted ? "Unmute" : "Mute"}
+                            shortcut="M"
                             pressed={call.muted}
                             variant={call.muted ? "on" : "glass"}
                             disabled={phase === "starting"}
@@ -404,12 +481,26 @@ export function CallScreen({ call, actions }: CallScreenProps) {
                         {isVideo && (
                             <ControlButton
                                 label={call.cameraOff ? "Start video" : "Stop video"}
+                                shortcut="V"
                                 pressed={call.cameraOff}
                                 variant={call.cameraOff ? "on" : "glass"}
                                 disabled={phase === "starting"}
                                 onClick={actions.toggleCamera}
                             >
                                 {call.cameraOff ? <VideoOffIcon /> : <VideoIcon />}
+                            </ControlButton>
+                        )}
+
+                        {canShare && (
+                            <ControlButton
+                                label={call.sharingScreen ? "Stop sharing" : "Share screen"}
+                                shortcut="S"
+                                pressed={call.sharingScreen}
+                                variant={call.sharingScreen ? "on" : "glass"}
+                                disabled={phase !== "active"}
+                                onClick={actions.toggleScreenShare}
+                            >
+                                {call.sharingScreen ? <ScreenShareOffIcon /> : <ScreenShareIcon />}
                             </ControlButton>
                         )}
 

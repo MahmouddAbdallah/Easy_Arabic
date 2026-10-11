@@ -6,6 +6,7 @@
  *   QualitySampler   two consecutive `getStats()` snapshots in, one readable sample out (bitrate, loss, RTT, fps...)
  *   QualityMeter     samples in, a steady level for the signal indicator out (quick to warn, slow to cheer up)
  *   VideoGovernor    samples in, the video tier to send out (steps down fast, climbs back slowly, can pause video)
+ *   JitterBufferPolicy  samples in, how much extra playout buffering the receiver should keep (smoother sound on a shaky link)
  *
  * The browser's own congestion control still decides how much it really sends. The governor only sets the
  * ceiling (resolution, frame rate, bitrate) so a weak link gets a smaller, steadier picture instead of a
@@ -35,6 +36,16 @@ export interface VideoPicture {
 /** Why the browser is encoding less than it could. */
 export type QualityLimit = "none" | "bandwidth" | "cpu" | "other";
 
+/** How the media travels between the two browsers. */
+export interface CallRoute {
+    /** host: same network; srflx / prflx: across NATs; relay: through a TURN server (on either side). */
+    kind: "host" | "srflx" | "prflx" | "relay" | "unknown";
+    /** What carries it. For a relay this is how this browser reaches the TURN server (`tls` gets through HTTPS-only firewalls). */
+    protocol: "udp" | "tcp" | "tls" | "unknown";
+    /** wifi, cellular, ethernet, vpn... when the browser says so (Chrome). */
+    network: string | null;
+}
+
 export interface QualitySample {
     rttMs: number | null;
     jitterMs: number | null;
@@ -54,6 +65,14 @@ export interface QualitySample {
     silent: boolean;
     /** The media goes through a TURN relay instead of straight between the two browsers. */
     relayed: boolean | null;
+    /** Share of the sound the listener heard as filler made up for lost audio over the last interval, 0 to 1. */
+    audioConcealed: number | null;
+    /** Names of the codecs in use, e.g. "VP8" and "opus". */
+    videoCodec: string | null;
+    audioCodec: string | null;
+    route: CallRoute | null;
+    /** Frames the receiver had to throw away over the last interval (it couldn't decode or show them in time). */
+    framesDropped: number;
 }
 
 /** What the call screen shows. */
@@ -78,6 +97,37 @@ const kindOf = (stat: Stat): string | undefined => {
     return typeof kind === "string" ? kind : undefined;
 };
 const idOf = (stat: Stat): string => (typeof stat.id === "string" ? stat.id : `${String(stat.type)}:${String(stat.ssrc ?? "")}`);
+
+/** "video/VP8" -> "VP8", "audio/opus" -> "Opus". */
+function codecName(codec: Stat | undefined): string | null {
+    const mime = typeof codec?.mimeType === "string" ? codec.mimeType : "";
+    const name = mime.split("/")[1];
+    if (!name) return null;
+    return name.toLowerCase() === "opus" ? "Opus" : name;
+}
+
+const CANDIDATE_REACH = ["host", "srflx", "prflx", "relay"] as const;
+
+/**
+ * How the media travels, from the two ends of the selected candidate pair. A relay on EITHER end means the
+ * media goes through a TURN server, so the worse of the two decides.
+ */
+function routeOf(local: Stat | undefined, remote: Stat | undefined): CallRoute | null {
+    const typeOf = (candidate: Stat | undefined) => {
+        const type = candidate?.candidateType;
+        return typeof type === "string" && (CANDIDATE_REACH as readonly string[]).includes(type) ? (type as (typeof CANDIDATE_REACH)[number]) : undefined;
+    };
+    const localType = typeOf(local);
+    const remoteType = typeOf(remote);
+    if (!localType && !remoteType) return null;
+
+    const kind = CANDIDATE_REACH[Math.max(localType ? CANDIDATE_REACH.indexOf(localType) : 0, remoteType ? CANDIDATE_REACH.indexOf(remoteType) : 0)];
+    // For our own relay candidate, `relayProtocol` says how we reach the TURN server; otherwise it is the candidate's own transport.
+    const raw = localType === "relay" && typeof local?.relayProtocol === "string" ? local.relayProtocol : (local?.protocol ?? remote?.protocol);
+    const protocol = raw === "udp" || raw === "tcp" || raw === "tls" ? raw : "unknown";
+    const network = typeof local?.networkType === "string" && local.networkType !== "unknown" ? local.networkType : null;
+    return { kind, protocol, network };
+}
 
 /** The candidate pair the media is using. */
 function selectedPair(pairs: Stat[], transports: Stat[]): Stat | undefined {
@@ -130,6 +180,10 @@ export class QualitySampler {
         let packetsIn = 0;
         let lostIn = 0;
         let freezes = 0;
+        let concealed = 0;
+        let audioSamples = 0;
+        let framesDropped = 0;
+        let audioStat: Stat | null = null;
         let videoOut: Stat | null = null;
         let videoOutFrames: number | null = null;
         let videoIn: Stat | null = null;
@@ -140,12 +194,14 @@ export class QualitySampler {
         const pairs: Stat[] = [];
         const transports: Stat[] = [];
         const candidates = new Map<string, Stat>();
+        const codecs = new Map<string, Stat>();
 
         for (const stat of stats) {
             switch (stat.type) {
                 case "outbound-rtp": {
                     if (stat.isRemote === true) break;
                     bytesOut += grew(stat, "bytesSent") ?? 0;
+                    if (kindOf(stat) === "audio") audioStat = audioStat ?? stat;
                     if (kindOf(stat) === "video") {
                         const frames = grew(stat, "framesEncoded");
                         if (!videoOut || (finite(stat.frameWidth) ?? 0) > (finite(videoOut.frameWidth) ?? 0)) {
@@ -163,9 +219,15 @@ export class QualitySampler {
                     lostIn += grew(stat, "packetsLost") ?? 0;
                     const jitter = finite(stat.jitter);
                     if (jitter !== undefined) jitters.push(jitter * 1000);
+                    if (kindOf(stat) === "audio") {
+                        audioStat = stat;
+                        concealed += grew(stat, "concealedSamples") ?? 0;
+                        audioSamples += grew(stat, "totalSamplesReceived") ?? 0;
+                    }
                     if (kindOf(stat) === "video") {
                         videoBytesIn += bytes;
                         freezes += grew(stat, "freezeCount") ?? 0;
+                        framesDropped += grew(stat, "framesDropped") ?? 0;
                         const frames = grew(stat, "framesDecoded");
                         if (!videoIn || (finite(stat.frameWidth) ?? 0) > (finite(videoIn.frameWidth) ?? 0)) {
                             videoIn = stat;
@@ -186,6 +248,9 @@ export class QualitySampler {
                     break;
                 case "transport":
                     transports.push(stat);
+                    break;
+                case "codec":
+                    codecs.set(idOf(stat), stat);
                     break;
                 case "local-candidate":
                 case "remote-candidate":
@@ -225,7 +290,8 @@ export class QualitySampler {
         const available = finite(pair?.availableOutgoingBitrate);
         const localCandidate = typeof pair?.localCandidateId === "string" ? candidates.get(pair.localCandidateId) : undefined;
         const remoteCandidate = typeof pair?.remoteCandidateId === "string" ? candidates.get(pair.remoteCandidateId) : undefined;
-        const route = localCandidate ?? remoteCandidate;
+        const route = routeOf(localCandidate, remoteCandidate);
+        const codecOf = (stat: Stat | null) => (stat && typeof stat.codecId === "string" ? codecName(codecs.get(stat.codecId)) : null);
 
         return {
             rttMs,
@@ -239,7 +305,12 @@ export class QualitySampler {
             limit,
             frozen: freezes > 0 || (videoIn !== null && videoBytesIn > 1500 && videoInFrames === 0),
             silent: bytesIn <= 0,
-            relayed: route && typeof route.candidateType === "string" ? route.candidateType === "relay" : null,
+            relayed: route ? route.kind === "relay" : null,
+            audioConcealed: audioSamples > 0 ? Math.min(1, concealed / audioSamples) : null,
+            videoCodec: codecOf(videoOut) ?? codecOf(videoIn),
+            audioCodec: codecOf(audioStat),
+            route,
+            framesDropped,
         };
     }
 }
@@ -257,6 +328,8 @@ export function scoreSample(sample: QualitySample): number {
     if (sample.rttMs !== null) score -= ramp(sample.rttMs, 150, 600, 45);
     if (sample.loss !== null) score -= ramp(sample.loss * 100, 0.5, 8, 70);
     if (sample.jitterMs !== null) score -= ramp(sample.jitterMs, 30, 120, 25);
+    // Choppy sound is what people notice first, and it can be bad while the packet counters still look fine.
+    if (sample.audioConcealed !== null) score -= ramp(sample.audioConcealed * 100, 4, 30, 20);
     if (sample.frozen) score -= 20;
     if (sample.limit === "bandwidth") score -= 8;
     else if (sample.limit === "cpu") score -= 6;
@@ -358,6 +431,18 @@ export const VIDEO_TIERS: readonly VideoTier[] = [
     { id: "minimal", shortSide: 240, fps: 15, kbps: 250 },
 ];
 
+/**
+ * A shared screen is read, not watched: text has to stay sharp, so the picture keeps its size as long as it
+ * can and gives up frames first (a slide at 5 fps is fine, a blurred slide is not).
+ */
+export const SCREEN_TIERS: readonly VideoTier[] = [
+    { id: "full", shortSide: 1080, fps: 15, kbps: 2500 },
+    { id: "high", shortSide: 720, fps: 12, kbps: 1400 },
+    { id: "medium", shortSide: 480, fps: 10, kbps: 800 },
+    { id: "low", shortSide: 360, fps: 8, kbps: 450 },
+    { id: "minimal", shortSide: 240, fps: 5, kbps: 200 },
+];
+
 export interface CaptureSize {
     width: number;
     height: number;
@@ -383,10 +468,10 @@ const MAX_PIXEL_SHARE = 1.5;
  * The tiers worth using for a camera that delivers `capture`, best first: nothing above the camera's own
  * size is offered (it would change nothing), and `maxShortSide` is the most this device should send.
  */
-export function videoLadder(capture: CaptureSize, maxShortSide = Number.POSITIVE_INFINITY): VideoTier[] {
+export function videoLadder(capture: CaptureSize, maxShortSide = Number.POSITIVE_INFINITY, tiers: readonly VideoTier[] = VIDEO_TIERS): VideoTier[] {
     const short = Math.min(capture.width, capture.height);
-    const allowed = VIDEO_TIERS.filter((tier) => tier.shortSide <= maxShortSide);
-    const usable = allowed.length > 0 ? allowed : [VIDEO_TIERS[VIDEO_TIERS.length - 1]];
+    const allowed = tiers.filter((tier) => tier.shortSide <= maxShortSide);
+    const usable = allowed.length > 0 ? allowed : [tiers[tiers.length - 1]];
 
     // Start at the smallest tier that still covers the camera's picture.
     let start = 0;
@@ -592,5 +677,67 @@ export class VideoGovernor {
         this.starved = 0;
         this.severe = 0;
         this.healthy = 0;
+    }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * The receive buffer
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The least extra playout delay worth asking for, and the most: past that, lag is worse than the glitches it prevents. */
+const JITTER_TARGET_MIN_MS = 80;
+const JITTER_TARGET_MAX_MS = 300;
+/** Targets move in steps of this size, so a wobbling reading doesn't rewrite the receivers every second. */
+const JITTER_STEP_MS = 20;
+/** The buffer is let go (back to the browser's own choice) after the link has been calm this long. */
+const JITTER_RELEASE_AFTER_MS = 20_000;
+
+/**
+ * Decides how much extra playout buffering the receivers should keep (`RTCRtpReceiver.jitterBufferTarget`, a floor
+ * under what the browser would choose on its own). On a steady link it asks for nothing, so calls stay as
+ * live as possible. When packets arrive unevenly or go missing it raises the floor, trading a little delay for
+ * sound and picture that don't stutter, and lets it go again once the link has been calm for a while.
+ */
+export class JitterBufferPolicy {
+    private target: number | null = null;
+    private calmSince: number | null = null;
+
+    reset() {
+        this.target = null;
+        this.calmSince = null;
+    }
+
+    /** The playout floor in milliseconds to ask for, or null to leave it to the browser. */
+    update(sample: QualitySample, now: number): number | null {
+        // Nothing arrived: jitter and loss say nothing about the link, keep whatever is set.
+        if (sample.silent) return this.target;
+
+        const jitter = sample.jitterMs ?? 0;
+        const loss = sample.loss ?? 0;
+        const concealed = sample.audioConcealed ?? 0;
+
+        if (jitter >= 30 || loss >= 0.02 || concealed >= 0.04) {
+            this.calmSince = null;
+            // Enough room to ride out a few times the jitter. It only grows while the trouble lasts.
+            const wanted = Math.round((jitter * 3) / JITTER_STEP_MS) * JITTER_STEP_MS;
+            const next = Math.min(JITTER_TARGET_MAX_MS, Math.max(JITTER_TARGET_MIN_MS, wanted));
+            if (this.target === null || next > this.target) this.target = next;
+            return this.target;
+        }
+
+        // Neither bad nor clearly calm: hold.
+        if (jitter >= 20 || loss >= 0.01 || concealed >= 0.02) {
+            this.calmSince = null;
+            return this.target;
+        }
+
+        if (this.target !== null) {
+            this.calmSince ??= now;
+            if (now - this.calmSince >= JITTER_RELEASE_AFTER_MS) {
+                this.target = null;
+                this.calmSince = null;
+            }
+        }
+        return this.target;
     }
 }

@@ -28,6 +28,8 @@ interface ControlButtonProps {
     disabled?: boolean;
     /** Hide the caption (the button keeps its accessible name). */
     hideLabel?: boolean;
+    /** The key that does the same thing (shown in the tooltip, announced to screen readers). */
+    shortcut?: string;
     className?: string;
 }
 
@@ -40,6 +42,7 @@ export function ControlButton({
     pressed,
     disabled,
     hideLabel,
+    shortcut,
     className,
 }: ControlButtonProps) {
     return (
@@ -48,7 +51,8 @@ export function ControlButton({
                 type="button"
                 aria-label={label}
                 aria-pressed={pressed}
-                title={label}
+                aria-keyshortcuts={shortcut}
+                title={shortcut ? `${label} (${shortcut})` : label}
                 disabled={disabled}
                 onClick={onClick}
                 className={cn(

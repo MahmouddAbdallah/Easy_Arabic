@@ -13,7 +13,9 @@
  *
  * A dropped connection is not the end of a call: the media is brought back by restarting ICE, retried with growing
  * pauses, for CALL_RECONNECT_TIMEOUT_MS (longer once this browser is back online, or the other side is seen
- * negotiating). Nothing is restarted while the browser is offline.
+ * negotiating). Nothing is restarted while the browser is offline. A move to another kind of network (Wi-Fi to
+ * mobile data) restarts ICE straight away instead of waiting for the old route to die, within the call's budget
+ * of signaling messages.
  */
 import axios from "axios";
 import { collection, doc, onSnapshot, query, where, type Unsubscribe } from "firebase/firestore";
@@ -44,10 +46,13 @@ import {
     getCallMediaErrorMessage,
     getCallSupportProblem,
     getCameraErrorMessage,
+    getMicrophoneErrorMessage,
+    getScreenShareErrorMessage,
     openLocalMedia,
     type EngineConnectionState,
     type LocalMedia,
 } from "./callEngine";
+import { rememberDevice } from "./callMedia";
 import type { ConnectionQuality, QualityLevel } from "./callQuality";
 import { callSounds, unlockCallSounds } from "./callSounds";
 import { getErrorMessage } from "./getErrorMessage";
@@ -100,6 +105,15 @@ export interface CallSessionState {
     videoPaused: boolean;
     canSwitchCamera: boolean;
     mirrorLocal: boolean;
+    /** This browser sends its screen instead of its camera. */
+    sharingScreen: boolean;
+    /** The other side sends its screen instead of its camera. */
+    remoteSharing: boolean;
+    /** The microphone and camera in use, by the browser's device ids. */
+    microphoneId: string | null;
+    cameraId: string | null;
+    /** The call has a TURN relay to fall back on (people behind strict firewalls can only be reached through one). */
+    relayAvailable: boolean;
     /** A video call without a working camera: the person is heard but not seen. */
     videoUnavailable: boolean;
     localStream: MediaStream | null;
@@ -130,6 +144,11 @@ export const IDLE_CALL_STATE: CallSessionState = {
     videoPaused: false,
     canSwitchCamera: false,
     mirrorLocal: true,
+    sharingScreen: false,
+    remoteSharing: false,
+    microphoneId: null,
+    cameraId: null,
+    relayAvailable: false,
     videoUnavailable: false,
     localStream: null,
     remoteStream: null,
@@ -171,6 +190,18 @@ const RECONNECTING_SHOWN_AFTER_MS = 1500;
 const STALL_SECONDS = 8;
 /** TURN passwords last about an hour: a call older than this gets fresh servers before an ICE restart. */
 const ICE_SERVERS_MAX_AGE_MS = 30 * 60_000;
+/** A change of network type is given a moment to settle (the new address needs a second to arrive) before ICE restarts. */
+const NETWORK_CHANGE_DEBOUNCE_MS = 1500;
+/** Restarts nobody was forced into (a network change, coming back online) are at least this far apart. */
+const PROACTIVE_RESTART_GAP_MS = 10_000;
+/**
+ * A call may only carry MAX_CALL_SIGNALS signaling messages, and every ICE restart costs a few dozen. Restarts that
+ * are only precaution stop at this many (sent plus received); recovering from real trouble never does.
+ */
+const PROACTIVE_RESTART_SIGNAL_LIMIT = 400;
+
+/** The Network Information API (Chrome, Android): its `type` says Wi-Fi, cellular, ethernet... */
+type NavigatorWithConnection = Navigator & { connection?: EventTarget & { type?: string } };
 
 const kindOf = (mode: CallMode) => (mode === "video" ? "video" : "voice");
 
@@ -227,6 +258,9 @@ export class CallController {
     private syncAgain = false;
     private outbound: Promise<void> = Promise.resolve();
     private cameraBusy = false;
+    /** Signaling messages sent and received in this call: what an ICE restart is weighed against. */
+    private signalCount = 0;
+    private lastProactiveRestartAt = 0;
     /** Bumped whenever a session starts or ends: an async step that finds it changed stops quietly. */
     private attempt = 0;
     /** Calls this browser has already shown, so a repeated doorbell never rings twice. */
@@ -237,6 +271,7 @@ export class CallController {
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private restartTimer: ReturnType<typeof setTimeout> | null = null;
     private blipTimer: ReturnType<typeof setTimeout> | null = null;
+    private networkTimer: ReturnType<typeof setTimeout> | null = null;
     private dismissTimer: ReturnType<typeof setTimeout> | null = null;
     private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -319,7 +354,7 @@ export class CallController {
                 this.extendReconnectDeadline();
                 this.scheduleRestart(0);
             } else {
-                void this.engine?.restartIce(); // the route may have changed even though nothing has noticed yet
+                this.restartAsPrecaution(); // the route may have changed even though nothing has noticed yet
             }
         };
         const setOffline = () => this.setState({ offline: true });
@@ -328,16 +363,29 @@ export class CallController {
             if (document.visibilityState !== "visible" || !this.callId) return;
             this.beat();
             if (this.linkDown && !this.state.offline) this.scheduleRestart(0);
+            // A phone call or another app may have taken the microphone or camera while the page was away.
+            this.engine?.refreshLocalTracks();
+        };
+        // Wi-Fi to mobile data (and back) doesn't always make the browser go offline; the kind of network changing is the hint.
+        const connection = (navigator as NavigatorWithConnection).connection;
+        let networkType = connection?.type;
+        const onNetworkChange = () => {
+            const type = connection?.type;
+            if (type === networkType) return;
+            networkType = type;
+            this.networkChanged();
         };
         window.addEventListener("pagehide", onPageHide);
         window.addEventListener("online", setOnline);
         window.addEventListener("offline", setOffline);
         document.addEventListener("visibilitychange", onVisibilityChange);
+        connection?.addEventListener("change", onNetworkChange);
         this.removeListeners = () => {
             window.removeEventListener("pagehide", onPageHide);
             window.removeEventListener("online", setOnline);
             window.removeEventListener("offline", setOffline);
             document.removeEventListener("visibilitychange", onVisibilityChange);
+            connection?.removeEventListener("change", onNetworkChange);
         };
         if (typeof navigator !== "undefined" && navigator.onLine === false) this.setState({ offline: true });
         this.updatePolling();
@@ -539,11 +587,11 @@ export class CallController {
         this.cameraBusy = true;
         try {
             await engine.setCameraOff(!engine.isCameraOff);
-            this.setState({ cameraOff: engine.isCameraOff, localStream: engine.localStream, mirrorLocal: engine.mirrorLocal });
         } catch (error) {
             toast.error(getCameraErrorMessage(error), { id: "call-camera-error" });
         } finally {
             this.cameraBusy = false;
+            this.syncLocalMedia(engine);
         }
     }
 
@@ -553,11 +601,60 @@ export class CallController {
         this.cameraBusy = true;
         try {
             await engine.switchCamera();
-            this.setState({ localStream: engine.localStream, mirrorLocal: engine.mirrorLocal });
         } catch (error) {
             toast.error(getCameraErrorMessage(error), { id: "call-camera-error" });
         } finally {
             this.cameraBusy = false;
+            this.syncLocalMedia(engine);
+        }
+    }
+
+    /** Shares the screen in place of the camera, or stops sharing. A cancelled picker is not an error. */
+    async toggleScreenShare(): Promise<void> {
+        const engine = this.engine;
+        if (!engine || this.cameraBusy || this.state.mode !== "video") return;
+        this.cameraBusy = true;
+        try {
+            if (engine.isSharingScreen) await engine.stopScreenShare();
+            else await engine.startScreenShare();
+        } catch (error) {
+            const message = getScreenShareErrorMessage(error);
+            if (message) toast.error(message, { id: "call-screen-error" });
+        } finally {
+            this.cameraBusy = false;
+            this.syncLocalMedia(engine);
+        }
+    }
+
+    /** Another microphone, from the device menu. The one in use keeps working if the new one can't be opened. */
+    async selectMicrophone(deviceId: string): Promise<void> {
+        const engine = this.engine;
+        if (!engine || this.cameraBusy) return;
+        this.cameraBusy = true;
+        try {
+            await engine.selectMicrophone(deviceId);
+            rememberDevice("microphone", deviceId);
+        } catch (error) {
+            toast.error(getMicrophoneErrorMessage(error), { id: "call-device-error" });
+        } finally {
+            this.cameraBusy = false;
+            this.syncLocalMedia(engine);
+        }
+    }
+
+    /** Another camera, from the device menu. */
+    async selectCamera(deviceId: string): Promise<void> {
+        const engine = this.engine;
+        if (!engine || this.cameraBusy) return;
+        this.cameraBusy = true;
+        try {
+            await engine.selectCamera(deviceId);
+            rememberDevice("camera", deviceId);
+        } catch (error) {
+            toast.error(getCameraErrorMessage(error), { id: "call-camera-error" });
+        } finally {
+            this.cameraBusy = false;
+            this.syncLocalMedia(engine);
         }
     }
 
@@ -579,29 +676,39 @@ export class CallController {
             events: {
                 onSignals: (signals) => this.sendSignals(signals),
                 onConnectionState: (state) => this.onConnectionState(state),
-                onLocalStream: (stream) =>
-                    this.setState({ localStream: stream, mirrorLocal: this.engine?.mirrorLocal ?? true }),
+                onLocalStream: () => this.syncLocalMedia(),
                 onRemoteStream: (stream) => this.setState({ remoteStream: stream }),
-                onRemoteMedia: ({ muted, cameraOff, videoPaused }) =>
-                    this.setState({ remoteMuted: muted, remoteCameraOff: cameraOff, remoteVideoPaused: videoPaused }),
+                onRemoteMedia: ({ muted, cameraOff, videoPaused, sharing }) =>
+                    this.setState({ remoteMuted: muted, remoteCameraOff: cameraOff, remoteVideoPaused: videoPaused, remoteSharing: sharing }),
                 onQuality: (quality) => this.onQuality(quality),
                 onDeviceLost: (kind) => {
                     toast.error(kind === "audio" ? "Your microphone was disconnected." : "Your camera was disconnected.", {
                         id: `call-device-${kind}`,
                     });
-                    if (kind === "video") this.setState({ cameraOff: true, localStream: this.engine?.localStream ?? null });
+                    this.syncLocalMedia();
                 },
+                onCameraUnavailable: (error) => toast.error(getCameraErrorMessage(error), { id: "call-camera-error" }),
             },
         });
     }
 
-    private showLocalMedia(engine: CallEngine, media: LocalMedia) {
+    /** Mirrors what the engine captures and sends into the state the call screen renders. */
+    private syncLocalMedia(engine: CallEngine | null = this.engine) {
+        // A call that ended (or was replaced) while an async step was running has nothing left to show.
+        if (!engine || engine !== this.engine) return;
         this.setState({
             localStream: engine.localStream,
             mirrorLocal: engine.mirrorLocal,
             cameraOff: engine.isCameraOff,
-            videoUnavailable: media.videoUnavailable,
+            sharingScreen: engine.isSharingScreen,
+            microphoneId: engine.microphoneId,
+            cameraId: engine.activeCameraId,
         });
+    }
+
+    private showLocalMedia(engine: CallEngine, media: LocalMedia) {
+        this.syncLocalMedia(engine);
+        this.setState({ videoUnavailable: media.videoUnavailable, relayAvailable: engine.hasRelayServer });
         if (media.videoUnavailable) {
             toast("Your camera isn't available. You'll be heard, but not seen.", { icon: "📷", id: "call-no-camera" });
         }
@@ -708,6 +815,30 @@ export class CallController {
         }
         if (!this.linkDown) return;
         this.scheduleRestart(Math.min(RESTART_RETRY_STEP_MS * Math.max(1, this.restartAttempt), RESTART_RETRY_MAX_MS));
+    }
+
+    /** The device moved to another kind of network: look for the new route now, not when the old one has died. */
+    private networkChanged() {
+        if (this.networkTimer !== null) clearTimeout(this.networkTimer);
+        this.networkTimer = setTimeout(() => {
+            this.networkTimer = null;
+            this.restartAsPrecaution();
+        }, NETWORK_CHANGE_DEBOUNCE_MS);
+    }
+
+    /**
+     * An ICE restart that nothing forced: the route may have changed even though no one has noticed. It is skipped
+     * while a recovery is already under way or the browser is offline (the `online` event brings the next try), and
+     * once the call has used up most of its signaling messages, which real trouble may still need.
+     */
+    private restartAsPrecaution() {
+        const engine = this.engine;
+        if (!engine || this.state.phase !== "active" || this.linkDown || this.state.offline) return;
+        if (this.signalCount >= PROACTIVE_RESTART_SIGNAL_LIMIT) return;
+        const now = Date.now();
+        if (now - this.lastProactiveRestartAt < PROACTIVE_RESTART_GAP_MS) return;
+        this.lastProactiveRestartAt = now;
+        void engine.restartIce();
     }
 
     /** A call can outlive its TURN passwords; an ICE restart with expired ones couldn't reach a relay. */
@@ -866,6 +997,7 @@ export class CallController {
     private sendSignals(signals: Parameters<typeof callApi.signal>[1]) {
         const callId = this.callId;
         if (!callId) return;
+        this.signalCount += signals.length;
         const attempt = this.attempt;
         // One request at a time keeps the offer, the answer and the candidates in the order they were made.
         this.outbound = this.outbound.then(async () => {
@@ -895,6 +1027,7 @@ export class CallController {
         const fresh = signals.filter((signal) => signal.seq > this.cursor).sort((a, b) => a.seq - b.seq);
         if (fresh.length === 0) return;
         this.cursor = fresh[fresh.length - 1].seq;
+        this.signalCount += fresh.length;
         // The other side is renegotiating: it is there, and the recovery deserves the time to finish.
         if (this.linkDown && fresh.some((signal) => signal.type !== "candidate")) this.extendReconnectDeadline();
 
@@ -1016,13 +1149,17 @@ export class CallController {
         this.restartAttempt = 0;
         this.reconnectDeadline = 0;
         this.silentSeconds = 0;
+        this.signalCount = 0;
+        this.lastProactiveRestartAt = 0;
         if (this.quality !== null) this.setQuality(null);
         this.syncing = false;
         this.syncAgain = false;
         this.outbound = Promise.resolve();
         this.cameraBusy = false;
 
-        (["ringTimer", "connectTimer", "reconnectTimer", "restartTimer", "blipTimer"] as const).forEach((timer) => this.clearTimer(timer));
+        (["ringTimer", "connectTimer", "reconnectTimer", "restartTimer", "blipTimer", "networkTimer"] as const).forEach((timer) =>
+            this.clearTimer(timer)
+        );
         if (this.heartbeatTimer !== null) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = null;
         this.callUnsubscribe?.();
@@ -1030,7 +1167,7 @@ export class CallController {
         callSounds.stopAll();
     }
 
-    private clearTimer(name: "ringTimer" | "connectTimer" | "reconnectTimer" | "restartTimer" | "blipTimer") {
+    private clearTimer(name: "ringTimer" | "connectTimer" | "reconnectTimer" | "restartTimer" | "blipTimer" | "networkTimer") {
         const timer = this[name];
         if (timer !== null) clearTimeout(timer);
         this[name] = null;

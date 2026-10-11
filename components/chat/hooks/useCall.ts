@@ -50,6 +50,9 @@ export interface CallActions {
     toggleMute: () => void;
     toggleCamera: () => void;
     switchCamera: () => void;
+    toggleScreenShare: () => void;
+    selectMicrophone: (deviceId: string) => void;
+    selectCamera: (deviceId: string) => void;
     dismissEnded: () => void;
 }
 
@@ -65,6 +68,9 @@ export function useCallActions(): CallActions {
             toggleMute: () => controller.toggleMute(),
             toggleCamera: () => void controller.toggleCamera(),
             switchCamera: () => void controller.switchCamera(),
+            toggleScreenShare: () => void controller.toggleScreenShare(),
+            selectMicrophone: (deviceId) => void controller.selectMicrophone(deviceId),
+            selectCamera: (deviceId) => void controller.selectCamera(deviceId),
             dismissEnded: () => controller.dismissEnded(),
         }),
         [controller]

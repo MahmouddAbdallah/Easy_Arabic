@@ -58,16 +58,18 @@ interface AdaptiveVideoProps {
     mirror?: boolean;
     /** Your own camera: silent, and not something to announce. */
     muted?: boolean;
+    /** Never crop, whatever the shapes: a shared screen is read, and the edge of a document is not "a sliver". */
+    alwaysContain?: boolean;
     onPlaying?: () => void;
     onEmptied?: () => void;
     className?: string;
 }
 
 /** A video that fills its parent as fully as it can without cropping away more than a sliver of the picture. */
-export function AdaptiveVideo({ videoRef, stream, size, visible, mirror = false, muted = false, onPlaying, onEmptied, className }: AdaptiveVideoProps) {
+export function AdaptiveVideo({ videoRef, stream, size, visible, mirror = false, muted = false, alwaysContain = false, onPlaying, onEmptied, className }: AdaptiveVideoProps) {
     const frameRef = useRef<HTMLDivElement>(null);
     const frame = useElementSize(frameRef);
-    const fit = pictureFit(size, frame);
+    const fit = alwaysContain ? "contain" : pictureFit(size, frame);
 
     return (
         <div ref={frameRef} className={cn("absolute inset-0 overflow-hidden", className)}>

@@ -2,14 +2,16 @@
  * The WebRTC half of a call, with no knowledge of React, Firestore or the API: it owns the
  * RTCPeerConnection and the microphone/camera, and talks to the outside through a few callbacks.
  *
- *   media          getUserMedia (+ camera released when "camera off", switched between cameras)
+ *   media          getUserMedia (+ camera released when "camera off", switched between cameras and microphones,
+ *                  or replaced by a shared screen)
  *   negotiation    "perfect negotiation": either side may renegotiate (ICE restart after a network
  *                  change) without the two offers colliding; the callee is the polite peer
  *   signaling out  ICE candidates are batched and only sent once `setSignalingReady(true)`
  *   signaling in   handled strictly one at a time, candidates wait for the remote description
- *   state channel  a tiny RTCDataChannel carries "muted" / "camera off" / "video paused" to the other person's screen
+ *   state channel  a tiny RTCDataChannel carries "muted" / "camera off" / "video paused" / "sharing" to the other person's screen
  *   quality        getStats() once a second: a connection reading for the screen, and the video sender
- *                  (resolution, frame rate, bitrate) kept within what the network can carry
+ *                  (resolution, frame rate, bitrate) kept within what the network can carry, and the receive buffer
+ *                  raised while packets arrive unevenly
  */
 import {
     MAX_SIGNALS_PER_REQUEST,
@@ -23,16 +25,31 @@ import {
     type CallSignal,
     type CallSignalInput,
 } from "./call";
-import { maxSendShortSide, openCameraStream, tuneVideoTrack, type CameraTarget } from "./callMedia";
 import {
+    maxSendShortSide,
+    openCameraStream,
+    openScreenStream,
+    readDevicePreferences,
+    tuneAudioTrack,
+    tuneVideoTrack,
+    withMicrophone,
+    type CameraTarget,
+    type MicrophoneTarget,
+} from "./callMedia";
+import { hasRelayServer } from "./callIce";
+import {
+    JitterBufferPolicy,
     QualityMeter,
     QualitySampler,
+    SCREEN_TIERS,
+    VIDEO_TIERS,
     VideoGovernor,
     planFor,
     videoLadder,
     type CaptureSize,
     type ConnectionQuality,
     type QualitySample,
+    type VideoTier,
 } from "./callQuality";
 
 export type EngineConnectionState = "connecting" | "connected" | "disconnected" | "failed" | "closed";
@@ -42,6 +59,8 @@ export interface RemoteMediaState {
     cameraOff: boolean;
     /** The other side stopped sending video because its connection is too weak for it (not a choice). */
     videoPaused: boolean;
+    /** The picture the other side sends is their screen, not their camera. */
+    sharing: boolean;
 }
 
 export interface CallEngineEvents {
@@ -57,6 +76,8 @@ export interface CallEngineEvents {
     onQuality: (quality: ConnectionQuality) => void;
     /** A device was unplugged mid-call and could not be replaced. */
     onDeviceLost: (kind: "audio" | "video") => void;
+    /** The camera could not be turned back on by the engine itself (e.g. after a screen share ended). */
+    onCameraUnavailable: (error: unknown) => void;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -130,7 +151,46 @@ export function getCameraErrorMessage(error: unknown): string {
     }
 }
 
-const AUDIO: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+/** Switching to another microphone failed (the one in use keeps working). */
+export function getMicrophoneErrorMessage(error: unknown): string {
+    switch ((error as { name?: string } | null)?.name) {
+        case "NotAllowedError":
+        case "PermissionDeniedError":
+        case "SecurityError":
+            return "Microphone access is blocked. Allow it for this site in your browser settings, then try again.";
+        case "NotFoundError":
+        case "DevicesNotFoundError":
+        case "OverconstrainedError":
+            return "That microphone isn't available any more.";
+        case "NotReadableError":
+        case "TrackStartError":
+        case "AbortError":
+            return "That microphone is busy or unavailable. Close other apps that use it and try again.";
+        default:
+            return "Couldn't switch microphone. Please try again.";
+    }
+}
+
+/** Turning screen sharing on failed for a reason worth telling the person about; null when they simply changed their mind. */
+export function getScreenShareErrorMessage(error: unknown): string | null {
+    const { name, message } = (error ?? {}) as { name?: string; message?: string };
+    switch (name) {
+        case "NotAllowedError":
+        case "PermissionDeniedError":
+            // Cancelling the picker is also reported as "not allowed": only the system-level refusal is news.
+            return /by system/i.test(message ?? "")
+                ? "Your computer isn't letting the browser record the screen. Allow it in your system's privacy settings, then try again."
+                : null;
+        case "AbortError":
+            return null;
+        case "NotFoundError":
+            return "There's no screen to share.";
+        case "NotReadableError":
+            return "Couldn't capture that screen. Pick another one and try again.";
+        default:
+            return "Couldn't share your screen. Please try again.";
+    }
+}
 
 export interface LocalMedia {
     stream: MediaStream;
@@ -141,33 +201,66 @@ export interface LocalMedia {
 /** Opens the microphone (and the camera for a video call). Throws CallMediaError. */
 export async function openLocalMedia(mode: CallMode): Promise<LocalMedia> {
     const devices = navigator.mediaDevices;
+    // The devices picked in an earlier call are a preference, not a demand: one that is gone is simply not used.
+    const preferred = readDevicePreferences();
+    const microphone: MicrophoneTarget | undefined = preferred.microphone ? { deviceId: preferred.microphone, exact: false } : undefined;
+    const camera: CameraTarget | undefined = preferred.camera ? { deviceId: preferred.camera, exact: false } : undefined;
+
+    const tuned = (stream: MediaStream): MediaStream => {
+        stream.getAudioTracks().forEach(tuneAudioTrack);
+        stream.getVideoTracks().forEach(tuneVideoTrack);
+        return stream;
+    };
+
     try {
         if (mode === "video") {
             try {
                 // The camera's real shape and best practical size: see ./callMedia.ts.
-                const stream = await openCameraStream(AUDIO);
-                stream.getVideoTracks().forEach((track) => tuneVideoTrack(track));
-                return { stream, videoUnavailable: false };
+                return { stream: tuned(await withMicrophone(microphone, (audio) => openCameraStream(audio, camera))), videoUnavailable: false };
             } catch {
                 // A call without a working camera is still a call. If the microphone is the problem, this throws too.
-                return { stream: await devices.getUserMedia({ audio: AUDIO }), videoUnavailable: true };
+                return { stream: tuned(await withMicrophone(microphone, (audio) => devices.getUserMedia({ audio }))), videoUnavailable: true };
             }
         }
-        return { stream: await devices.getUserMedia({ audio: AUDIO }), videoUnavailable: false };
+        return { stream: tuned(await withMicrophone(microphone, (audio) => devices.getUserMedia({ audio }))), videoUnavailable: false };
     } catch (error) {
         throw new CallMediaError(error, mode);
     }
 }
 
-async function openTrack(kind: "audio" | "video", camera?: CameraTarget): Promise<MediaStreamTrack> {
-    const stream = kind === "audio" ? await navigator.mediaDevices.getUserMedia({ audio: AUDIO }) : await openCameraStream(false, camera);
-    const track = (kind === "audio" ? stream.getAudioTracks() : stream.getVideoTracks())[0];
+async function openMicrophoneTrack(target?: MicrophoneTarget): Promise<MediaStreamTrack> {
+    const stream = await withMicrophone(target, (audio) => navigator.mediaDevices.getUserMedia({ audio }));
+    const [track] = stream.getAudioTracks();
     if (!track) {
         stream.getTracks().forEach((t) => t.stop());
-        throw new Error(`No ${kind} track`);
+        throw new Error("No audio track");
     }
-    if (kind === "video") tuneVideoTrack(track);
+    tuneAudioTrack(track);
     return track;
+}
+
+async function openCameraTrack(target?: CameraTarget): Promise<MediaStreamTrack> {
+    const stream = await openCameraStream(false, target);
+    const [track] = stream.getVideoTracks();
+    if (!track) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new Error("No video track");
+    }
+    tuneVideoTrack(track);
+    return track;
+}
+
+/** The first of `targets` that opens. */
+async function openFirstCamera(targets: CameraTarget[]): Promise<MediaStreamTrack> {
+    let failure: unknown;
+    for (const target of targets) {
+        try {
+            return await openCameraTrack(target);
+        } catch (error) {
+            failure = error;
+        }
+    }
+    throw failure;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -178,13 +271,24 @@ async function openTrack(kind: "audio" | "video", camera?: CameraTarget): Promis
 const CANDIDATE_BATCH_MS = 120;
 /** How often the connection is measured. */
 const STATS_INTERVAL_MS = 1000;
+/** A local device the browser reports as muted for this long (while the page is on screen) is opened again. */
+const STUCK_TRACK_MS = 5000;
+
+/** What the picture being sent comes from. */
+type VideoSource = "camera" | "screen" | "none";
+
+/** `RTCRtpReceiver.jitterBufferTarget` is missing from the DOM typings of some TypeScript versions. */
+type JitterBufferReceiver = RTCRtpReceiver & { jitterBufferTarget: number | null };
 
 interface ControlMessage {
     v: 1;
     muted: boolean;
+    /** No picture at all is being sent: the camera is off and no screen is shared. */
     cameraOff: boolean;
     /** Video switched off by the sender's own network (see VideoGovernor), as opposed to somebody turning the camera off. */
     paused?: boolean;
+    /** The picture is the sender's screen. Absent in messages from older versions: read as false. */
+    sharing?: boolean;
 }
 
 export interface CallEngineOptions {
@@ -215,8 +319,12 @@ export class CallEngine {
     private local: MediaStream;
     private remoteTracks: MediaStreamTrack[] = [];
     private muted = false;
-    private cameraOff: boolean;
+    private videoSource: VideoSource;
+    /** The camera used last: the one that comes back when the camera is turned on again. */
     private cameraId: string | undefined;
+    /** The camera was on when screen sharing began, so it comes back when sharing ends. */
+    private resumeCameraAfterShare = false;
+    private relayConfigured: boolean;
     private closed = false;
     private lastState: EngineConnectionState | null = null;
     /** The call has been connected at least once: from then on a stuck offer may be rolled back. */
@@ -228,7 +336,11 @@ export class CallEngine {
     private readonly sampler = new QualitySampler();
     private readonly meter = new QualityMeter();
     private readonly governor = new VideoGovernor();
+    private readonly jitterPolicy = new JitterBufferPolicy();
+    private jitterTarget: number | null = null;
     private readonly maxShortSide = maxSendShortSide();
+    /** Local devices the browser reports as muted, each with the timer that opens it again if that lasts. */
+    private readonly stuckTimers = new Map<MediaStreamTrack, ReturnType<typeof setTimeout>>();
     /** Video is switched off for the network; the other screen is told. */
     private videoPaused = false;
     private encoderQueue: Promise<void> = Promise.resolve();
@@ -255,8 +367,9 @@ export class CallEngine {
         this.events = events;
         this.polite = role === "callee";
         this.local = media.stream;
-        this.cameraOff = mode === "video" && media.stream.getVideoTracks().length === 0;
+        this.videoSource = mode === "video" && media.stream.getVideoTracks().length > 0 ? "camera" : "none";
         this.cameraId = media.stream.getVideoTracks()[0]?.getSettings().deviceId;
+        this.relayConfigured = hasRelayServer(iceServers);
 
         this.pc = new RTCPeerConnection({
             iceServers,
@@ -307,13 +420,35 @@ export class CallEngine {
         return this.muted;
     }
 
+    /** A video call that isn't sending the camera (it is off, or the screen is being shared instead). */
     get isCameraOff(): boolean {
-        return this.cameraOff;
+        return this.mode === "video" && this.videoSource !== "camera";
     }
 
-    /** The front camera is shown mirrored, like a mirror; the back camera is not. */
+    get isSharingScreen(): boolean {
+        return this.videoSource === "screen";
+    }
+
+    /** The front camera is shown mirrored, like a mirror; the back camera and a shared screen are not. */
     get mirrorLocal(): boolean {
+        if (this.videoSource === "screen") return false;
         return this.local.getVideoTracks()[0]?.getSettings().facingMode !== "environment";
+    }
+
+    /** The microphone in use, as the browser names it. */
+    get microphoneId(): string | null {
+        return this.local.getAudioTracks()[0]?.getSettings().deviceId ?? null;
+    }
+
+    /** The camera in use, or the one that comes back when the camera is turned on again. */
+    get activeCameraId(): string | null {
+        const track = this.videoSource === "camera" ? this.local.getVideoTracks()[0] : undefined;
+        return track?.getSettings().deviceId ?? this.cameraId ?? null;
+    }
+
+    /** Were TURN servers handed to this call? Without one, people behind strict firewalls can't be reached. */
+    get hasRelayServer(): boolean {
+        return this.relayConfigured;
     }
 
     async canSwitchCamera(): Promise<boolean> {
@@ -471,6 +606,7 @@ export class CallEngine {
         if (this.closed) return;
         try {
             this.pc.setConfiguration({ ...this.pc.getConfiguration(), iceServers });
+            this.relayConfigured = hasRelayServer(iceServers);
         } catch (error) {
             console.warn("[call] Couldn't update the ICE servers:", error);
         }
@@ -537,6 +673,7 @@ export class CallEngine {
             if (!sample) return;
 
             this.adaptVideo(sample, now);
+            this.adaptReceiveBuffer(sample, now);
             const { level, score } = this.meter.update(sample);
             this.events.onQuality({ level, score, sample, sending: this.sendingState() });
         } catch {
@@ -546,16 +683,39 @@ export class CallEngine {
         }
     }
 
+    /**
+     * Raises the playout floor of both receivers while packets arrive unevenly, and lets it go when the link is
+     * calm again (see JitterBufferPolicy). Browsers without the property keep their own buffer.
+     */
+    private adaptReceiveBuffer(sample: QualitySample, now: number) {
+        const target = this.jitterPolicy.update(sample, now);
+        if (target === this.jitterTarget) return;
+        this.jitterTarget = target;
+        for (const { receiver } of this.pc.getTransceivers()) {
+            if (!("jitterBufferTarget" in receiver)) continue;
+            try {
+                (receiver as JitterBufferReceiver).jitterBufferTarget = target;
+            } catch {
+                /* refused: the browser keeps choosing its own buffer */
+            }
+        }
+    }
+
     /** The size the camera delivers right now: it changes when a phone is turned or the camera is switched. */
     private captureSize(): CaptureSize | null {
         const settings = this.local.getVideoTracks()[0]?.getSettings();
         return settings?.width && settings.height ? { width: settings.width, height: settings.height } : null;
     }
 
+    /** The tiers on offer for what is being sent: a screen keeps its sharpness longer and gives up frames first. */
+    private ladderFor(capture: CaptureSize): VideoTier[] {
+        return videoLadder(capture, this.maxShortSide, this.videoSource === "screen" ? SCREEN_TIERS : VIDEO_TIERS);
+    }
+
     private sendingState(): ConnectionQuality["sending"] {
         const capture = this.captureSize();
         if (this.mode !== "video" || !capture) return null;
-        const ladder = videoLadder(capture, this.maxShortSide);
+        const ladder = this.ladderFor(capture);
         const index = Math.min(this.governor.tier, ladder.length - 1);
         return { tier: ladder[index].id, paused: this.videoPaused, reduced: this.videoPaused || index > 0 };
     }
@@ -564,7 +724,7 @@ export class CallEngine {
         const capture = this.captureSize();
         if (this.mode !== "video" || !capture) return; // nothing is being sent: nothing to adapt
 
-        const decision = this.governor.update(sample, videoLadder(capture, this.maxShortSide), capture, now);
+        const decision = this.governor.update(sample, this.ladderFor(capture), capture, now);
         if (decision.paused !== this.videoPaused) {
             this.videoPaused = decision.paused;
             this.sendMediaState();
@@ -574,8 +734,8 @@ export class CallEngine {
 
     private encoderPlanKey(): string {
         const capture = this.captureSize();
-        const tier = capture ? Math.min(this.governor.tier, videoLadder(capture, this.maxShortSide).length - 1) : -1;
-        return `${tier}|${this.videoPaused}|${capture ? `${capture.width}x${capture.height}` : "none"}`;
+        const tier = capture ? Math.min(this.governor.tier, this.ladderFor(capture).length - 1) : -1;
+        return `${this.videoSource}|${tier}|${this.videoPaused}|${capture ? `${capture.width}x${capture.height}` : "none"}`;
     }
 
     /** Writes the current video plan (and, once, the audio priority) onto the senders. One write at a time. */
@@ -619,7 +779,7 @@ export class CallEngine {
         if (this.videoPaused) {
             encoding.active = false;
         } else {
-            const ladder = videoLadder(capture, this.maxShortSide);
+            const ladder = this.ladderFor(capture);
             const plan = planFor(ladder[Math.min(this.governor.tier, ladder.length - 1)], capture);
             encoding.active = true;
             encoding.maxBitrate = plan.maxBitrate;
@@ -634,7 +794,7 @@ export class CallEngine {
         }
     }
 
-    /* ---- microphone and camera ---- */
+    /* ---- microphone, camera and screen ---- */
 
     setMuted(muted: boolean) {
         this.muted = muted;
@@ -645,17 +805,22 @@ export class CallEngine {
 
     /** Turning the camera off releases it (its light goes out) instead of just sending black frames. */
     async setCameraOff(off: boolean): Promise<void> {
-        if (this.mode !== "video" || off === this.cameraOff || this.closed) return;
+        if (this.mode !== "video" || off === this.isCameraOff || this.closed) return;
 
         if (off) {
-            this.cameraOff = true;
             await this.swapTrack("video", null);
         } else {
-            const track = await openTrack("video", this.cameraId ? { deviceId: this.cameraId } : undefined); // throws if the camera can't be opened: stays off
-            await this.swapTrack("video", track);
-            this.cameraOff = false;
+            // Throws if the camera can't be opened: the call stays as it was. A shared screen gives way to the camera.
+            const track = await openCameraTrack(this.cameraTarget());
+            await this.swapTrack("video", track, "camera");
+            this.resumeCameraAfterShare = false;
         }
         this.sendMediaState();
+    }
+
+    /** How to reopen the camera used last. It may have been unplugged since: then the browser picks another one. */
+    private cameraTarget(): CameraTarget | undefined {
+        return this.cameraId ? { deviceId: this.cameraId, exact: false } : undefined;
     }
 
     /**
@@ -663,7 +828,7 @@ export class CallEngine {
      * turn. The current one is released first: many phones can't open two.
      */
     async switchCamera(): Promise<void> {
-        if (this.mode !== "video" || this.cameraOff || this.closed) return;
+        if (this.mode !== "video" || this.videoSource !== "camera" || this.closed) return;
 
         const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(
             (device) => device.kind === "videoinput" && device.deviceId
@@ -680,14 +845,34 @@ export class CallEngine {
             targets.push({ facing: settings.facingMode === "user" ? "environment" : "user", exact: true });
         }
         targets.push({ deviceId: next.deviceId });
+        await this.replaceCamera(targets);
+    }
 
+    /** A particular camera, from the device menu. With the camera off it is only remembered, for when it starts. */
+    async selectCamera(deviceId: string): Promise<void> {
+        if (this.mode !== "video" || this.closed) return;
+        if (this.videoSource !== "camera") {
+            this.cameraId = deviceId;
+            return;
+        }
+        if (deviceId === this.activeCameraId) return;
+        await this.replaceCamera([{ deviceId }]);
+    }
+
+    /**
+     * Puts the first camera of `targets` that opens on the wire. When none does, the one that worked is brought
+     * back; when even that fails, the call goes on without a picture and the other screen says so.
+     */
+    private async replaceCamera(targets: CameraTarget[]): Promise<void> {
+        const previous = this.activeCameraId;
         this.local.getVideoTracks().forEach((track) => track.stop());
+
         let failure: unknown;
         for (const target of targets) {
             let track: MediaStreamTrack | null = null;
             try {
-                track = await openTrack("video", target);
-                await this.swapTrack("video", track);
+                track = await openCameraTrack(target);
+                await this.swapTrack("video", track, "camera");
                 this.cameraId = track.getSettings().deviceId ?? ("deviceId" in target ? target.deviceId : this.cameraId);
                 return;
             } catch (error) {
@@ -696,11 +881,74 @@ export class CallEngine {
             }
         }
 
-        // Couldn't open another camera: go back to the one that worked.
-        await this.swapTrack("video", await openTrack("video", currentId ? { deviceId: currentId } : undefined)).catch(() =>
-            this.events.onDeviceLost("video")
-        );
+        try {
+            await this.swapTrack("video", await openCameraTrack(previous ? { deviceId: previous, exact: false } : undefined), "camera");
+        } catch {
+            await this.swapTrack("video", null).catch(() => undefined);
+            this.sendMediaState();
+            this.events.onDeviceLost("video");
+        }
         throw failure;
+    }
+
+    /** A particular microphone, from the device menu. The current one keeps working if the new one can't be opened. */
+    async selectMicrophone(deviceId: string): Promise<void> {
+        if (this.closed || deviceId === this.microphoneId) return;
+        const track = await openMicrophoneTrack({ deviceId, exact: true });
+        if (this.closed) {
+            track.stop();
+            return;
+        }
+        try {
+            await this.swapTrack("audio", track);
+        } catch (error) {
+            track.stop();
+            throw error;
+        }
+    }
+
+    /**
+     * Shares the screen in place of the camera. The same video sender carries it, so nothing has to be negotiated
+     * again and nothing can fall out of step; the camera is released while the screen is shared (its light goes
+     * out) and comes back when sharing stops. Rejects when the person cancels the picker.
+     */
+    async startScreenShare(): Promise<void> {
+        if (this.mode !== "video" || this.closed || this.videoSource === "screen") return;
+
+        const stream = await openScreenStream();
+        if (this.closed) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+        }
+
+        const cameraWasOn = this.videoSource === "camera";
+        try {
+            await this.swapTrack("video", stream.getVideoTracks()[0], "screen");
+        } catch (error) {
+            stream.getTracks().forEach((track) => track.stop());
+            throw error;
+        }
+        this.resumeCameraAfterShare = cameraWasOn;
+        this.sendMediaState();
+    }
+
+    /** Back to the camera, if it was on before, otherwise to no picture. The browser's own "Stop sharing" button leads here too. */
+    async stopScreenShare(): Promise<void> {
+        if (this.videoSource !== "screen" || this.closed) return;
+
+        const restoreCamera = this.resumeCameraAfterShare;
+        this.resumeCameraAfterShare = false;
+        if (restoreCamera) {
+            try {
+                await this.swapTrack("video", await openCameraTrack(this.cameraTarget()), "camera");
+                this.sendMediaState();
+                return;
+            } catch (error) {
+                this.events.onCameraUnavailable(error);
+            }
+        }
+        await this.swapTrack("video", null);
+        this.sendMediaState();
     }
 
     private transceiver(kind: "audio" | "video"): RTCRtpTransceiver | undefined {
@@ -708,7 +956,7 @@ export class CallEngine {
     }
 
     /** Puts `next` (or nothing) on the wire in place of the current track of that kind. */
-    private async swapTrack(kind: "audio" | "video", next: MediaStreamTrack | null) {
+    private async swapTrack(kind: "audio" | "video", next: MediaStreamTrack | null, source: Exclude<VideoSource, "none"> = "camera") {
         const current = this.local.getTracks().find((track) => track.kind === kind);
         const transceiver = this.transceiver(kind);
 
@@ -719,37 +967,123 @@ export class CallEngine {
         await transceiver?.sender.replaceTrack(next);
 
         current?.stop();
+        this.forget(current);
         const others = this.local.getTracks().filter((track) => track !== current);
         if (next) {
             if (kind === "audio") next.enabled = !this.muted;
             this.watch(next);
         }
         this.local = new MediaStream(next ? [...others, next] : others);
+        if (kind === "video") this.setVideoSource(next ? source : "none");
         this.events.onLocalStream(this.local);
-        // Another camera (or none) means another picture size: the video sender is set up for it.
+        // Another camera, a screen or nothing means another picture size: the video sender is set up for it.
         if (kind === "video") void this.applyEncoderSettings();
+    }
+
+    private setVideoSource(source: VideoSource) {
+        if (source === this.videoSource) return;
+        this.videoSource = source;
+        // A screen and a face have different tiers, and the old picture's trouble says nothing about the new one.
+        this.governor.reset();
+        this.videoPaused = false;
+        this.encoderKey = "";
     }
 
     /** A device that disappears mid-call (unplugged, taken by another app) is replaced if possible. */
     private watch(track: MediaStreamTrack) {
         // `ended` is only fired when the device went away: stopping a track ourselves doesn't fire it.
-        track.addEventListener("ended", async () => {
-            if (this.closed || !this.local.getTracks().includes(track)) return;
-            const kind = track.kind as "audio" | "video";
-            try {
-                const camera = kind === "video" && this.cameraId ? { deviceId: this.cameraId } : undefined;
-                await this.swapTrack(kind, await openTrack(kind, camera));
-            } catch {
-                this.events.onDeviceLost(kind);
+        track.addEventListener("ended", () => void this.onTrackEnded(track));
+        track.addEventListener("mute", () => this.onTrackMuted(track));
+        track.addEventListener("unmute", () => this.forget(track));
+    }
+
+    private async onTrackEnded(track: MediaStreamTrack) {
+        if (this.closed || !this.local.getTracks().includes(track)) return;
+        this.forget(track);
+        const kind = track.kind as "audio" | "video";
+
+        // The browser's own "Stop sharing" button.
+        if (kind === "video" && this.videoSource === "screen") {
+            await this.stopScreenShare().catch(() => undefined);
+            return;
+        }
+
+        try {
+            if (kind === "audio") {
+                // Whichever microphone the system offers now.
+                await this.swapTrack("audio", await openMicrophoneTrack());
+            } else {
+                // The same camera if it is back, otherwise any other one.
+                const targets: CameraTarget[] = [...(this.cameraId ? [{ deviceId: this.cameraId }] : []), { facing: "user" }];
+                await this.swapTrack("video", await openFirstCamera(targets), "camera");
             }
-        });
+        } catch {
+            if (kind === "video") {
+                // Keep the engine's idea of the call in step with what is really being sent.
+                await this.swapTrack("video", null).catch(() => undefined);
+                this.sendMediaState();
+            }
+            this.events.onDeviceLost(kind);
+        }
+    }
+
+    /** The browser says a local device is muted: nothing comes from it. Usually a phone call or another app has taken it. */
+    private onTrackMuted(track: MediaStreamTrack) {
+        if (this.closed || this.stuckTimers.has(track)) return;
+        // A shared screen that isn't changing is not a stuck device.
+        if (track.kind === "video" && this.videoSource === "screen") return;
+        this.stuckTimers.set(
+            track,
+            setTimeout(() => {
+                this.stuckTimers.delete(track);
+                void this.recoverTrack(track);
+            }, STUCK_TRACK_MS)
+        );
+    }
+
+    private forget(track: MediaStreamTrack | undefined) {
+        if (!track) return;
+        const timer = this.stuckTimers.get(track);
+        if (timer !== undefined) clearTimeout(timer);
+        this.stuckTimers.delete(track);
+    }
+
+    /** Opens a device again when it stayed muted while the page was on screen: the usual cure for a call that took the microphone. */
+    private async recoverTrack(track: MediaStreamTrack) {
+        if (this.closed || !track.muted || track.readyState !== "live" || !this.local.getTracks().includes(track)) return;
+        // A page that is out of sight has its devices muted on purpose (a phone in the background): nothing to fix yet.
+        if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+
+        const deviceId = track.getSettings().deviceId;
+        try {
+            if (track.kind === "audio") {
+                await this.swapTrack("audio", await openMicrophoneTrack(deviceId ? { deviceId, exact: false } : undefined));
+            } else {
+                await this.swapTrack("video", await openCameraTrack(deviceId ? { deviceId, exact: false } : undefined), "camera");
+            }
+        } catch {
+            /* the old device stays: a muted one is better than none */
+        }
+    }
+
+    /** The page is back on screen: devices the system muted while it was away get a moment, then are opened again. */
+    refreshLocalTracks() {
+        for (const track of this.local.getTracks()) {
+            if (track.muted && track.readyState === "live") this.onTrackMuted(track);
+        }
     }
 
     /* ---- "muted" and "camera off" for the other person's screen ---- */
 
     private sendMediaState() {
         if (this.control.readyState !== "open") return;
-        const message: ControlMessage = { v: 1, muted: this.muted, cameraOff: this.cameraOff, paused: this.videoPaused };
+        const message: ControlMessage = {
+            v: 1,
+            muted: this.muted,
+            cameraOff: this.mode === "video" && this.videoSource === "none",
+            paused: this.videoPaused,
+            sharing: this.videoSource === "screen",
+        };
         try {
             this.control.send(JSON.stringify(message));
         } catch {
@@ -766,6 +1100,7 @@ export class CallEngine {
                 muted: message.muted === true,
                 cameraOff: message.cameraOff === true,
                 videoPaused: message.paused === true,
+                sharing: message.sharing === true,
             });
         } catch {
             /* not ours */
@@ -782,6 +1117,9 @@ export class CallEngine {
         if (this.flushTimer !== null) clearTimeout(this.flushTimer);
         this.flushTimer = null;
         this.outbox = [];
+
+        this.stuckTimers.forEach((timer) => clearTimeout(timer));
+        this.stuckTimers.clear();
 
         this.local.getTracks().forEach((track) => track.stop());
         this.pc.onicecandidate = null;
