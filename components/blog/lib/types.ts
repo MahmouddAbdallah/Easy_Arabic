@@ -170,6 +170,8 @@ export interface BlogPublicList {
     pagination: BlogPagination;
     categories: BlogTaxonomyItem[];
     tags: BlogTaxonomyItem[];
+    /** Every published post, whatever the filter (`pagination.totalItems` only counts the filtered ones). */
+    totalPublished: number;
     truncated: boolean;
 }
 

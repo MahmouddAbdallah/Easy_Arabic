@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, CalendarDays, Users } from 'lucide-react'
+import { BookOpen, CalendarDays, SettingsIcon, Users } from 'lucide-react'
 import { cn } from 'cn'
 
 interface TeacherSectionNavProps {
@@ -22,42 +22,44 @@ const TeacherSectionNav = ({ teacherId, totalLessons, totalFamilies, pendingRequ
     const basePath = `/dashboard/teachers/${teacherId}`
     const onFamilies = pathname.startsWith(`${basePath}/families`)
     const onPlanner = pathname.startsWith(`${basePath}/planner`)
+    const onSettings = pathname.startsWith(`${basePath}/settings`)
 
     const items = [
-        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onFamilies && !onPlanner, hint: undefined },
+        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onFamilies && !onPlanner && !onSettings, hint: undefined },
         { href: `${basePath}/families`, label: 'families', count: totalFamilies, icon: Users, active: onFamilies, hint: undefined },
         { href: `${basePath}/planner`, label: 'Planner', count: pendingRequests, icon: CalendarDays, active: onPlanner, hint: `${pendingRequests} pending ${pendingRequests === 1 ? 'request' : 'requests'}` },
+        { href: `${basePath}/settings`, label: 'Settings', icon: SettingsIcon, active: onSettings, hint: undefined },
+
     ]
 
     return (
-        <nav
-            aria-label="Teacher sections"
-            className="w-full rounded-xl border border-border/60 bg-card p-1 shadow-xs sm:w-fit"
-        >
-            <ul className="flex gap-1">
+        <nav aria-label={"Teacher sections"} className="w-full rounded-xl border border-border/60 bg-card p-1 shadow-xs sm:w-fit">
+            <ul className="flex gap-1 w-full  max-md:overflow-x-auto">
                 {items.map(({ href, label, count, icon: Icon, active, hint }) => (
                     <li key={href} className="flex-1 sm:flex-none">
                         <Link
                             href={href}
                             aria-current={active ? 'page' : undefined}
                             className={cn(
-                                'flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+                                'flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none',
                                 active
                                     ? 'bg-brand-soft text-brand ring-1 ring-brand/20'
                                     : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                             )}
                         >
-                            <Icon className="h-4 w-4" />
+                            <Icon className="size-4" />
                             {label}
-                            <span
-                                className={cn(
-                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
-                                    active ? 'bg-brand/15 text-brand' : 'bg-muted text-muted-foreground'
-                                )}
-                                title={hint}
-                            >
-                                {count}
-                            </span>
+                            {count !== undefined && (
+                                <span
+                                    className={cn(
+                                        'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                                        active ? 'bg-brand/15 text-brand' : 'bg-muted text-muted-foreground'
+                                    )}
+                                    title={hint}
+                                >
+                                    {count}
+                                </span>
+                            )}
                         </Link>
                     </li>
                 ))}

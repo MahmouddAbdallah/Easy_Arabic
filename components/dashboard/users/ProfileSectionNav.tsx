@@ -38,10 +38,10 @@ const ProfileSectionNav = ({ kind, id, totalLessons, totalLinked, pendingRequest
     const onSettings = pathname.startsWith(`${basePath}/settings`)
 
     const items = [
-        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onLinked && !onPlanner, hint: undefined },
+        { href: basePath, label: 'Lessons', count: totalLessons, icon: BookOpen, active: !onLinked && !onPlanner && !onSettings, hint: undefined },
         { href: `${basePath}/${segment}`, label, count: totalLinked, icon, active: onLinked, hint: undefined },
-        { href: `${basePath}/settings`, label: 'Settings', icon: SettingsIcon, active: onSettings },
         { href: `${basePath}/planner`, label: 'Planner', count: pendingRequests, icon: CalendarDays, active: onPlanner, hint: `${pendingRequests} pending ${pendingRequests === 1 ? 'request' : 'requests'}` },
+        { href: `${basePath}/settings`, label: 'Settings', icon: SettingsIcon, active: onSettings, hint: undefined },
     ]
 
     return (

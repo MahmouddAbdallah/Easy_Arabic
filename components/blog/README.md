@@ -29,7 +29,7 @@ empty draft to a published page, how comments are moderated, and why things work
 
 | | |
 |---|---|
-| **Public pages** | `/blog` (list, filters, pagination) and `/blog/<slug>` (one article) |
+| **Public pages** | `/blog` (an editorial front page, filters, pagination) and `/blog/<slug>` (one article) |
 | **Admin pages** | `/dashboard/blog` (posts and editor) and `/dashboard/blog/comments` (moderation) |
 | **Storage** | Firestore (`blogs`, `blogSlugs`, `blogComments`). Media in Cloudinary. |
 | **Rendering** | Server components, rendered on every request. The only client scripts on a public article are the code blocks' "Copy" button, the comment form, and the small script that highlights the current section in the table-of-contents rail. |
@@ -71,13 +71,25 @@ Everything tunable (routes, collection names, limits, rate limits) lives in
 components/blog/
   Blog.tsx               one published post (server component, drop it into any route)
   BlogArticle.tsx        the article layout (shared by the public page and the dashboard preview)
-  BlogIndex.tsx          the public list page (filters, pagination)
-  BlogCard.tsx           a post card
+  BlogIndex.tsx          the public list page: a thin async wrapper (fetches one page, hands it to BlogIndexView)
+  BlogCard.tsx           a post card (used by the related-posts band under an article)
   BlogMeta.tsx           author, date, reading time
   BlogToc.tsx            "On this page" (a collapsible card in the text on small screens, the rail on large ones)
   BlogTocSidebar.tsx     the sticky rail itself (client component: it only adds the current-section highlight)
   BlogJsonLd.tsx         schema.org BlogPosting data
-  BlogPagination.tsx
+  BlogPagination.tsx     newer / older links and page numbers
+
+  index/                 the PUBLIC LIST page (/blog), drawn from data that is already loaded
+    BlogIndexView.tsx    composes the page: hero or masthead, lead story, category bar, articles, tag band
+    BlogHero.tsx         the front page's opening (message, two ways in, a sentence of real counts)
+    HeroArch.tsx         the arch with the site's hero photograph and the word "Iqra" (decorative)
+    BlogMasthead.tsx     the compact opening for a category, a tag or page 2 and beyond
+    FeaturedPost.tsx     the lead story
+    TopicNav.tsx         the sticky category bar (links, with counts)
+    ActiveTabScroller.tsx  client: keeps the selected category in view when the bar scrolls sideways
+    ArticleGrid.tsx, ArticleCard.tsx, CoverImage.tsx   the article previews
+    TagCloud.tsx         the tag band that closes the page
+    EmptyState.tsx, Ornaments.tsx, styles.ts
 
   content/               how a stored post becomes HTML
     BlogContent.tsx      renders the structured body (paragraphs, images, videos, embeds, ...)
@@ -107,7 +119,8 @@ components/blog/
     blogs.server.ts      all Firestore access for posts
     media.server.ts      uploads and clean-up (Cloudinary)
     http.server.ts       admin check, error shape, body parsing
-    listing.ts           in-memory filter + pagination (pure)
+    listing.ts           in-memory filter + pagination + the lead-story rule (pure)
+    fonts.ts             the calligraphy face used once, on the front page's arch
     mappers.ts, slug.ts, taxonomy.ts, direction.ts, format.ts, url.ts, highlight.ts
     metadata.ts          <head> metadata
     revalidate.server.ts cache refresh after a change
@@ -204,7 +217,52 @@ is no stored HTML, there is nothing to sanitize at render time and no way to inj
 
 Posts, newest first, nine per page. Filters are `?category=` and `?tag=` (compared by slug, so
 `Grammar` and `grammar` are the same filter) and `?page=`. A page past the end lands on the last
-page instead of an empty one.
+page instead of an empty one. The data layer, filtering and pagination are unchanged; `BlogIndex`
+still fetches one page and `app/blog/page.tsx` is still a thin route entry. What changed is how the
+page is drawn (`index/`), and it has two faces, chosen by where the reader is:
+
+- **The front page** (first page, no filter), where somebody arrives:
+  1. **Hero.** A deep-teal opening with the headline, a short lede, a gold button that jumps to the
+     lead story and a quiet one that jumps to the category bar, and one picture: an arch (the shape of
+     a prayer-hall niche) holding the site's own hero photograph, with the word *Iqra* (اقرأ, "read")
+     in calligraphy at its foot. The arch is the only ornamental moment on the page and is
+     `aria-hidden`; the page makes sense without it. Under the buttons is a single sentence of
+     counts and the newest post's date (for example "14 articles across 5 topics. The newest was
+     published on ..."). It is counted from the published posts, and with none it says the first
+     article is on its way.
+  2. **Lead story.** One article shown large, with its cover, category, title, excerpt and byline. It
+     is the newest of the three latest posts **that has a cover image**, or simply the newest if none
+     of them has one (`pickFeatured` in `lib/listing.ts`). It is taken out of the list below so it is
+     never shown twice.
+  3. **Category bar.** Underlined tabs with counts, sticky under the site's navbar while the articles
+     scroll past, scrolling sideways on a phone. They are plain links (`aria-current` marks the
+     selected one); one filter applies at a time.
+  4. **Latest articles.** The first row of two is larger; the rest are a three-column grid. A
+     preview has no card box: the cover's edge is the card, and the whole preview is one click target
+     (the headline's link stretches over it) except its category link. Each preview reads in the
+     direction of its own headline, so an Arabic article's preview sits flush right inside an English
+     page.
+  5. **Pagination**, then the **tag band** (the first 16 tags with counts, the rest behind a native
+     `<details>`). A tag chip toggles that tag on and off.
+- **Everything else** (a category, a tag, page 2 and beyond), where somebody wants the articles: a
+  compact masthead saying where you are (kind, name, article count) with a way back, then the same
+  category bar and the articles. A category or tag whose name is Arabic mirrors the whole masthead.
+
+Every figure on the page comes from the loaded list (`totalPublished` was added to `BlogPublicList`
+for the "All articles" count and the hero sentence); no copy states a number of its own, and no post,
+statistic or image is invented. A post without a cover shows a brand-coloured panel with the pattern
+and a star instead of a broken or empty frame.
+
+Notes for whoever edits it:
+
+- `BlogIndexView` is pure and synchronous (it takes the list as a prop), so it renders with any
+  data. The hero's eyebrow, headline and lede are optional props of `BlogIndex` / `BlogIndexView`.
+- Class order matters in one place: this project's `cn` behaves like `tailwind-merge`, so a later
+  `text-[size]` drops an earlier `leading-*`. `ArticleCard` puts the size first for that reason.
+- The only client component is `ActiveTabScroller`. The only motion is the hero arriving once (both
+  animations are off under `prefers-reduced-motion`); hover states are CSS.
+- The arch's picture is `public/assets/hero.jpg`, reused. Swap `PHOTO` in `HeroArch.tsx` to change it.
+- Metadata for the list is unchanged.
 
 ### The article (`/blog/<slug>`)
 
@@ -481,6 +539,18 @@ that route must also be rendered per request.
 ---
 
 ## Change history
+
+### Public list redesign (`/blog`)
+
+Presentation of the list only: no change to the Firestore data layer, pagination, filtering, API routes,
+the article page, the dashboard or the Notification system. New in `components/blog/index/`: the hero
+with the arch, the compact masthead for filtered views, the lead story, the sticky category bar, preview
+cards without a box, the tag band and the empty state, composed by `BlogIndexView`. `BlogIndex` became a
+thin async wrapper around it, and `BlogPagination` was restyled (newer / older links, numbered pages on
+wider screens) with its props and `pageWindow` export unchanged. Small additions to the shared logic:
+`totalPublished` on `BlogPublicList`, `pickFeatured` in `lib/listing.ts` (with its lead-story rule),
+`pluralize` in `lib/format.ts`, and `lib/fonts.ts` (the calligraphy face, loaded only for the arch).
+`BlogCard` is untouched and still serves the related-posts band under an article.
 
 ### Article page redesign (reading layout, rail, comments)
 

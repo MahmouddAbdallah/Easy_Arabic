@@ -83,7 +83,23 @@ export function buildPublicList(
     const { items, pagination } = paginate(filtered, query.page, query.pageSize);
     // Taxonomy is built from every published post, not the filtered ones, so the filter bar never shrinks as you filter.
     const { categories, tags } = buildTaxonomy(published);
-    return { data: items, pagination, categories, tags, truncated: meta.truncated };
+    return { data: items, pagination, categories, tags, totalPublished: published.length, truncated: meta.truncated };
+}
+
+/** How many of the newest posts may be passed over to find one with a cover image (see `pickFeatured`). */
+const FEATURED_LOOKAHEAD = 3;
+
+/**
+ * The lead story of the list's front page. It is the newest post, unless that one has no cover image
+ * and one of the next few does: the lead story is the one big picture on the page, so a post without
+ * a cover only leads when nothing close behind it has one. Everything else keeps its order.
+ * Pure: the page decides *when* there is a lead story (front page, no filter), this decides *which*.
+ */
+export function pickFeatured(posts: readonly BlogSummary[]): { featured: BlogSummary | undefined; rest: BlogSummary[] } {
+    if (posts.length === 0) return { featured: undefined, rest: [] };
+    const withCover = posts.slice(0, FEATURED_LOOKAHEAD).findIndex((post) => post.coverImage !== null);
+    const index = withCover === -1 ? 0 : withCover;
+    return { featured: posts[index], rest: posts.filter((_, position) => position !== index) };
 }
 
 /**

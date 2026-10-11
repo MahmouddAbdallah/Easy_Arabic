@@ -36,8 +36,8 @@ export interface BlogArticleProps {
  */
 const GUTTER = "mx-auto w-full px-5 sm:px-8";
 const COLUMN = "max-w-[46rem]"; // 42rem of text plus the side gutters
-const WIDE = "lg:max-w-5xl"; // 60rem of content plus the side gutters
-const MEASURE = "max-w-[42rem]";
+const WIDE = "lg:max-w-7xl"; // 60rem of content plus the side gutters
+const MEASURE = "max-w-7xl";
 
 /**
  * The cover keeps its own proportions, within limits: a very tall image is trimmed a little and a
@@ -102,7 +102,7 @@ export function BlogArticle({ blog, showToc = true, related = [], comments, prev
                 {/* Arabic joins its letters, so it gets no negative letter-spacing, and more leading than Latin. */}
                 <h1
                     dir={textDirection(blog.title) ?? "auto"}
-                    className="max-w-[46rem] font-display text-[2rem] leading-[1.12] font-bold tracking-tight text-balance wrap-break-word text-foreground sm:text-[2.5rem] md:text-[2.75rem] lg:text-5xl [&[dir=rtl]]:leading-[1.4] [&[dir=rtl]]:tracking-normal"
+                    className="max-w-7xl font-display text-[2rem] leading-[1.12] font-bold tracking-tight text-balance wrap-break-word text-foreground sm:text-[2.5rem] md:text-[2.75rem] lg:text-5xl [&[dir=rtl]]:leading-[1.4] [&[dir=rtl]]:tracking-normal"
                 >
                     {blog.title}
                 </h1>
