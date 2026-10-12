@@ -87,12 +87,16 @@ export function NotificationToast({ payload, visible, onOpen, onDismiss }: Notif
                         <span dir="auto" className="block truncate text-base font-bold tracking-tight text-foreground transition-colors duration-200 group-hover:text-brand-deep">
                             {payload.title}
                         </span>
-                        <span dir="auto" className="line-clamp-2 block text-sm font-medium leading-relaxed text-muted-foreground/90">
+                        {/* No `block` on the clamped lines: line-clamp sets its own display, and Tailwind emits `.block` after it, so adding it switches the clamp off. */}
+                        <span dir="auto" className="line-clamp-2 text-sm font-medium leading-relaxed text-muted-foreground/90">
                             {payload.body}
                         </span>
-                        <span>
-                            {payload?.data?.message}
-                        </span>
+                        {payload.data?.message && (
+                            // Free text the sender wants shown (the chat puts the message here): a few lines at most, so a long one cannot stretch the toast.
+                            <span dir="auto" className="line-clamp-3 break-words">
+                                {payload.data.message}
+                            </span>
+                        )}
                     </span>
                 </button>
 

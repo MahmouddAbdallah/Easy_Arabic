@@ -18,9 +18,11 @@ components/notification/
 ├── NotificationPermissionPrompt.tsx  our "turn on notifications" card
 ├── NotificationItem.tsx / NotificationToast.tsx / typeIcons.ts
 ├── categoryIcons.ts                  icon name (from the configuration) -> component
+├── tsconfig.test.json                only for the tests: maps "@/*" and "server-only" so they run outside Next (see Tests)
 ├── ActiveContextReporter.tsx         reports the current page of this tab
+├── NotificationsMenu.tsx             the navbar bell: live unread dot, the list in a popover (mounted only while it is open)
 ├── dashboard/                        the admin's configuration form (standalone: render <NotificationDashboard /> anywhere)
-│   ├── NotificationDashboard.tsx        shell: tabs, preview, save bar; loading / forbidden / error / conflict states
+│   ├── Dashboard.tsx                    shell (exports NotificationDashboard): tabs, preview, save bar; loading / forbidden / error / conflict states
 │   ├── SectionsTab.tsx                  add / edit / reorder / switch off / remove the sections users can mute
 │   ├── DeliveryTab.tsx                  route each notification type to a section; urgency, time-to-live, pop-up, icon
 │   ├── SoundTab.tsx                     the master switch, volume, the chime (or an audio file), politeness
@@ -66,13 +68,15 @@ components/notification/
     │   └── chunk.ts           split a list into groups
     └── client/              browser only
         ├── inboxStore.ts      THE one Firestore listener on the list (shared by bell, page, alerts)
-        ├── configStore.ts     THE one shared copy of the configuration (cache -> fetch -> refresh on return)
+        ├── configStore.ts     THE one shared copy of the configuration (cache -> fetch -> refresh on return; one fetch per browser)
         ├── alerts.ts          pop-up/sound decisions + push/stored de-duplication (no browser APIs: testable)
         ├── sound.ts           Web Audio chime (or an audio file) per the configured sound; autoplay-safe, rate-limited
         ├── promptGate.ts      the 7-day rule for our prompt
         ├── presence.ts        event-driven page reporter (no heartbeat)
-        ├── device.ts          FCM token, registration marker, per-device opt-out
-        └── api.ts             every request to /api/notification
+        ├── device.ts          FCM token (the messaging SDK loads on first use), registration marker, per-device opt-out
+        ├── locks.ts           `withCrossTabLock`: one tab at a time across the browser (Web Locks); fails open
+        ├── api.ts             every request to /api/notification
+        └── *.test.ts          tests of the above; testFakes.ts is the browser fakes they run on (see Tests)
 ```
 
 (`app/api/notification/config/route.ts` is the configuration's endpoint; `_lib/route.ts` takes an optional `roles`.)
@@ -95,7 +99,7 @@ Two layers that look alike and must stay apart:
 |             | **Configuration** (`lib/config.ts`)                                                                              | **Settings** (`lib/settings.ts`)                        |
 | ----------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | Scope       | one for the whole app                                                                                            | one per user                                            |
-| Who sets it | an admin, in `dashboard/NotificationDashboard.tsx`                                                               | each person, on their settings screen                   |
+| Who sets it | an admin, in `dashboard/Dashboard.tsx`                                                                           | each person, on their settings screen                   |
 | Stored in   | `notificationConfig/main` (one document)                                                                         | `notificationSettings/{userId}`                         |
 | Written via | `PUT /api/notification/config` (**admin only**)                                                                  | `PATCH /api/notification/settings` (the session's user) |
 | Says        | which sections exist, how it sounds, which controls people get, what they default to, how each type is delivered | what _this person_ chose, within that                   |
@@ -125,15 +129,19 @@ applies, so nothing changes until an admin saves one.
   loads share one read, **never throws** — on a Firestore failure it uses the last known copy, then the defaults). It
   gates by section, resolves each recipient's settings under it, applies per-type urgency/TTL and injects the default icon.
 - **Browser**: `GET /api/notification/config` (any signed-in user), kept in one shared copy (`lib/client/configStore.ts`):
-  the last visit's copy or the defaults at once, refreshed on load and when the tab is revisited after 5 minutes. No
-  polling, no Firestore listener — so **no Firestore rule is needed** for it. The settings screen, pop-up duration and sound are drawn from it.
+  the last visit's copy or the defaults at once. A copy fetched less than 5 minutes ago — by this tab or by any other tab
+  of the browser (the time is stored next to the copy) — is used as it is; an older one is fetched on load and when the
+  tab is revisited. When several tabs find it stale together, one fetches under a cross-tab lock and the others take its
+  answer; a copy another tab stores is picked up as it happens (revisions only go up, so an older copy never replaces a
+  newer one). A failed fetch keeps the copy and is not tried again for 30 s. No polling, no Firestore listener — so
+  **no Firestore rule is needed** for it. The settings screen, pop-up duration and sound are drawn from it.
 - **Service worker**: untouched on purpose. It has no Firebase SDK and no access to the configuration, so what it
   needs (`icon`, `silent`) is decided on the server and travels in the payload, which the worker already honours.
 
 **The dashboard** is a standalone component; render it on any page you control:
 
 ```tsx
-import NotificationDashboard from "@/components/notification/dashboard/NotificationDashboard";
+import NotificationDashboard from "@/components/notification/dashboard/Dashboard";
 
 export default function NotificationAdminPage() {
   return <NotificationDashboard />;
@@ -188,6 +196,17 @@ with a `tag` replace each other and are counted ("Ali (3)"). Clicking either kin
 **In-app alerts without push.** `useInAppAlerts` also watches the shared inbox store for new unread
 arrivals, so people who never enabled push still get pop-ups and sound. A push and its stored copy of the
 same send carry the same id and produce one pop-up and one sound, whichever arrives first.
+
+**This browser as a push target.** `lib/client/device.ts` gets the browser's FCM token and keeps it registered on the
+server. A marker in localStorage (user + token, valid 7 days) says "already registered", so opening a tab costs nothing.
+When several tabs find the registration missing at once (a restored session, an expired marker, a different user),
+registering — and removing — the token takes a cross-tab lock (`lib/client/locks.ts`): one tab saves it and the others
+find the marker it wrote, instead of each sending the same request. A lock the browser cannot give (no Web Locks API, or
+not granted within 10 s) never holds anything up for longer than that wait: the tab carries on by itself, as every tab
+did before, and a repeated registration is harmless — only wasteful. Firebase's messaging SDK is downloaded the first
+time it is needed, after a check that the browser has notifications, service workers and push at all — so it is not
+part of a page's first load, and a browser without them never fetches it. The check runs for every visitor, signed in
+or not, because the settings screen shows "checking" until it answers.
 
 **Settings.** `notificationSettings/{userId}` is read live by the browser (one document listener) and
 written only by `PATCH /api/notification/settings`. Edits apply instantly, are saved after 400 ms as one
@@ -260,12 +279,16 @@ a notification when it is marked read (now + 30 days) and removed if it is sent 
 | Push to D devices                                 | D/500 FCM calls (ten at a time); only devices that failed for a passing reason are sent again, at most twice                    |
 | Identical send within 3 s                         | dropped before any I/O (now also before the configuration is read)                                                              |
 | New tab for a signed-in user                      | 0 requests (registration marker lasts 7 days)                                                                                   |
-| App session                                       | + 1 request for the configuration on load, and one more only when the tab is revisited after 5 minutes. No listener, no polling |
+| Several tabs, registration missing or expired     | 1 request per browser (cross-tab lock), not one per tab; a valid marker means no lock and no request                            |
+| App session, configuration                        | 0 or 1 request: none while any tab fetched it in the last 5 min; older, 1 per browser. No listener, no polling                  |
+| Configuration fetch fails                         | the copy is kept; no new attempt for 30 s, however often the tab is revisited                                                   |
 | `sendNotification` / settings change              | + 0 reads normally: the configuration is cached 20 s per instance (1 read when it expires, shared by concurrent sends)          |
 | Admin opens the dashboard / saves                 | 1 fresh read / 1 transaction (read + write) + 1 read-back                                                                       |
 
 Settings changes reach sends on _other_ server instances within 20 s (the read cache); the instance that
 saved them applies them at once. The same holds for the configuration: a save reaches other instances within 20 s.
+The settings cache holds at most 5,000 users per instance; when it is full, the user read longest ago makes room, and
+reading a user again counts as reading them anew — a refresh never pushes somebody else out.
 
 ### Sizes and limits (each lives in one constant — change it there)
 
@@ -276,6 +299,13 @@ saved them applies them at once. The same holds for the configuration: a save re
 | `FCM_BATCH_SIZE` × `FCM_BATCH_CONCURRENCY` | 500 × 10 | `server/push.ts`       | 500 is the SDK's maximum per `sendEach`; ten calls cover the 5,000-token cap               |
 | `MAX_ATTEMPTS`                             | 3        | `server/push.ts`       | one send and two retries; the pauses keep the worst case under about two seconds           |
 
+The browser and cache timings are one constant each, too:
+
+- `CONFIG_STALE_MS` (5 min) and `CONFIG_RETRY_MS` (30 s) in `lib/client/configStore.ts` — how old the configuration copy may get, and the pause after a failed fetch.
+- `LOCK_WAIT_MS` (10 s) in `lib/client/locks.ts` — how long a tab waits for the cross-tab lock before it carries on without it.
+- `SYNC_MARKER_TTL_MS` (7 days) in `lib/client/device.ts` — how long "this browser is registered" is believed.
+- `SETTINGS_CACHE_MS` (20 s) and `SETTINGS_CACHE_MAX` (5,000 users) in `lib/server/settings.ts`.
+
 A transaction holds the locks of everything it touches until it commits, so a notification to one person (a chat
 message) waits less behind a 100-user transaction than behind a 250-user one. Keep each concurrency at or above the
 number of groups the largest allowed audience makes (10 inbox groups, 10 FCM calls): with fewer slots than groups the
@@ -284,6 +314,10 @@ groups queue in waves and a big send becomes slower than it was before this pass
 These numbers were chosen on a model of Firestore and FCM (latency per round trip, per written document, lock waits),
 not measured against the real services. They are safe starting points, and the first thing to re-tune if production
 traces show something different.
+
+The browser-side counts in the table (one registration, one configuration fetch per browser) are what the tests in
+`lib/client/*.test.ts` assert against fakes of the browser APIs. How much traffic that saves in production has not been
+measured.
 
 ## Service worker notes
 
@@ -302,6 +336,32 @@ The worker is not configuration-aware and does not need to be: the server resolv
 results in the payload — `icon` (the configured default when the sender gave none) and `silent` (when sound is off for
 that person, or off for everyone in the configuration's sound).
 
+## Tests
+
+`node:test` suites sit next to the code they cover — the parts that are easy to get subtly wrong and cannot be seen
+failing by clicking around:
+
+- `lib/client/locks.test.ts` — the cross-tab lock: turns, the waiting limit, failing open (no Web Locks, request refused,
+  not granted in time), a task never runs twice.
+- `lib/client/device.test.ts` — registering this browser: several tabs make one request; marker, another user, a new
+  token and `force`; a failed save frees the lock; push turned off in another tab while one waited.
+- `lib/client/configStore.test.ts` — the shared configuration: a fresh copy means no request, one fetch for several
+  stale tabs, the 30 s pause after a failure, the revision guard, `apply()`, `refresh()`, `dispose()`, a clock set back
+  (before or after a failure), a stored time whose copy is gone, storage that is unusable, letting go of the store.
+- `lib/server/settings.test.ts` — the settings cache: 20 s freshness and which entry goes when it is full.
+- `lib/client/testFakes.ts` — the fakes they run on (Web Locks, localStorage, a window and document). Test support only;
+  nothing in the app imports it.
+
+Run them from the project root. `tsx` is not a project dependency (`npx` fetches it when it is needed), and
+`tsconfig.test.json` only adds what Next.js normally provides — the `server-only` alias — so the files load outside Next:
+
+```bash
+npx tsx --tsconfig components/notification/tsconfig.test.json --test "components/notification/**/*.test.ts"
+```
+
+They use fakes and no network: they show how this code behaves, not how real browsers, Firestore or FCM do. The files
+are part of the project's type-check and lint like any other.
+
 ## Not done on purpose
 
 - `unregisterDevice()` is never called when the user signs out (the sign-out code lives outside this
@@ -319,6 +379,17 @@ that person, or off for everyone in the configuration's sound).
   numbers show those reads matter.
 - **No global FCM rate limiter.** Each instance sends its own calls; when FCM pushes back (`message-rate-exceeded`,
   `unavailable`) the affected devices are retried with a jittered pause. A shared limiter would need shared state.
+- **Looked at and left alone**, each for a reason:
+  - _Skipping the push-support check when nobody is signed in._ What shows its answer (the settings screen, the enable
+    button) reads "checking" until it arrives, and `/notification`, which does not check for a session itself, renders
+    them; skipping the check would leave those waiting for good.
+  - _Retrying Firestore transactions in `server/inbox.ts`._ The Firestore SDK already retries contention errors (up to
+    five attempts); a second layer would multiply them.
+  - _Deleting a device token on `messaging/mismatched-credential`._ FCM reports a token that belongs to another sender
+    (`SENDER_ID_MISMATCH`) and a rejected permission (`PERMISSION_DENIED`) with that one code; with a wrong credential it
+    would delete every good device.
+  - _Shortening over-long `data` values inside `sendNotification()`._ It validates and answers `INVALID_INPUT` on purpose,
+    so a caller's bug is not hidden; the caller shortens its own text (see the chat note under "Limits that remain").
 
 ## Limits that remain (and where they live)
 
@@ -336,6 +407,20 @@ that person, or off for everyone in the configuration's sound).
   `WHERE fcmToken IN (...)`), and `deleteTokens` / `registerUserToken` filter on it — add `@@index([fcmToken])` before the
   table gets large. `authorization()` (`lib/verifyAuth.ts`) reads the user from Postgres on every API request; that is
   what makes a ban or password change effective immediately, so it is not cached here.
+- **Outside this folder, a bug found while optimising (not changed here):** the chat's `notifyNewMessage`
+  (`components/chat/lib/messageNotifications.server.ts`) puts the whole message into `data.message`, but
+  `sendNotificationSchema` allows at most 500 characters per `data` value (`lib/schema.ts`) and a chat message may have
+  up to 4,096 (`MAX_MESSAGE_LENGTH`). A message of 501 characters or more is refused with `INVALID_INPUT`: the receiver
+  gets no push and no entry in the notification list for it, and the only trace is a `console.error`. The fix belongs in
+  the chat: send a preview, e.g. `message.length > 500 ? message.slice(0, 499).replace(/[\uD800-\uDBFF]$/, '') + '…' : message`
+  (the `replace` drops half a surrogate pair that the cut can leave). Delete this note once it is fixed.
+- **The browser-side coordination is best effort, by design.** A tab that is still fetching its token when another tab
+  removes the device has not asked for the lock yet, so it can register the revoked token afterwards (for "off on this
+  device" the opt-out stops it; otherwise the dead token is dropped on the next send). A request that hangs holds the
+  lock while it hangs: other tabs wait at most 10 s, then go ahead. A configuration fetch that was answered just before
+  an admin's save and lands just after it can leave the older copy in storage until its 5 minutes are up. And if the
+  messaging SDK cannot be downloaded when a page opens (offline, a deploy replaced the file), that page view treats push
+  as unavailable until it is reloaded.
 
 ## Extending
 

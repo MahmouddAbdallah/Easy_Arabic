@@ -43,7 +43,11 @@ export function cachedChoices(userId: string, now = Date.now()): NotificationSet
 export function rememberChoices(snapshot: DocumentSnapshot, now = Date.now()): NotificationSettingsPatch {
     const stored = pickStoredSettings(snapshot.data());
 
-    if (cache.size >= SETTINGS_CACHE_MAX) cache.delete(cache.keys().next().value as string); // oldest first
+    // A Map keeps the position a key was first inserted at, however often it is set again. Removing it first moves
+    // it to the end, so "first in the Map" really is the entry read longest ago — and a user who keeps being
+    // refreshed is never the one evicted to make room.
+    cache.delete(snapshot.id);
+    if (cache.size >= SETTINGS_CACHE_MAX) cache.delete(cache.keys().next().value as string);
     cache.set(snapshot.id, { stored, at: now });
     return stored;
 }
