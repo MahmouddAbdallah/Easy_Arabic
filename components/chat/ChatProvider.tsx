@@ -14,6 +14,7 @@ import { CHAT_ROOT_CLASS, CHAT_THEME_CSS } from './lib/chatTheme';
 import { laterOf } from './lib/chatState';
 import { useConversationState, type ConversationStateHandle } from './hooks/useConversationState';
 import { useConversationActions, type ConversationActions } from './hooks/useConversationActions';
+import { useViewportHeight } from './hooks/useViewportHeight';
 
 
 interface ChatContextType {
@@ -71,6 +72,9 @@ export const ChatProvider: React.FC = () => {
         fetchUser();
     }, [receiverId]);
 
+    const { viewHeight, messagesTopRef } = useViewportHeight();
+
+
     return (
         <ChatContext.Provider
             value={{
@@ -88,12 +92,15 @@ export const ChatProvider: React.FC = () => {
                 <div
                     className={`${CHAT_ROOT_CLASS} flex h-dvh min-h-dvh w-full items-center justify-center bg-(--chat-canvas-edge) sm:p-4 lg:p-6`}
                 >
-                    <div className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-[1500px]">
+                    <div
+                        style={{ height: viewHeight }}
+
+                        className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-375">
                         <div className="flex h-full w-full">
                             {/* Conversations */}
                             <aside
                                 className={`${receiverId ? "hidden" : "flex"
-                                    } h-full w-full shrink-0 border-e border-(--chat-line) bg-(--chat-surface) md:flex md:w-[340px] lg:w-[380px]`}
+                                    } h-full w-full shrink-0 border-e border-(--chat-line) bg-(--chat-surface) md:flex md:w-85 lg:w-95`}
                             >
                                 <ChatSidebar />
                             </aside>
@@ -103,6 +110,8 @@ export const ChatProvider: React.FC = () => {
                                 className={`${!receiverId ? "hidden" : "flex"
                                     } h-full min-w-0 flex-1 flex-col md:flex`}
                             >
+                                <div ref={messagesTopRef} />
+
                                 {receiverId ? <ChatArea /> : <NoChatSelected />}
                             </main>
                         </div>
