@@ -24,10 +24,11 @@ const ConfigContext = createContext<NotificationConfig>(DEFAULT_NOTIFICATION_CON
  *                                  defaults): one shared copy, set in the dashboard — NOT the user's settings;
  *   - useNotificationSettingsState the user's settings (one Firestore document, saved through the API), resolved
  *                                  against that configuration;
- *   - useInAppAlerts               pop-ups and sound for notifications that arrive while the app is open,
- *                                  whether they came as a push or as a new entry in the list;
- *   - useServiceWorkerBridge       hands pushes received by the service worker to the page, and performs
- *                                  navigation when a system notification is clicked;
+ *   - useInAppAlerts               pop-ups and sound for notifications that arrive while the app is open and in use,
+ *                                  whether they came as a push or as a new entry in the list (a tab that is not
+ *                                  in use leaves the alert to the system notification, if push is active here);
+ *   - useServiceWorkerBridge       hands pushes received by the service worker to the page — saying whether it took
+ *                                  them — and performs navigation when a system notification is clicked;
  *   - usePermissionPrompt          decides when to offer to turn push on (never within 7 days of a dismissal);
  *   - ActiveContextReporter        tells the server which page this tab shows, so notifications about a page
  *                                  the user is already on are never sent.
@@ -41,7 +42,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const push = usePushRegistration(userId);
     const { config } = useNotificationConfig(userId);
     const settingsState = useNotificationSettingsState(userId, config);
-    const offerPush = useInAppAlerts(userId, settingsState.settings, config);
+    const offerPush = useInAppAlerts(userId, settingsState.settings, config, push.isActive);
     useServiceWorkerBridge(offerPush);
     const prompt = usePermissionPrompt({ userId, push, notificationsEnabled: settingsState.settings.enabled });
 

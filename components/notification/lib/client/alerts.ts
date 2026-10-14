@@ -13,10 +13,17 @@
  * one sound whichever route is faster.
  *
  * What it then decides is policy.ts, shared with the server: paused / muted or disabled section / quiet hours /
- * pop-ups off / sound off — under the admin's notification configuration (config.ts). Two more rules are about the moment rather than the person:
+ * pop-ups off / sound off — under the admin's notification configuration (config.ts). Three more rules are about the moment rather than the person:
  *   - a hidden tab shows nothing (the system notification or the list covers it);
+ *   - a tab that can be seen but is not the one the person is working in (another app is in front of it, it is half
+ *     covered, it sits on a second screen) shows nothing either WHEN a system notification is on its way: that is the
+ *     alert they will notice, and a pop-up inside a window nobody is looking at would only be an unseen second copy.
+ *     A device that cannot show system notifications still gets the pop-up;
  *   - a notification about the page the user is looking at right now tells them nothing new — the server
  *     already skips these, this catches the case where its record of the tab had lapsed.
+ *
+ * The service worker asks the page whether it took a pushed notification, and draws a system notification itself
+ * when the answer is no. `takenInApp` turns what `offer` did into that answer.
  */
 import type { NotificationConfig } from '../config';
 import type { NotificationPayload } from '../contract';
@@ -34,6 +41,10 @@ export interface AlertEnvironment {
     config(): NotificationConfig;
     /** Is the tab visible? */
     isVisible(): boolean;
+    /** Is the person working in this tab — it is visible and its window is the one in use (not another app, not another window)? */
+    isFocused(): boolean;
+    /** Will a system notification reach this device (push permitted, registered, not turned off here)? */
+    pushActive(): boolean;
     /** Is the user already on `link`? */
     isViewing(link: string): boolean;
     showPopup(payload: NotificationPayload): void;
@@ -45,9 +56,21 @@ export interface AlertEnvironment {
 const REMEMBER_MS = 2 * 60_000;
 const REMEMBER_MAX = 200;
 
+export type AlertOutcome = 'shown' | 'duplicate' | 'hidden' | 'background' | 'viewing' | 'silent';
+
 export interface AlertCenter {
-    /** Offers an arrived notification. Returns what was done with it, for tests and debugging. */
-    offer(alert: Alert): 'shown' | 'duplicate' | 'hidden' | 'viewing' | 'silent';
+    /** Offers an arrived notification. Returns what was done with it, for the service-worker bridge (see `takenInApp`), tests and debugging. */
+    offer(alert: Alert): AlertOutcome;
+}
+
+/**
+ * Was the notification dealt with inside the app? Yes when it was shown — and also when showing nothing was the right
+ * thing: the person is looking at that very page, chose no pop-ups and no sound, or it was already shown. They are in
+ * the app, so a system notification on top would be the duplication they opted out of. No when nobody could see
+ * anything: the tab is hidden, or it is not the one in use while a system notification covers it.
+ */
+export function takenInApp(outcome: AlertOutcome): boolean {
+    return outcome !== 'hidden' && outcome !== 'background';
 }
 
 export function createAlertCenter(env: AlertEnvironment): AlertCenter {
@@ -66,11 +89,15 @@ export function createAlertCenter(env: AlertEnvironment): AlertCenter {
     return {
         offer({ payload }) {
             const now = env.now();
-            if (!remember(payload.id, now)) return 'duplicate';
             if (!env.isVisible()) return 'hidden';
-            if (payload.link && env.isViewing(payload.link)) return 'viewing';
 
             const decision = decideAlerts(env.settings(), payload.type, now, env.config());
+            if (!env.isFocused() && env.pushActive() && decision.push) return 'background';
+
+            // Only a notification that gets this far is remembered: one that nothing was shown for (hidden, background)
+            // must stay free to be shown if the same send arrives again by the other route once the person is here.
+            if (!remember(payload.id, now)) return 'duplicate';
+            if (payload.link && env.isViewing(payload.link)) return 'viewing';
             if (!decision.popup && !decision.sound) return 'silent';
 
             if (decision.popup) env.showPopup(payload);

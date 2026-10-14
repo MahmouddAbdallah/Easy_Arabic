@@ -36,8 +36,8 @@ components/notification/
 │   ├── useNotificationSettingsState.ts  settings: one doc listener, optimistic, debounced saves
 │   ├── usePushRegistration.ts           support, browser permission, FCM token, "off on this device"
 │   ├── usePermissionPrompt.ts           when to show the prompt (7-day rule)
-│   ├── useInAppAlerts.ts                pop-up + sound for notifications that arrive while the app is open
-│   └── useServiceWorkerBridge.ts        service worker -> page: pushes, click navigation
+│   ├── useInAppAlerts.ts                pop-up + sound for notifications that arrive while the app is open and in use
+│   └── useServiceWorkerBridge.ts        service worker -> page: pushes (and whether the page took them), click navigation
 └── lib/
     ├── contract.ts          shared constants, wire format, types (no server/browser imports)
     ├── config.ts            the CONFIGURATION shape, limits, built-in defaults, lookups (shared)
@@ -69,14 +69,14 @@ components/notification/
     └── client/              browser only
         ├── inboxStore.ts      THE one Firestore listener on the list (shared by bell, page, alerts)
         ├── configStore.ts     THE one shared copy of the configuration (cache -> fetch -> refresh on return; one fetch per browser)
-        ├── alerts.ts          pop-up/sound decisions + push/stored de-duplication (no browser APIs: testable)
+        ├── alerts.ts          pop-up/sound decisions + push/stored de-duplication + "was it taken in the app?" for the worker (no browser APIs: testable)
         ├── sound.ts           Web Audio chime (or an audio file) per the configured sound; autoplay-safe, rate-limited
         ├── promptGate.ts      the 7-day rule for our prompt
-        ├── presence.ts        event-driven page reporter (no heartbeat)
+        ├── presence.ts        event-driven page reporter (no heartbeat); "here" means the tab is visible AND in focus
         ├── device.ts          FCM token (the messaging SDK loads on first use), registration marker, per-device opt-out
         ├── locks.ts           `withCrossTabLock`: one tab at a time across the browser (Web Locks); fails open
         ├── api.ts             every request to /api/notification
-        └── *.test.ts          tests of the above; testFakes.ts is the browser fakes they run on (see Tests)
+        └── *.test.ts          tests of the above; testFakes.ts (browser fakes) and workerFakes.ts (runs the real service worker on fakes) are what they run on (see Tests)
 ```
 
 (`app/api/notification/config/route.ts` is the configuration's endpoint; `_lib/route.ts` takes an optional `roles`.)
@@ -188,14 +188,19 @@ and a group that fails is reported without hiding, undoing or delaying the other
   up to two more times, after a jittered pause (about 0.25–0.5 s, then 0.5–1 s). Dead tokens are never retried, they
   are deleted. A repeated delivery is harmless: the service worker and the page recognise the same send and show it once.
 
-**Receive.** FCM data message -> service worker. A visible page gets it (`useServiceWorkerBridge` ->
-`useInAppAlerts`) and decides on pop-up/sound; otherwise the worker draws a system notification. Pushes
-with a `tag` replace each other and are counted ("Ali (3)"). Clicking either kind tells the server
-(`POST /handled`), which deletes the stored copy.
+**Receive.** FCM data message -> service worker. If the person is working in a page of the app — visible **and** its
+window in focus — the worker hands the message to that page (`useServiceWorkerBridge` -> `useInAppAlerts`), which decides
+on pop-up/sound and answers whether it took the notification. In every other case the worker draws a system
+notification: no page open, a minimized window, a tab in the background, a window that can be seen but has another app
+in front of it, a page that answers "not me" or does not answer within a second. Pushes with a `tag` replace each other
+and are counted ("Ali (3)"). Clicking either kind tells the server (`POST /handled`), which deletes the stored copy.
+See "Service worker notes" for what each browser allows a push to do without a notification.
 
 **In-app alerts without push.** `useInAppAlerts` also watches the shared inbox store for new unread
 arrivals, so people who never enabled push still get pop-ups and sound. A push and its stored copy of the
-same send carry the same id and produce one pop-up and one sound, whichever arrives first.
+same send carry the same id and produce one pop-up and one sound, whichever arrives first. A tab that can be seen
+but is not the one in use shows nothing when a system notification is on its way (push active on this device and
+allowed by the person's settings and quiet hours) — that is the alert they will notice; without one, the pop-up is shown.
 
 **This browser as a push target.** `lib/client/device.ts` gets the browser's FCM token and keeps it registered on the
 server. A marker in localStorage (user + token, valid 7 days) says "already registered", so opening a tab costs nothing.
@@ -230,9 +235,13 @@ yet (`permission === 'default'`), push is not switched off on this device and no
 moment (`promptGate`). A browser that said _block_ is never asked again — the settings screen explains how
 to unblock, and the app notices the change by itself (permissions API + tab focus).
 
-**Suppression.** A visible tab reports its page when it settles on it, and again only when the person
-interacts after 2.5 minutes of quiet. The server trusts a report for 5 minutes. No heartbeat: an idle tab
-simply lapses and its owner is notified as usual.
+**Suppression.** A tab the person is working in — visible **and** its window in focus — reports its page when it
+settles on it, and again only when the person interacts after 2.5 minutes of quiet. The server trusts a report for
+5 minutes. When the person leaves (another app takes the focus, the tab is hidden or closed) the tab takes its report
+back, so the server stops holding notifications back for them: after a 3 s grace, so an alt-tab costs nothing; at once
+for a closing tab and for a tab a phone or tablet put in the background (a page there may be frozen before a timer
+fires). A window that merely can be seen is not "here". No heartbeat: an idle tab simply lapses and its owner is
+notified as usual.
 
 ## Firestore data
 
@@ -268,7 +277,8 @@ a notification when it is marked read (now + 30 days) and removed if it is sent 
 | Idle tab                                          | 0 requests (no heartbeat, no polling)                                                                                           |
 | Page change                                       | 1 request after the page stays put 300 ms (bursts collapse); 1 Firestore write, no read                                         |
 | Interaction after >2.5 min since the last report  | 1 request, 1 write — at most one per 2.5 min per active tab                                                                     |
-| Tab hidden > 3 s / closed                         | 1 request, 1 transaction (writes only if there is something to remove or sweep)                                                 |
+| Tab hidden or out of focus > 3 s / closed         | 1 request, 1 transaction (writes only if there is something to remove or sweep)                                                 |
+| Phone or tablet: tab put in the background        | the same, sent at once (a page there may be frozen before a timer fires)                                                        |
 | Opening/closing the bell                          | 0 reads: the list listener is shared and lives 60 s past the last user                                                          |
 | App session                                       | 1 listener on the newest 20 notifications, 1 on the settings document, 1 on the counter (navbar)                                |
 | Settings change                                   | 1 request per 400 ms burst, 1 write                                                                                             |
@@ -327,10 +337,33 @@ the device, counts tagged ones, and passes `silent` to `showNotification`. Brows
 system notification makes sound and `silent: true` is a request, not a guarantee: where a browser or OS
 ignores it, the device's own notification-sound setting applies and the app's sound setting cannot override it.
 
-A push is handed to a visible page first (in-app pop-up) and drawn as a system notification when no page confirms it
-within one second. If the handshake itself fails (the list of open pages cannot be read), the worker falls back to the
-system notification too: a doubled notification is better than a lost one, and a push handler that ends without showing
-anything makes the browser draw its own generic "this site was updated in the background" notice.
+A push is handed to a page only when the person is working in it: the page is visible **and** its window has the focus
+(`WindowClient.focused`; a browser that does not report it reads as "not in use"). A window that can merely be seen —
+another app in front of it, half covered, on a second screen — is not being looked at, so it gets the system notification,
+like a minimized window or a closed page. The page answers whether it took the notification (`useServiceWorkerBridge`):
+yes also when the person's settings say no pop-up and no sound (they are in the app, and a system notification on top
+would be the duplicate they opted out of), no when nobody could see anything after all. A "no", no answer within one
+second, or a failed handshake (the list of open pages cannot be read) all end in the system notification: a doubled
+notification is better than a lost one.
+
+What a push may do _without_ a notification differs by browser, which is why the worker tells them apart by user agent
+(`MAY_SKIP_NOTIFICATION`). The rules below come from the browsers' own documentation and source (Chromium's
+`push_messaging_notification_manager.cc`, Firefox's `PushRecord.sys.mjs`, WebKit's "Enforce silent push quota" change);
+none of it has been exercised on a real device from this folder (see Tests). In particular, that Safari counts a
+notification shown and taken back at once as a notification follows from WebKit counting a push as silent only when
+`showNotification` is never called while it is handled — it has not been tried:
+
+| Browser                                                                      | A push handed to a page, with no notification drawn                                                                                                                                         | The worker                                                                        |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Chrome, Edge, Opera, Samsung Internet (Chromium), desktop and Android        | Allowed while a tab of the site is visible (focus is not needed). Otherwise a small allowance, then the browser draws its own generic "this site has been updated in the background" notice | Hands over to a visible, focused page only                                        |
+| Firefox, desktop and Android                                                 | Counts against a quota; an open tab of the site resets it, so it only runs down while no tab is open, and a site that runs out loses its subscription                                       | The same                                                                          |
+| Safari on macOS, every browser on iOS and iPadOS (Home Screen web apps only) | Not allowed: a push that shows no notification is "silent", and after three the subscription is removed (the site has to ask for permission again)                                          | Draws the notification and takes it straight back: silent, under a tag of its own |
+| A browser it cannot tell                                                     | Unknown                                                                                                                                                                                     | Treated like Safari: a flash is cheaper than a lost subscription                  |
+
+The taken-back notification has a tag of its own, never the conversation's: under the conversation's tag it would replace
+(and then remove) a notification of that conversation the person has not dealt with yet. If a browser refuses an option
+of `showNotification` (a `timestamp` that is not a number, an `image` it cannot take), the worker retries with a plain
+one — a push that ends without any notification is the failure this worker exists to avoid.
 
 The worker is not configuration-aware and does not need to be: the server resolves the configuration and puts the
 results in the payload — `icon` (the configured default when the sender gave none) and `silent` (when sound is off for
@@ -349,8 +382,17 @@ failing by clicking around:
   stale tabs, the 30 s pause after a failure, the revision guard, `apply()`, `refresh()`, `dispose()`, a clock set back
   (before or after a failure), a stored time whose copy is gone, storage that is unusable, letting go of the store.
 - `lib/server/settings.test.ts` — the settings cache: 20 s freshness and which entry goes when it is full.
+- `lib/client/serviceWorker.test.ts` — the real `public/firebase-messaging-sw.js`, run as written: a closed page, a
+  minimized window, a window that is visible but not in use, one that is in use (Chrome, Edge, Firefox, Safari, iPhone
+  browsers, an unknown one); a page that declines, does not answer or cannot be reached; tags and counts; payload formats;
+  a browser refusing an option; the click (which window, which link, what the server is told).
+- `lib/client/alerts.test.ts` — the in-app alert rules: settings, quiet hours, one pop-up per send, and the new "tab not
+  in use" rule with what the worker is told (`takenInApp`).
+- `lib/client/presence.test.ts` — which page the server believes a person is on: reported only while the tab is visible
+  and in focus; the 3 s grace; at once on a phone's hidden tab and on close; no report from a pointer over an unused window.
 - `lib/client/testFakes.ts` — the fakes they run on (Web Locks, localStorage, a window and document). Test support only;
-  nothing in the app imports it.
+  nothing in the app imports it. `lib/client/workerFakes.ts` is the same for the service worker: it evaluates the real
+  worker file in `node:vm` on fakes of the open windows, the notifications on screen, `MessageChannel`, `fetch` and timers.
 
 Run them from the project root. `tsx` is not a project dependency (`npx` fetches it when it is needed), and
 `tsconfig.test.json` only adds what Next.js normally provides — the `server-only` alias — so the files load outside Next:
@@ -359,8 +401,11 @@ Run them from the project root. `tsx` is not a project dependency (`npx` fetches
 npx tsx --tsconfig components/notification/tsconfig.test.json --test "components/notification/**/*.test.ts"
 ```
 
-They use fakes and no network: they show how this code behaves, not how real browsers, Firestore or FCM do. The files
-are part of the project's type-check and lint like any other.
+They use fakes and no network: they show how this code behaves, not how real browsers, Firestore or FCM do. The service
+worker tests in particular show the worker's _decisions_ (who it asks, what it draws, what it takes back, where a click
+goes); that Chrome, Firefox and Safari then behave as the table above says, that FCM delivers to a closed page, and that
+the operating system shows the notification (Windows notification centre, Android shade, iOS) are not covered by any test
+here — only a real device proves them. The files are part of the project's type-check and lint like any other.
 
 ## Not done on purpose
 
@@ -414,6 +459,19 @@ are part of the project's type-check and lint like any other.
   gets no push and no entry in the notification list for it, and the only trace is a `console.error`. The fix belongs in
   the chat: send a preview, e.g. `message.length > 500 ? message.slice(0, 499).replace(/[\uD800-\uDBFF]$/, '') + '…' : message`
   (the `replace` drops half a surrogate pair that the cut can leave). Delete this note once it is fixed.
+- **Background delivery depends on the platform, not only on this code.** A system notification for a closed page needs the
+  permission granted, a registered token, and a browser the operating system lets run in the background: battery savers
+  and "force stop" on Android, a browser that is not running on some desktops, Focus Assist / Do Not Disturb / the
+  browser's own switch in the OS notification settings. On iPhone and iPad web push exists only for a web app added to the
+  Home Screen (with a manifest that asks for `display: standalone`), not for a tab in Safari or another iOS browser. A
+  device that a browser or OS refuses to wake receives the push when it next can, until the message's time-to-live ends.
+- **A subscription the browser replaces while the site is closed is not renewed until the next visit.** The worker has no
+  Firebase SDK, so it cannot ask FCM for a new token itself; the page re-syncs the token when it next opens and the old one
+  is deleted by the first send that finds it dead.
+- **"In focus" is read from the browser** (`document.hasFocus()` in the page, `WindowClient.focused` in the worker). A browser
+  that reports it wrongly — always false, say — would show system notifications while the person is in the app, instead of
+  pop-ups: nothing is lost, but it is the old duplicate. Someone who leaves the app in front and in focus and walks away is
+  still "here" until the server's 5 minutes run out, so a notification for that page is held back for that long.
 - **The browser-side coordination is best effort, by design.** A tab that is still fetching its token when another tab
   removes the device has not asked for the lock yet, so it can register the revoked token afterwards (for "off on this
   device" the opt-out stops it; otherwise the dead token is dropped on the next send). A request that hangs holds the

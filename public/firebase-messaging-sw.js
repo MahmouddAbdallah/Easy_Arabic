@@ -4,11 +4,25 @@
  * firebase `getToken()` registers this file automatically (scope: /firebase-cloud-messaging-push-scope)
  * and FCM delivers every push to it. It is the ONE place that draws notifications:
  *
- *   push arrives ──▶ a page of the app is visible? ──yes──▶ hand it to the page (in-app toast)
- *                                                  └──no───▶ show a system notification
+ *   push arrives ──▶ the person is working in a page of the app (visible AND in focus)?
+ *                        ──yes, and the page takes it──▶ hand it to the page (in-app toast)
+ *                        └─no (closed, minimized, in the background, behind another app, or the page declines)
+ *                                                      ──▶ show a system notification
  *   system notification clicked ──▶ tell the server it was handled (its stored copy is deleted),
  *                                   focus the app and go to the notification's `link`
  *   system notification dismissed / ignored ──▶ nothing: its stored copy stays, unread, in the list
+ *
+ * "Working in" means visible AND focused, not merely visible: a window that can be seen but is not the one in use
+ * (half behind another app, on a second screen, left open beside the app the person is working in) is not being looked
+ * at, and a pop-up inside it would go unseen. It is treated like a minimized window — the system notification is shown.
+ *
+ * A push the page takes shows no system notification. Chromium and Firefox allow a push to end that way while a page of
+ * the site is visible (which is why only a visible page is ever asked). WebKit — Safari on macOS and every browser on iOS —
+ * does not: it expects a notification for every push and removes the push subscription after three that show none, which
+ * would end background notifications until the site asks for permission again. There the worker still draws the
+ * notification and takes it straight back (silently, under a tag of its own); see showAndWithdraw. A browser the worker
+ * cannot tell is treated like WebKit — a notification drawn for nothing costs a flash, a subscription lost costs every
+ * one after it.
  *
  * The messages are FCM *data-only* messages built by sendNotification(), so the Firebase SDK never
  * draws a second copy. Notifications that share a `tag` replace each other and are counted ("Ali (3)");
@@ -34,6 +48,14 @@ const DEFAULT_ICON = '/icons/notification-icon.png';
 /** How long to wait for a page to confirm it handled a message before falling back. */
 const PAGE_REPLY_TIMEOUT_MS = 1000;
 
+/**
+ * May a push end without a system notification in this browser (while a page of the site is visible)? Chromium and
+ * Firefox allow it; their user agents say "Chrome/" (Edge, Opera and Samsung Internet too) or "Firefox/". WebKit does
+ * not — Safari on macOS and every browser on iOS and iPadOS, whatever its name. Those say "CriOS", "FxiOS" or "EdgiOS"
+ * (or nothing at all, in a Home Screen web app), never "Chrome/" or "Firefox/". Anything not recognised answers no.
+ */
+const MAY_SKIP_NOTIFICATION = /Chrome\/|Chromium\/|Firefox\//.test((self.navigator && self.navigator.userAgent) || '');
+
 // Take over immediately when this file changes, instead of waiting for every tab to close.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
@@ -52,28 +74,61 @@ async function handlePush(event) {
     const payload = readPayload(event);
     if (!payload) return;
 
-    if (await handedToPage(payload)) return;
+    if (await handedToPage(payload)) {
+        // The page alerted the person itself. A browser that insists on a notification for every push still gets one.
+        if (!MAY_SKIP_NOTIFICATION) await showAndWithdraw(payload);
+        return;
+    }
     await showSystemNotification(payload);
 }
 
 /**
- * Did a visible page of the app take this notification (to show it as an in-app toast)? Never rejects: if the
+ * Did a page the person is working in take this notification (to show it as an in-app toast)? Never rejects: if the
  * handshake itself fails, the answer is "no" and the person gets a system notification — a doubled notification
  * is better than a lost one, and a push handler that ends without showing anything makes the browser draw its
  * own generic "this site was updated in the background" notice.
  */
 async function handedToPage(payload) {
     try {
-        // Only a *visible* page can show an in-app toast; background tabs can't be seen.
-        const visiblePages = (await getWindowClients()).filter((client) => client.visibilityState === 'visible');
-        if (visiblePages.length === 0) return false;
+        // Only a page that is visible AND focused can alert the person: a background tab can't be seen, and a window that
+        // can be seen but is not in use (another app is in front of it) is not being looked at. (`focused` missing — an
+        // old browser — reads as "not in use": the system notification is the safe answer.)
+        const workingPages = (await getWindowClients()).filter((client) => client.visibilityState === 'visible' && client.focused === true);
+        if (workingPages.length === 0) return false;
 
-        const replies = await Promise.all(visiblePages.map((client) => askPage(client, { type: MESSAGE.RECEIVED, payload })));
-        // If a visible page has no listener (e.g. notifications aren't mounted on that route),
-        // nobody confirmed — the caller falls through so the user still sees the notification.
+        const replies = await Promise.all(workingPages.map((client) => askPage(client, { type: MESSAGE.RECEIVED, payload })));
+        // The page confirms only if it really took the notification. One with no listener (e.g. notifications aren't mounted
+        // on that route), or one that finds it cannot show anything after all, does not — the caller falls through so
+        // the user still sees the notification.
         return replies.some(Boolean);
     } catch {
         return false;
+    }
+}
+
+/**
+ * Draws a notification and takes it back at once, for browsers that count a push as ignored unless a notification
+ * was shown (see MAY_SKIP_NOTIFICATION). Two details keep the person from noticing:
+ *   - it is silent — the page has just alerted them in its own way;
+ *   - it has a tag of its own, never the conversation's: under the conversation's tag it would replace a notification
+ *     of that conversation the person has not dealt with yet, and taking it back would remove that one too.
+ * Never rejects: the page has taken the notification, so there is nothing left to lose.
+ */
+async function showAndWithdraw(payload) {
+    const tag = 'withdrawn:' + payload.id;
+    try {
+        await self.registration.showNotification(payload.title, {
+            body: payload.body,
+            icon: payload.icon || DEFAULT_ICON,
+            tag,
+            silent: true,
+            dir: 'auto',
+            data: { id: payload.id },
+        });
+        const shown = await self.registration.getNotifications({ tag });
+        shown.forEach((notification) => notification.close());
+    } catch {
+        /* best-effort */
     }
 }
 
@@ -96,17 +151,27 @@ async function showSystemNotification(payload) {
         }
     }
 
-    return self.registration.showNotification(count > 1 ? payload.title + ' (' + count + ')' : payload.title, {
-        body: payload.body,
-        icon: payload.icon || DEFAULT_ICON,
-        image: payload.image,
-        tag,
-        renotify: grouped, // buzz again when a tagged notification is replaced (needs a tag)
-        silent: payload.silent === true ? true : undefined, // the user's sound preference, where the browser honours it
-        dir: 'auto', // Arabic and English text both lay out correctly
-        timestamp: payload.sentAt,
-        data: { link: toAppPath(payload.link), id: payload.id, type: payload.type, key: payload.key, count },
-    });
+    const title = count > 1 ? payload.title + ' (' + count + ')' : payload.title;
+    const data = { link: toAppPath(payload.link), id: payload.id, type: payload.type, key: payload.key, count };
+
+    try {
+        return await self.registration.showNotification(title, {
+            body: payload.body,
+            icon: payload.icon || DEFAULT_ICON,
+            image: payload.image,
+            tag,
+            renotify: grouped, // buzz again when a tagged notification is replaced (needs a tag)
+            silent: payload.silent === true ? true : undefined, // the user's sound preference, where the browser honours it
+            dir: 'auto', // Arabic and English text both lay out correctly
+            timestamp: payload.sentAt,
+            data,
+        });
+    } catch {
+        // A browser can refuse an option it does not like (a `timestamp` that is not a number, an `image` it cannot take).
+        // A plainer notification is better than none: a push that ends without one makes Chromium draw its own "updated
+        // in the background" notice, and WebKit counts it against the subscription.
+        return self.registration.showNotification(title, { body: payload.body, tag, data });
+    }
 }
 
 /** Reads the push into a payload object, or null if it isn't something we can display. */
