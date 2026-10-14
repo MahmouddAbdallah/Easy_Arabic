@@ -1,7 +1,6 @@
 "use client";
 
 import { BanIcon, Loader2Icon, UserCheckIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useChat } from "../ChatProvider";
 
 /**
@@ -18,24 +17,22 @@ export function BlockedNotice() {
         return (
             <div
                 role="status"
-                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-[22px] border border-(--chat-danger)/25 bg-(--chat-danger-soft) px-4 py-3"
             >
-                <p className="flex min-w-0 items-center gap-2.5 text-xs font-medium text-destructive">
+                <p className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-(--chat-danger)">
                     <BanIcon className="size-4 shrink-0" aria-hidden />
                     <span>You blocked {name || "this contact"}. Unblock to send messages or call.</span>
                 </p>
-                <Button
+                <button
                     type="button"
-                    size="sm"
-                    variant="outline"
                     disabled={busy}
                     aria-busy={pending === "unblock"}
                     onClick={() => void conversationActions.unblock()}
-                    className="rounded-xl"
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-(--chat-line-strong) bg-(--chat-surface) px-4 text-sm font-medium text-(--chat-ink) outline-none transition-colors hover:bg-(--chat-surface-3) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring) disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4"
                 >
                     {pending === "unblock" ? <Loader2Icon className="animate-spin" /> : <UserCheckIcon />}
                     Unblock
-                </Button>
+                </button>
             </div>
         );
     }
@@ -43,7 +40,7 @@ export function BlockedNotice() {
     return (
         <p
             role="status"
-            className="flex items-center justify-center gap-2.5 rounded-2xl border border-border/50 bg-muted/40 px-4 py-3 text-xs font-medium text-muted-foreground"
+            className="flex items-center justify-center gap-2.5 rounded-[22px] border border-(--chat-line) bg-(--chat-surface) px-4 py-3 text-sm font-medium text-(--chat-ink-2)"
         >
             <BanIcon className="size-4 shrink-0" aria-hidden />
             You can&apos;t send messages or call this person right now.

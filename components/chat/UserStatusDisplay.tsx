@@ -1,68 +1,59 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
-import { firebaseClientDBRealTime } from '@/lib/config/firebase-client';
-import { clsx } from 'cn';
+import { cn } from 'cn';
+import { useUserPresence } from './hooks/useUserPresence';
 
-interface Status {
-    state: 'online' | 'offline';
-    last_changed: number;
+/** Three dots that rise in turn: someone is typing. Still when the reader prefers less motion. */
+export function TypingDots({ className }: { className?: string }) {
+    return (
+        <span aria-hidden className={cn('inline-flex items-center gap-[3px] align-middle', className)}>
+            {[0, 1, 2].map((index) => (
+                <span
+                    key={index}
+                    className="size-[5px] rounded-full bg-current motion-reduce:animate-none"
+                    style={{ animation: 'chat-dot 1.2s ease-in-out infinite', animationDelay: `${index * 0.16}s` }}
+                />
+            ))}
+        </span>
+    );
 }
+
 type UserStatusDisplayProps = {
     userId: string;
-    ping?: boolean,
-    showStatus?: boolean,
-    typing?: boolean
-}
-export default function UserStatusDisplay({
-    userId,
-    ping = false,
-    showStatus = false,
-    typing = false
-}: UserStatusDisplayProps
-) {
-    const [status, setStatus] = useState<Status | null>(null);
+    /** A soft ring pulses around the dot while the person is online. */
+    ping?: boolean;
+    /** Also say it in words next to the dot. */
+    showStatus?: boolean;
+    typing?: boolean;
+};
 
-    useEffect(() => {
-        const statusRef = ref(firebaseClientDBRealTime, `status/${userId}`);
-        const unsubscribe = onValue(statusRef, (snapshot) => {
-            setStatus(snapshot.val());
-        });
-        return () => unsubscribe();
-    }, [userId]);
-
-    const isOnline = status?.state === 'online';
+/**
+ * The little green dot of someone who is online (nothing at all when they are not, like every messenger: an
+ * absent dot says "offline" without a grey blob on every avatar), optionally with the status in words.
+ * Place it in the corner of an avatar.
+ */
+export default function UserStatusDisplay({ userId, ping = false, showStatus = false, typing = false }: UserStatusDisplayProps) {
+    const { online } = useUserPresence(userId);
 
     return (
-        <div className="group relative inline-flex items-center gap-2">
-            <div className="relative flex size-3.5">
-                {isOnline && ping && (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                )}
-
-                <span
-                    className={`
-                        relative inline-flex rounded-full size-3.5 border-2 border-white shadow-sm
-                        ${isOnline ? 'bg-green-500' : 'bg-gray-400'}
-                    `}
-                />
-            </div>
-
-            {showStatus && (typing ? (
-                // Replaces the Online/Offline label while the other user is typing, and steps aside
-                // again (back to the normal status) as soon as they stop.
-                <span className="text-[11px] font-medium text-primary animate-pulse">
-                    Typing...
+        <span className="inline-flex items-center gap-1.5">
+            {online && (
+                <span className="relative flex size-3">
+                    {ping && <span className="absolute inline-flex size-full animate-ping rounded-full bg-(--chat-online) opacity-60 motion-reduce:animate-none" />}
+                    <span className="relative inline-flex size-3 rounded-full border-2 border-(--chat-surface) bg-(--chat-online)" />
                 </span>
-            ) : (
-                <span className={clsx(
-                    "text-[11px] font-medium",
-                    isOnline ? 'text-emerald-500' : 'text-gray-500'
-                )}>
-                    {isOnline ? 'Online' : 'Offline'}
-                </span>
-            ))}
-        </div>
+            )}
+
+            {showStatus &&
+                (typing ? (
+                    <span className="text-xs font-medium text-(--chat-accent-text)">
+                        typing <TypingDots />
+                    </span>
+                ) : (
+                    <span className={cn('text-xs font-medium', online ? 'text-(--chat-online)' : 'text-(--chat-ink-3)')}>
+                        {online ? 'Online' : 'Offline'}
+                    </span>
+                ))}
+        </span>
     );
 }

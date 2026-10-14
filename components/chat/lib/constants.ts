@@ -6,6 +6,9 @@ export const MESSAGES_API_URL = "/api/chat/messages";
 /** How many messages a chat loads when it opens, and each time "Load more" is pressed. */
 export const MESSAGES_PAGE_SIZE = 15;
 
+/** One toast slot for "couldn't load / couldn't open": a failed jump shows its message once, not twice. */
+export const CHAT_LOAD_ERROR_TOAST_ID = "chat-load-error";
+
 /**
  * Where the composer's toasts appear. The app-wide Toaster sits bottom-right, right on top of the
  * Send button, which would block pressing Send again after a failure.

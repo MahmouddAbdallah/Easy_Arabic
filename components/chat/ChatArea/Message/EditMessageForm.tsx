@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { MAX_MESSAGE_LENGTH } from "../../lib/constants";
 
 interface EditMessageFormProps {
@@ -52,8 +50,9 @@ export function EditMessageForm({ initialText, saving, onSave, onCancel }: EditM
 
     return (
         <div className="flex flex-col gap-2">
-            <Textarea
+            <textarea
                 ref={textareaRef}
+                dir="auto"
                 value={value}
                 rows={1}
                 maxLength={MAX_MESSAGE_LENGTH}
@@ -61,29 +60,26 @@ export function EditMessageForm({ initialText, saving, onSave, onCancel }: EditM
                 aria-label="Edit message"
                 onChange={(event) => setValue(event.target.value)}
                 onKeyDown={handleKeyDown}
-                className="min-h-0 max-h-48 resize-none rounded-lg border-primary-foreground/25 bg-primary-foreground/10 px-2.5 py-1.5 text-[12px] leading-relaxed text-primary-foreground focus-visible:border-primary-foreground/50 focus-visible:ring-primary-foreground/20 md:text-[13px] dark:bg-primary-foreground/10"
+                className="max-h-48 min-h-0 w-full resize-none rounded-xl border border-(--chat-out-soft) bg-(--chat-out-soft) px-3 py-2 text-[15px] leading-[1.5] text-(--chat-out-ink) outline-none placeholder:text-(--chat-out-meta) focus:border-white/50 disabled:opacity-70"
             />
             <div className="flex items-center justify-end gap-1.5">
-                <Button
+                <button
                     type="button"
-                    variant="ghost"
-                    size="xs"
                     disabled={saving}
                     onClick={onCancel}
-                    className="text-primary-foreground/90 hover:bg-primary-foreground/10 hover:text-primary-foreground dark:hover:bg-primary-foreground/10"
+                    className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium text-(--chat-out-ink) outline-none transition-colors hover:bg-(--chat-out-soft) focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-60"
                 >
                     Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                     type="button"
-                    size="xs"
                     disabled={!canSave}
                     onClick={() => onSave(trimmed)}
-                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-semibold text-(--chat-accent-text) outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-50"
                 >
-                    {saving && <Loader2Icon className="animate-spin" />}
+                    {saving && <Loader2Icon className="size-3.5 animate-spin" />}
                     Save
-                </Button>
+                </button>
             </div>
         </div>
     );

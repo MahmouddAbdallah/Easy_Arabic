@@ -1,18 +1,19 @@
 "use client";
 
-import { ScrollArea } from "@/components/ui/scroll-area";
 import SearchPeople from "./SearchPeople";
 import { SidebarHeader } from "./SidebarHeader";
 import { useChat } from "../ChatProvider";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/components/AppContext";
 import { collection, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { firebaseClientDB } from "@/lib/config/firebase-client";
 import ReceiverInfo from "./ReceiverInfo";
 import { getUnreadCount, type UnreadCount } from "../lib/unread";
 import { isChatClearedFor, isChatHiddenFor } from "../lib/chatState";
+import { useToday } from "../hooks/useToday";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { MessageCircleIcon } from "lucide-react";
 
 export interface ChatItemType {
     id: string;
@@ -31,12 +32,33 @@ export interface ChatItemType {
     blocks?: Record<string, string>;
 }
 
+function ListSkeleton() {
+    return (
+        <div role="status" aria-label="Loading conversations" className="space-y-0.5 px-1 pt-1">
+            {Array.from({ length: 7 }, (_, index) => (
+                <div key={index} className="flex items-center gap-3.5 rounded-2xl p-3">
+                    <div className="chat-skeleton size-[52px] shrink-0 rounded-full" />
+                    <div className="flex flex-1 flex-col gap-2.5">
+                        <div className="flex justify-between gap-6">
+                            <div className="chat-skeleton h-3.5 w-28 rounded-md" />
+                            <div className="chat-skeleton h-3 w-10 rounded-md" />
+                        </div>
+                        <div className="chat-skeleton h-3 w-3/4 rounded-md" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export function ChatSidebar() {
     const [chats, setChats] = useState<ChatItemType[] | null>(null);
 
     const { receiverId, locallyDeleted } = useChat();
     const { user } = useAppContext();
     const pathname = usePathname();
+    // One clock for every row, so the times turn "Today" into "Yesterday" together after midnight.
+    const today = useToday();
 
     useEffect(() => {
         if (!user?.id) return;
@@ -50,42 +72,64 @@ export function ChatSidebar() {
         });
     }, [user?.id]);
 
+    // A deleted chat stays out of the list until something newer than the deletion arrives.
+    // `locallyDeleted` is this browser's own deletion, applied before Firestore reports it.
+    const visible = useMemo(
+        () => chats?.filter((chat) => !isChatHiddenFor(chat, user?.id, locallyDeleted[chat.id])) ?? null,
+        [chats, user?.id, locallyDeleted]
+    );
+
     return (
-        <aside className="w-full border-r border-border/40 h-full flex flex-col bg-background/60 backdrop-blur-2xl select-none shrink-0 transition-all">
+        <div className="flex h-full w-full min-w-0 flex-col bg-(--chat-surface)">
             {/* 1. Header: profile, presence and menu (see SidebarHeader) */}
             <SidebarHeader />
 
-            {/* 2. Search & Filters */}
+            {/* 2. Search for people */}
             <SearchPeople />
 
-            {/* 3. Chat List */}
-            <ScrollArea className="flex-1 px-2">
-                <div className="space-y-1 py-1">
-                    {chats?.map((chat) => {
-                        // A deleted chat stays out of the list until something newer than the deletion arrives.
-                        // `locallyDeleted` is this browser's own deletion, applied before Firestore reports it.
-                        if (isChatHiddenFor(chat, user?.id, locallyDeleted[chat.id])) return null;
-                        // Everything in it was cleared: nothing to preview (the other person's list is untouched).
-                        const cleared = isChatClearedFor(chat, user?.id);
-                        const receiveId = chat.participants.find(id => id != user?.id as string) ?? '';
-                        const isSelected = receiveId == receiverId;
-                        return (
-                            <Link
-                                key={chat?.id}
-                                href={`${pathname}?receiverId=${receiveId}`}
-                            >
-                                <ReceiverInfo
-                                    receiverId={receiveId as string}
-                                    lastSend={cleared ? undefined : chat?.updatedAt as Timestamp}
-                                    message={cleared ? '' : chat?.lastMessage}
-                                    isSelected={isSelected}
-                                    unreadCount={getUnreadCount(chat?.unreadCount, user?.id)}
-                                />
-                            </Link>
-                        );
-                    })}
-                </div>
-            </ScrollArea>
-        </aside>
+            {/* 3. Conversations */}
+            <div className="chat-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+                {visible === null ? (
+                    <ListSkeleton />
+                ) : visible.length === 0 ? (
+                    <div className="flex flex-col items-center px-8 py-16 text-center">
+                        <span className="mb-4 grid size-14 place-items-center rounded-full bg-(--chat-accent-soft) text-(--chat-accent-text)">
+                            <MessageCircleIcon className="size-6" aria-hidden />
+                        </span>
+                        <p className="text-base font-semibold text-(--chat-ink)">No conversations yet</p>
+                        <p className="mt-1 text-sm text-(--chat-ink-2)">Search for a person above to start chatting.</p>
+                    </div>
+                ) : (
+                    <nav aria-label="Conversations">
+                        <ul className="space-y-0.5">
+                            {visible.map((chat) => {
+                                // Everything in it was cleared: nothing to preview (the other person's list is untouched).
+                                const cleared = isChatClearedFor(chat, user?.id);
+                                const receiveId = chat.participants.find(id => id != user?.id as string) ?? '';
+                                const isSelected = receiveId == receiverId;
+                                return (
+                                    <li key={chat.id}>
+                                        <Link
+                                            href={`${pathname}?receiverId=${receiveId}`}
+                                            aria-current={isSelected ? "page" : undefined}
+                                            className="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring)"
+                                        >
+                                            <ReceiverInfo
+                                                receiverId={receiveId as string}
+                                                lastSend={cleared ? undefined : chat?.updatedAt as Timestamp}
+                                                message={cleared ? '' : chat?.lastMessage}
+                                                isSelected={isSelected}
+                                                unreadCount={getUnreadCount(chat?.unreadCount, user?.id)}
+                                                today={today}
+                                            />
+                                        </Link>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </nav>
+                )}
+            </div>
+        </div>
     );
 }

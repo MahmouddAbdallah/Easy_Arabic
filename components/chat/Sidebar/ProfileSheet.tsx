@@ -27,6 +27,7 @@ import { getInitials } from "../lib/initials";
 import { getRoleLabel } from "../lib/roles";
 import { InfoRow } from "../shared/InfoRow";
 import { PresenceDot, PresenceLabel } from "./PresenceDot";
+import { CHAT_ROOT_CLASS } from "../lib/chatTheme";
 
 /** "Oct 7, 2026" from anything the server may have sent for a date; null when it isn't one. */
 function formatDate(value: string | Date | null | undefined): string | null {
@@ -72,9 +73,9 @@ export function ProfileSheet({ open, onOpenChange, finalFocus, user, presence, a
             <SheetContent
                 side="left"
                 finalFocus={finalFocus}
-                className="gap-0 p-0 data-[side=left]:w-full data-[side=left]:sm:w-96"
+                className={`${CHAT_ROOT_CLASS} gap-0 bg-(--chat-surface) p-0 data-[side=left]:w-full data-[side=left]:sm:w-96`}
             >
-                <SheetHeader className="border-b border-border/40 px-4 py-3.5">
+                <SheetHeader className="border-b border-(--chat-line) px-4 py-4">
                     <SheetTitle>Profile</SheetTitle>
                     <SheetDescription className="sr-only">Your account details and shortcuts to manage them.</SheetDescription>
                 </SheetHeader>

@@ -13,6 +13,7 @@ import {
     AlertDialogMedia,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ui } from "../lib/chatTheme";
 
 /** The actions that need a confirmation. (Unblocking is harmless and takes effect at once.) */
 export type ConfirmableAction = "block" | "clear" | "delete";
@@ -74,21 +75,22 @@ export function ConversationActionDialog({ action, name, pending, onConfirm, onC
                 if (!next && !pending) onClose();
             }}
         >
-            <AlertDialogContent size="sm">
+            <AlertDialogContent size="sm" className={`${ui.layer} rounded-3xl p-5`}>
                 <AlertDialogHeader>
-                    <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                    <AlertDialogMedia className="bg-(--chat-danger-soft) text-(--chat-danger)">
                         <copy.Icon />
                     </AlertDialogMedia>
                     <AlertDialogTitle>{copy.title(who)}</AlertDialogTitle>
                     <AlertDialogDescription>{copy.description(who)}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={pending} className="rounded-full">Cancel</AlertDialogCancel>
                     <AlertDialogAction
                         variant="destructive"
                         disabled={pending}
                         aria-busy={pending}
                         onClick={() => action && onConfirm(action)}
+                        className="rounded-full"
                     >
                         {pending && <Loader2Icon className="animate-spin" />}
                         {copy.confirm}

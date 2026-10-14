@@ -13,9 +13,7 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "cn";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ui } from "../../lib/chatTheme";
 import { CHAT_SEARCH_MAX_QUERY_LENGTH, CHAT_SEARCH_PANEL_ID, type ChatSearchResult } from "../../lib/chatSearch";
 import { useToday } from "../../hooks/useToday";
 import type { ChatSearchController } from "../../hooks/useChatSearch";
@@ -46,15 +44,15 @@ const SKELETON_ROWS = 5;
 
 function ResultSkeleton() {
     return (
-        <div aria-hidden className="flex items-start gap-3 px-3 py-2.5">
-            <Skeleton className="size-9 shrink-0 rounded-full" />
-            <div className="flex-1 space-y-2 pt-0.5">
+        <div aria-hidden className="flex items-start gap-3 px-3 py-3">
+            <div className="chat-skeleton size-10 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2.5 pt-0.5">
                 <div className="flex justify-between gap-6">
-                    <Skeleton className="h-3 w-20 rounded-md" />
-                    <Skeleton className="h-3 w-12 rounded-md" />
+                    <div className="chat-skeleton h-3 w-20 rounded-md" />
+                    <div className="chat-skeleton h-3 w-12 rounded-md" />
                 </div>
-                <Skeleton className="h-3 w-full rounded-md" />
-                <Skeleton className="h-3 w-2/3 rounded-md" />
+                <div className="chat-skeleton h-3 w-full rounded-md" />
+                <div className="chat-skeleton h-3 w-2/3 rounded-md" />
             </div>
         </div>
     );
@@ -70,22 +68,25 @@ interface MessageProps {
 /** A centred notice (nothing typed yet, no results, an error) */
 function Notice({ icon: Icon, title, children, tone = "default" }: MessageProps) {
     return (
-        <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+        <div className="flex flex-col items-center gap-4 px-8 py-16 text-center">
             <span
                 className={cn(
-                    "grid size-12 place-items-center rounded-2xl",
-                    tone === "error" ? "bg-destructive/10 text-destructive" : "bg-muted/60 text-muted-foreground"
+                    "grid size-14 place-items-center rounded-full",
+                    tone === "error" ? "bg-(--chat-danger-soft) text-(--chat-danger)" : "bg-(--chat-accent-soft) text-(--chat-accent-text)"
                 )}
             >
-                <Icon className="size-5" aria-hidden />
+                <Icon className="size-6" aria-hidden />
             </span>
-            <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">{title}</p>
-                {children && <div className="text-xs leading-relaxed text-muted-foreground">{children}</div>}
+            <div className="space-y-1.5">
+                <p className="text-base font-semibold text-(--chat-ink)">{title}</p>
+                {children && <div className="text-sm leading-relaxed text-(--chat-ink-2)">{children}</div>}
             </div>
         </div>
     );
 }
+
+const pillButton =
+    "inline-flex h-9 items-center justify-center gap-2 rounded-full border border-(--chat-line-strong) bg-(--chat-surface) px-4 text-[13px] font-medium text-(--chat-ink) outline-none transition-colors hover:bg-(--chat-surface-3) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring) disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4";
 
 export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onStep, onClose }: ChatSearchPanelProps) {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -197,35 +198,28 @@ export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onSt
                 if (event.key === "Escape") onClose();
             }}
             className={cn(
-                "flex flex-col bg-background animate-in fade-in-0 duration-150",
+                "chat-rise flex flex-col bg-(--chat-surface)",
                 // Phones: covers the chat. Wider: a column beside it.
                 "absolute inset-0 z-30",
-                "md:static md:inset-auto md:z-auto md:w-88 md:shrink-0 md:border-l md:border-border/40 md:bg-card/20 md:backdrop-blur-md md:slide-in-from-right-4 lg:w-96",
+                "md:static md:inset-auto md:z-auto md:w-[360px] md:shrink-0 md:border-s md:border-(--chat-line) lg:w-[400px]",
                 !listVisible && "max-md:hidden"
             )}
         >
-            <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border/40 px-3 md:px-4">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={onClose}
-                    aria-label="Close search"
-                    className="size-9 rounded-xl text-muted-foreground hover:text-foreground"
-                >
-                    <ArrowLeftIcon className="size-5 md:hidden" aria-hidden />
-                    <XIcon className="hidden size-4 md:block" aria-hidden />
-                </Button>
-                <h2 className="text-sm font-semibold tracking-tight text-foreground">Search messages</h2>
+            <div className="flex h-[68px] shrink-0 items-center gap-1 border-b border-(--chat-line) px-2 md:px-3">
+                <button type="button" onClick={onClose} aria-label="Close search" className={ui.iconButton}>
+                    <ArrowLeftIcon className="md:hidden" aria-hidden />
+                    <XIcon className="hidden md:block" aria-hidden />
+                </button>
+                <h2 className="text-base font-semibold text-(--chat-ink)">Search in chat</h2>
             </div>
 
-            <div className="shrink-0 space-y-2 px-3 pt-3 pb-1">
+            <div className="shrink-0 space-y-2 px-3 pb-1 pt-3">
                 <div className="group relative flex items-center">
                     <SearchIcon
                         aria-hidden
-                        className="pointer-events-none absolute start-3 z-10 size-3.5 text-muted-foreground/60 transition-colors group-focus-within:text-primary"
+                        className="pointer-events-none absolute start-3.5 z-10 size-[18px] text-(--chat-ink-3) transition-colors group-focus-within:text-(--chat-accent-text)"
                     />
-                    <Input
+                    <input
                         ref={inputRef}
                         // Arabic typed here must read right-to-left, English left-to-right.
                         dir="auto"
@@ -241,36 +235,33 @@ export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onSt
                         autoComplete="off"
                         autoCorrect="off"
                         spellCheck={false}
-                        // The chat root is `select-none`; Safari would then refuse to let you type here.
-                        className="h-10 select-text rounded-xl border-border/40 bg-muted/30 ps-9 pe-9 text-base shadow-none placeholder:text-muted-foreground/60 focus-visible:bg-background/80 focus-visible:ring-1 focus-visible:ring-primary/40 md:text-xs"
+                        className={cn(ui.field, "select-text ps-11 pe-11")}
                     />
                     <div className="absolute end-2 z-10 flex items-center">
                         {busy ? (
-                            <Loader2Icon aria-hidden className="size-3.5 animate-spin text-primary" />
+                            <Loader2Icon aria-hidden className="mx-2 size-4 animate-spin text-(--chat-accent-text)" />
                         ) : typed ? (
-                            <Button
+                            <button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
                                 aria-label="Clear search"
                                 onClick={() => {
                                     setQuery("");
                                     inputRef.current?.focus();
                                 }}
-                                className="size-6 rounded-full text-muted-foreground/70 hover:text-foreground"
+                                className="grid size-7 place-items-center rounded-full text-(--chat-ink-3) outline-none transition-colors hover:bg-(--chat-line) hover:text-(--chat-ink) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring)"
                             >
-                                <XIcon className="size-3" aria-hidden />
-                            </Button>
+                                <XIcon className="size-4" aria-hidden />
+                            </button>
                         ) : null}
                     </div>
                 </div>
 
-                <p aria-live="polite" className="min-h-4 px-1 text-[11px] font-medium text-muted-foreground/80">
+                <p aria-live="polite" className="min-h-5 px-2 text-[13px] text-(--chat-ink-3)">
                     {summary}
                 </p>
             </div>
 
-            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
+            <div ref={listRef} className="chat-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-4">
                 {status === "idle" || (!typed && results.length === 0) ? (
                     <Notice icon={SearchIcon} title="Search this conversation">
                         Type a word to find it in every message, including older ones that aren&apos;t on screen. File
@@ -285,9 +276,9 @@ export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onSt
                 ) : status === "error" && results.length === 0 ? (
                     <Notice icon={AlertCircleIcon} title="Couldn't search" tone="error">
                         <p>{error ?? "Something went wrong. Please try again."}</p>
-                        <Button type="button" variant="outline" size="sm" onClick={retry} className="mt-3 rounded-full">
+                        <button type="button" onClick={retry} className={cn(pillButton, "mt-4")}>
                             <RotateCcw /> Try again
-                        </Button>
+                        </button>
                     </Notice>
                 ) : results.length === 0 ? (
                     <Notice icon={SearchXIcon} title={`No messages found for “${searchedQuery}”`}>
@@ -297,17 +288,15 @@ export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onSt
                                     Nothing in the latest {scanned.toLocaleString()} messages. There is older history
                                     left to look through.
                                 </p>
-                                <Button
+                                <button
                                     type="button"
-                                    variant="outline"
-                                    size="sm"
                                     onClick={() => void loadMore()}
                                     disabled={loadingMore}
-                                    className="mt-3 rounded-full"
+                                    className={cn(pillButton, "mt-4")}
                                 >
                                     {loadingMore ? <Loader2Icon className="animate-spin" /> : <ChevronDownIcon />}
                                     Search older messages
-                                </Button>
+                                </button>
                             </>
                         ) : (
                             <p>Check the spelling or try a different word.</p>
@@ -315,10 +304,7 @@ export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onSt
                     </Notice>
                 ) : (
                     <>
-                        <ul
-                            aria-label="Search results"
-                            className={cn("space-y-0.5 transition-opacity", busy && "opacity-60")}
-                        >
+                        <ul aria-label="Search results" className={cn("space-y-0.5 transition-opacity", busy && "opacity-60")}>
                             {results.map((result) => {
                                 const sender = senderOf(result);
                                 return (
@@ -337,25 +323,25 @@ export function ChatSearchPanel({ search, me, other, listVisible, onSelect, onSt
                             })}
                         </ul>
 
-                        <div ref={sentinelRef} className="flex flex-col items-center gap-2 px-3 py-4 text-center">
+                        <div ref={sentinelRef} className="flex flex-col items-center gap-2 px-3 py-5 text-center">
                             {loadingMore ? (
-                                <p role="status" className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                                    <Loader2Icon className="size-3.5 animate-spin text-primary" aria-hidden />
+                                <p role="status" className="flex items-center gap-2 text-[13px] text-(--chat-ink-2)">
+                                    <Loader2Icon className="size-4 animate-spin text-(--chat-accent-text)" aria-hidden />
                                     Searching older messages…
                                 </p>
                             ) : error ? (
                                 <>
-                                    <p className="text-[11px] text-destructive">{error}</p>
-                                    <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} className="rounded-full">
+                                    <p className="text-[13px] text-(--chat-danger)">{error}</p>
+                                    <button type="button" onClick={() => void loadMore()} className={pillButton}>
                                         <RotateCcw /> Try again
-                                    </Button>
+                                    </button>
                                 </>
                             ) : hasMore ? (
-                                <Button type="button" variant="ghost" size="sm" onClick={() => void loadMore()} className="rounded-full text-xs text-muted-foreground">
+                                <button type="button" onClick={() => void loadMore()} className={pillButton}>
                                     <ChevronDownIcon /> Search older messages
-                                </Button>
+                                </button>
                             ) : (
-                                <p className="text-[11px] text-muted-foreground/70">That&apos;s everything in this conversation.</p>
+                                <p className="text-[13px] text-(--chat-ink-3)">That&apos;s everything in this conversation.</p>
                             )}
                         </div>
                     </>

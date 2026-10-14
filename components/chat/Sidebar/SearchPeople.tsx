@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Search, Loader2, X, User } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useForm, useWatch } from "react-hook-form";
 import axios from "axios";
 import { useAppContext } from "@/components/AppContext";
 import Link from "next/link";
+import { cn } from "cn";
+import { ui } from "../lib/chatTheme";
 
 interface SearchFormValues {
     query: string;
@@ -76,86 +76,75 @@ const SearchPeople = () => {
     };
 
     return (
-        <div className="p-3 space-y-2.5 relative">
-            <div className="relative flex items-center group">
-                <Search className="absolute left-3 h-3.5 w-3.5 text-muted-foreground/60 group-focus-within:text-primary transition-colors pointer-events-none z-10" />
+        <div className="relative space-y-2 px-3 pb-2 pt-1">
+            <div className="group relative flex items-center">
+                <Search className="pointer-events-none absolute start-3.5 z-10 size-[18px] text-(--chat-ink-3) transition-colors group-focus-within:text-(--chat-accent-text)" aria-hidden />
 
-                <Input
+                <input
                     {...register("query")}
-                    placeholder="Search people..."
-                    className="pl-8 pr-8 bg-muted/30 border-border/40 h-9 text-xs shadow-none focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:bg-background/80 transition-all rounded-xl placeholder:text-muted-foreground/50 font-medium"
+                    dir="auto"
+                    aria-label="Search people"
+                    placeholder="Search people"
+                    autoComplete="off"
+                    className={cn(ui.field, "ps-11 pe-11")}
                 />
 
-                <div className="absolute right-2.5 flex items-center gap-1 z-10">
+                <div className="absolute end-2 z-10 flex items-center">
                     {loading ? (
-                        <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                        <Loader2 className="mx-2 size-4 animate-spin text-(--chat-accent-text)" aria-hidden />
                     ) : searchQuery ? (
-                        <Button
+                        <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
                             onClick={handleClear}
-                            className="h-5 w-5 rounded-full hover:bg-muted text-muted-foreground/70 hover:text-foreground"
+                            aria-label="Clear search"
+                            className="grid size-7 place-items-center rounded-full text-(--chat-ink-3) outline-none transition-colors hover:bg-(--chat-line) hover:text-(--chat-ink) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring)"
                         >
-                            <X className="h-3 w-3" />
-                        </Button>
+                            <X className="size-4" aria-hidden />
+                        </button>
                     ) : null}
                 </div>
             </div>
 
             {(hasSearched || loading) && (
-                <div className="space-y-1 mt-1 bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-2 shadow-xl shadow-black/5 animate-in fade-in-50 zoom-in-95 duration-200">
+                <div className="chat-rise rounded-2xl border border-(--chat-line) bg-(--chat-surface) p-1.5 shadow-(--chat-shadow-md)">
                     {loading ? (
-                        <div className="p-4 text-center space-y-2">
-                            <Loader2 className="h-5 w-5 text-primary animate-spin mx-auto opacity-70" />
-                            <p className="text-[11px] text-muted-foreground/80 font-medium">
-                                Searching across directory...
-                            </p>
+                        <div className="space-y-2 p-4 text-center" role="status">
+                            <Loader2 className="mx-auto size-5 animate-spin text-(--chat-accent-text)" aria-hidden />
+                            <p className="text-sm text-(--chat-ink-2)">Searching people...</p>
                         </div>
                     ) : results.length > 0 ? (
-                        <div className="max-h-56 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                        <ul className="chat-scroll max-h-64 space-y-0.5 overflow-y-auto">
                             {results.map((person) => (
-                                <Link
-                                    href={`/chat?receiverId=${person?.id}`}
-                                    key={person.id}
-                                    onClick={() => { setHasSearched(false) }}
-                                    className="flex items-center justify-between p-2 rounded-xl hover:bg-accent/80 hover:text-accent-foreground transition-all duration-200 group cursor-pointer"
-                                >
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                <li key={person.id}>
+                                    <Link
+                                        href={`/chat?receiverId=${person?.id}`}
+                                        onClick={() => { setHasSearched(false) }}
+                                        className="flex cursor-pointer items-center gap-3 rounded-xl p-2 outline-none transition-colors hover:bg-(--chat-surface-2) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring)"
+                                    >
                                         <div className="relative shrink-0">
-                                            <Avatar className="h-8 w-8 ring-1 ring-border/40 shadow-xs">
+                                            <Avatar className="size-10 bg-(--chat-accent-soft) ring-1 ring-(--chat-line)">
                                                 <AvatarImage src={person.avatar} alt={person.name} />
-                                                <AvatarFallback className="text-[10px] bg-muted font-bold">
+                                                <AvatarFallback className="bg-(--chat-accent-soft) text-xs font-semibold text-(--chat-accent-text)">
                                                     {person.name?.slice(0, 2).toUpperCase() || "U"}
                                                 </AvatarFallback>
                                             </Avatar>
                                             {person.isOnline && (
-                                                <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-background" />
+                                                <span className="absolute -bottom-px -end-px size-3 rounded-full bg-(--chat-online) ring-2 ring-(--chat-surface)" />
                                             )}
                                         </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-xs font-semibold truncate text-foreground group-hover:text-accent-foreground">
-                                                {person.name}
-                                            </span>
-                                            {person.role && (
-                                                <span className="text-[10px] text-muted-foreground/70 truncate">
-                                                    {person.role}
-                                                </span>
-                                            )}
+                                        <div className="flex min-w-0 flex-col">
+                                            <span className="truncate text-[15px] font-medium text-(--chat-ink)">{person.name}</span>
+                                            {person.role && <span className="truncate text-[13px] text-(--chat-ink-3)">{person.role}</span>}
                                         </div>
-                                    </div>
-                                </Link>
+                                    </Link>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     ) : (
-                        <div className="p-4 text-center">
-                            <User className="h-5 w-5 text-muted-foreground/40 mx-auto mb-1" />
-                            <p className="text-xs font-medium text-muted-foreground">
-                                No people found
-                            </p>
-                            <p className="text-[10px] text-muted-foreground/60">
-                                Try searching with a different name
-                            </p>
+                        <div className="p-5 text-center">
+                            <User className="mx-auto mb-1.5 size-6 text-(--chat-ink-3)" aria-hidden />
+                            <p className="text-sm font-medium text-(--chat-ink)">No people found</p>
+                            <p className="text-[13px] text-(--chat-ink-3)">Try a different name</p>
                         </div>
                     )}
                 </div>

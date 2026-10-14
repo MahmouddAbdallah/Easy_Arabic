@@ -13,15 +13,8 @@ interface ReactionSummaryProps {
     onToggle: (reaction: ReactionKey) => void;
 }
 
-/** Reaction chips under a bubble. Clicking a chip toggles the current user's reaction. */
-export function ReactionSummary({
-    reactions,
-    currentUserId,
-    otherUserName,
-    isMe,
-    disabled,
-    onToggle,
-}: ReactionSummaryProps) {
+/** Reaction chips tucked under a bubble. Clicking a chip toggles the current user's reaction. */
+export function ReactionSummary({ reactions, currentUserId, otherUserName, isMe, disabled, onToggle }: ReactionSummaryProps) {
     const items = summarizeReactions(reactions, currentUserId);
     if (items.length === 0) return null;
 
@@ -29,12 +22,10 @@ export function ReactionSummary({
         <div
             role="group"
             aria-label="Reactions"
-            className={cn("relative z-10 -mt-2 flex flex-wrap gap-1 px-2", isMe ? "justify-end" : "justify-start")}
+            className={cn("relative z-10 -mt-2.5 flex flex-wrap gap-1 px-3", isMe ? "justify-end" : "justify-start")}
         >
             {items.map((item) => {
-                const names = item.userIds
-                    .map((id) => (id === currentUserId ? "You" : otherUserName || "Someone"))
-                    .join(", ");
+                const names = item.userIds.map((id) => (id === currentUserId ? "You" : otherUserName || "Someone")).join(", ");
                 return (
                     <button
                         key={item.key}
@@ -45,14 +36,14 @@ export function ReactionSummary({
                         title={`${item.label} · ${names}`}
                         onClick={() => onToggle(item.key)}
                         className={cn(
-                            "inline-flex items-center gap-1 rounded-full border bg-background px-1.5 py-0.5 text-[10px] leading-none shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                            "inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-xs leading-none shadow-(--chat-shadow-sm) outline-none transition-colors focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring) disabled:cursor-not-allowed disabled:opacity-60",
                             item.reactedByMe
-                                ? "border-primary/50 bg-primary/10 font-semibold text-primary"
-                                : "border-border/60 text-muted-foreground hover:bg-muted"
+                                ? "border-(--chat-accent-ring) bg-(--chat-accent-soft) font-semibold text-(--chat-accent-text)"
+                                : "border-(--chat-line) bg-(--chat-surface) text-(--chat-ink-2) hover:bg-(--chat-surface-3)"
                         )}
                     >
-                        <span className="text-[12px]">{item.emoji}</span>
-                        <span>{item.count}</span>
+                        <span className="text-[13px]">{item.emoji}</span>
+                        {item.count > 1 && <span className="tabular-nums">{item.count}</span>}
                     </button>
                 );
             })}

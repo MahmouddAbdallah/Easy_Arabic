@@ -30,6 +30,7 @@ import { formatLastSeen } from "../lib/presence";
 import { getRoleLabel } from "../lib/roles";
 import { InfoRow } from "../shared/InfoRow";
 import type { ConfirmableAction } from "./ConversationActionDialog";
+import { CHAT_ROOT_CLASS } from "../lib/chatTheme";
 
 interface QuickActionProps {
     Icon: ComponentType<{ className?: string }>;
@@ -107,7 +108,7 @@ export function ContactInfoSheet({
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
-                className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:w-96"
+                className={cn(CHAT_ROOT_CLASS, "gap-0 bg-(--chat-surface) p-0 data-[side=right]:w-full data-[side=right]:sm:w-96")}
                 aria-busy={busy}
             >
                 <SheetHeader className="border-b border-border/40 px-4 py-3.5">

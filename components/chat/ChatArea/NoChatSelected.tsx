@@ -1,52 +1,29 @@
-import { MessageSquarePlus, Sparkles, ShieldCheck, Zap } from "lucide-react";
+import { MessageCircleIcon } from "lucide-react";
 
+/** The pane beside the conversation list while no conversation is open. */
 export default function NoChatSelected() {
     return (
-        <div className="flex-1 flex flex-col items-center justify-center h-full bg-background/30 backdrop-blur-3xl relative select-none p-6 text-center overflow-hidden">
-            {/* Background Subtle Glowing Gradient */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="size-75 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-            </div>
+        <div className="relative flex h-full flex-1 flex-col items-center justify-center overflow-hidden bg-(--chat-canvas) p-8 text-center">
+            <div className="relative flex max-w-sm flex-col items-center">
+                <svg viewBox="0 0 160 120" className="mb-7 h-32 w-44" aria-hidden>
+                    <rect x="10" y="14" width="92" height="58" rx="22" className="fill-(--chat-in) stroke-(--chat-line-strong)" strokeWidth="1.5" />
+                    <path d="M32 72 L22 92 L50 72 Z" className="fill-(--chat-in) stroke-(--chat-line-strong)" strokeWidth="1.5" strokeLinejoin="round" />
+                    <rect x="28" y="33" width="54" height="6" rx="3" className="fill-(--chat-line-strong)" />
+                    <rect x="28" y="47" width="34" height="6" rx="3" className="fill-(--chat-line)" />
+                    <rect x="62" y="50" width="88" height="58" rx="22" className="fill-(--chat-out)" />
+                    <path d="M126 108 L138 120 L104 108 Z" className="fill-(--chat-out)" strokeLinejoin="round" />
+                    <rect x="80" y="69" width="52" height="6" rx="3" fill="white" opacity="0.85" />
+                    <rect x="80" y="83" width="32" height="6" rx="3" fill="white" opacity="0.5" />
+                </svg>
 
-            <div className="relative z-10 max-w-md flex flex-col items-center space-y-6">
-                {/* Main Animated Icon Badge */}
-                <div className="relative">
-                    <div className="w-20 h-20 rounded-3xl bg-linear-to-tr from-primary/20 via-primary/10 to-transparent border border-primary/20 flex items-center justify-center backdrop-blur-xl shadow-xl shadow-primary/5">
-                        <MessageSquarePlus className="w-9 h-9 text-primary" />
-                    </div>
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-primary"></span>
-                    </span>
-                </div>
-
-                {/* Text Area */}
-                <div className="space-y-2">
-                    <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                        No Conversation Selected
-                    </h2>
-                    <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                        Choose a contact from the sidebar or start a new conversation to start messaging.
-                    </p>
-                </div>
-
-                {/* Feature Highlights / Badges */}
-                <div className="grid grid-cols-3 gap-3 w-full pt-4 border-t border-border/30">
-                    <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-muted/30 border border-border/20 backdrop-blur-sm">
-                        <Zap className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-medium text-muted-foreground">Fast Sync</span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-muted/30 border border-border/20 backdrop-blur-sm">
-                        <ShieldCheck className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-medium text-muted-foreground">Encrypted</span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-muted/30 border border-border/20 backdrop-blur-sm">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-medium text-muted-foreground">Smart Features</span>
-                    </div>
-                </div>
+                <h2 className="text-xl font-semibold text-(--chat-ink)">Your messages</h2>
+                <p className="mt-2 text-[15px] leading-relaxed text-(--chat-ink-2)">
+                    Pick a conversation from the list, or search for a person to start a new one.
+                </p>
+                <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-(--chat-accent-soft) px-4 py-2 text-sm font-medium text-(--chat-accent-text)">
+                    <MessageCircleIcon className="size-4" aria-hidden />
+                    Nothing selected yet
+                </span>
             </div>
         </div>
     );

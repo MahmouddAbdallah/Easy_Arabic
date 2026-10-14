@@ -5,19 +5,19 @@ import { cn } from "cn";
 import { SELF_PRESENCE_LABEL, type SelfPresenceStatus } from "../hooks/useSelfPresence";
 
 const DOT_COLOR: Record<SelfPresenceStatus, string> = {
-    online: "bg-emerald-500",
-    offline: "bg-muted-foreground/60",
-    connecting: "animate-pulse bg-muted-foreground/40 motion-reduce:animate-none",
+    online: "bg-(--chat-online)",
+    offline: "bg-(--chat-ink-3)",
+    connecting: "animate-pulse bg-(--chat-ink-3)/60 motion-reduce:animate-none",
     "no-network": "bg-amber-500",
-    unavailable: "bg-muted-foreground/40",
+    unavailable: "bg-(--chat-ink-3)/60",
 };
 
 const LABEL_COLOR: Record<SelfPresenceStatus, string> = {
-    online: "text-emerald-600 dark:text-emerald-400",
-    offline: "text-muted-foreground",
-    connecting: "text-muted-foreground",
+    online: "text-(--chat-online)",
+    offline: "text-(--chat-ink-3)",
+    connecting: "text-(--chat-ink-3)",
     "no-network": "text-amber-600 dark:text-amber-400",
-    unavailable: "text-muted-foreground",
+    unavailable: "text-(--chat-ink-3)",
 };
 
 interface PresenceDotProps {
@@ -35,7 +35,7 @@ export function PresenceDot({ status, className }: PresenceDotProps) {
             aria-hidden="true"
             data-status={status}
             className={cn(
-                "absolute -end-px -bottom-px block size-3 rounded-full ring-2 ring-background transition-colors duration-300 motion-reduce:transition-none",
+                "absolute -end-px -bottom-px block size-3 rounded-full ring-2 ring-(--chat-surface) transition-colors duration-300 motion-reduce:transition-none",
                 DOT_COLOR[status],
                 className
             )}

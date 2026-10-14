@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronDownIcon, ChevronUpIcon, Loader2Icon, SearchIcon, XIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { cn } from "cn";
+import { ui } from "../../lib/chatTheme";
 import type { ChatSearchController } from "../../hooks/useChatSearch";
 
 interface ChatSearchNavigatorProps {
@@ -25,54 +26,35 @@ export function ChatSearchNavigator({ search, onStep, onShowList, onClose }: Cha
         <div
             role="toolbar"
             aria-label="Search results navigation"
-            className="flex shrink-0 items-center gap-1 border-t border-border/40 bg-card/60 px-2 py-1.5 backdrop-blur-md md:hidden"
+            className="flex shrink-0 items-center gap-1 border-t border-(--chat-line) bg-(--chat-surface) px-2 py-1.5 md:hidden"
         >
-            <Button type="button" variant="ghost" onClick={onShowList} className="h-10 gap-1.5 rounded-xl px-3 text-xs font-medium">
+            <button
+                type="button"
+                onClick={onShowList}
+                className="inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-(--chat-accent-text) outline-none transition-colors hover:bg-(--chat-accent-soft) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring) [&_svg]:size-4"
+            >
                 <SearchIcon aria-hidden /> Results
-            </Button>
+            </button>
 
             <div className="min-w-0 flex-1 text-center" aria-live="polite">
-                <p className="truncate text-xs font-semibold text-foreground" dir="auto">
+                <p className="truncate text-sm font-semibold text-(--chat-ink)" dir="auto">
                     {searchedQuery}
                 </p>
-                <p className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                <p className="flex items-center justify-center gap-1 text-xs text-(--chat-ink-3)">
                     {loadingMore && <Loader2Icon className="size-3 animate-spin" aria-hidden />}
                     {position}
                 </p>
             </div>
 
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Older match"
-                disabled={!canGoOlder || loadingMore}
-                onClick={() => onStep("older")}
-                className="size-10 rounded-xl"
-            >
-                <ChevronUpIcon className="size-5" aria-hidden />
-            </Button>
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Newer match"
-                disabled={!canGoNewer}
-                onClick={() => onStep("newer")}
-                className="size-10 rounded-xl"
-            >
-                <ChevronDownIcon className="size-5" aria-hidden />
-            </Button>
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Close search"
-                onClick={onClose}
-                className="size-10 rounded-xl text-muted-foreground"
-            >
-                <XIcon className="size-4" aria-hidden />
-            </Button>
+            <button type="button" aria-label="Older match" disabled={!canGoOlder || loadingMore} onClick={() => onStep("older")} className={ui.iconButton}>
+                <ChevronUpIcon aria-hidden />
+            </button>
+            <button type="button" aria-label="Newer match" disabled={!canGoNewer} onClick={() => onStep("newer")} className={ui.iconButton}>
+                <ChevronDownIcon aria-hidden />
+            </button>
+            <button type="button" aria-label="Close search" onClick={onClose} className={cn(ui.iconButton, "text-(--chat-ink-3)")}>
+                <XIcon aria-hidden />
+            </button>
         </div>
     );
 }

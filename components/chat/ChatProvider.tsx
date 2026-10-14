@@ -10,6 +10,7 @@ import { ChatArea } from './ChatArea/ChatArea';
 import { CallProvider } from './CallProvider';
 import NoChatSelected from './ChatArea/NoChatSelected';
 import { getChatId } from './lib/chatId';
+import { CHAT_ROOT_CLASS, CHAT_THEME_CSS } from './lib/chatTheme';
 import { laterOf } from './lib/chatState';
 import { useConversationState, type ConversationStateHandle } from './hooks/useConversationState';
 import { useConversationActions, type ConversationActions } from './hooks/useConversationActions';
@@ -82,21 +83,25 @@ export const ChatProvider: React.FC = () => {
             }}
         >
             <CallProvider>
-                <div className="flex h-dvh min-h-dvh w-full items-center justify-center p-2 sm:p-4">
-                    <div className="h-full w-full overflow-hidden rounded-3xl border bg-background shadow-sm lg:h-[90vh] lg:w-[90vw]">
-                        <div className="flex h-full w-full antialiased">
-                            {/* Sidebar Section */}
+                {/* The chat's own palette, type and motion. Scoped to `.chat-theme`: nothing outside the chat is touched. */}
+                <style dangerouslySetInnerHTML={{ __html: CHAT_THEME_CSS }} />
+                <div
+                    className={`${CHAT_ROOT_CLASS} flex h-dvh min-h-dvh w-full items-center justify-center bg-(--chat-canvas-edge) sm:p-4 lg:p-6`}
+                >
+                    <div className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-[1500px]">
+                        <div className="flex h-full w-full">
+                            {/* Conversations */}
                             <aside
                                 className={`${receiverId ? "hidden" : "flex"
-                                    } h-full w-full md:flex md:w-80 lg:w-96 shrink-0 border-r`}
+                                    } h-full w-full shrink-0 border-e border-(--chat-line) bg-(--chat-surface) md:flex md:w-[340px] lg:w-[380px]`}
                             >
                                 <ChatSidebar />
                             </aside>
 
-                            {/* Main Chat Area Section */}
+                            {/* The open conversation */}
                             <main
                                 className={`${!receiverId ? "hidden" : "flex"
-                                    } h-full flex-1 flex-col md:flex`}
+                                    } h-full min-w-0 flex-1 flex-col md:flex`}
                             >
                                 {receiverId ? <ChatArea /> : <NoChatSelected />}
                             </main>

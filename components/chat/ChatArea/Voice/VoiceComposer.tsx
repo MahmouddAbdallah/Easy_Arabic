@@ -12,7 +12,7 @@ import { VoicePlayer } from "./VoicePlayer";
 /** In the last stretch the timer says how long is left. */
 const WARN_SECONDS = 30;
 
-const ICON_BUTTON = "size-11 shrink-0 rounded-xl md:size-8";
+const ICON_BUTTON = "size-11 shrink-0 rounded-full";
 
 /** What a screen reader hears when the step changes. (The ticking timer itself is not announced.) */
 function getAnnouncement(voice: VoiceMessageController): string {
@@ -95,7 +95,7 @@ export function VoiceComposer({ voice }: { voice: VoiceMessageController }) {
                 aria-label="Voice message"
                 tabIndex={-1}
                 onKeyDown={onKeyDown}
-                className="flex min-h-14 items-center gap-1 rounded-2xl border border-border/40 bg-muted/30 p-1.5 shadow-sm outline-none md:min-h-12 md:gap-2"
+                className="flex min-h-14 items-center gap-1 rounded-[28px] border border-(--chat-line) bg-(--chat-surface) p-1.5 shadow-(--chat-shadow-md) outline-none md:gap-2"
             >
                 <p role="status" className="sr-only">
                     {getAnnouncement(voice)}

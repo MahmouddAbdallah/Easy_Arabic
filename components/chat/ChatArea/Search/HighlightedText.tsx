@@ -12,7 +12,7 @@ interface HighlightedTextProps {
 /**
  * `text` with the given stretches marked, the way a browser marks what "find in page" found.
  * Amber with dark text on purpose: it stays readable on a light bubble, a dark bubble and the
- * primary-coloured bubbles of your own messages alike.
+ * iris bubbles of your own messages alike.
  */
 export function HighlightedText({ text, ranges, className }: HighlightedTextProps) {
     if (ranges.length === 0) return <>{text}</>;
@@ -29,7 +29,7 @@ export function HighlightedText({ text, ranges, className }: HighlightedTextProp
         parts.push(
             <mark
                 key={`m${index}`}
-                className={cn("rounded-[3px] bg-amber-300 px-px text-amber-950 [-webkit-box-decoration-break:clone] [box-decoration-break:clone]", className)}
+                className={cn("rounded-[4px] bg-(--chat-mark) px-0.5 text-(--chat-mark-ink) [-webkit-box-decoration-break:clone] [box-decoration-break:clone]", className)}
             >
                 {text.slice(from, to)}
             </mark>

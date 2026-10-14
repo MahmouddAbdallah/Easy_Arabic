@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import { FileTextIcon, ImageIcon, PaperclipIcon, VideoIcon, type LucideIcon } from "lucide-react";
 import { cn } from "cn";
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENT_BYTES, formatFileSize } from "../../lib/attachments";
+import { ui } from "../../lib/chatTheme";
 import type { AttachmentType } from "../../types";
 
 const OPTIONS: Array<{ type: AttachmentType; label: string; hint: string; Icon: LucideIcon; tone: string }> = [
@@ -56,33 +56,26 @@ export function AttachMenu({ disabled, onFiles }: AttachMenuProps) {
         <>
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger
-                    render={
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={disabled}
-                            aria-label="Attach photos, videos or files"
-                            className="size-11 shrink-0 rounded-xl text-muted-foreground hover:text-foreground md:size-8"
-                        />
-                    }
+                    disabled={disabled}
+                    aria-label="Attach photos, videos or files"
+                    className={cn(ui.iconButton, "size-11 [&_svg]:size-[22px]")}
                 >
-                    <PaperclipIcon className="size-4" />
+                    <PaperclipIcon strokeWidth={1.75} />
                 </PopoverTrigger>
-                <PopoverContent side="top" align="start" sideOffset={10} className="w-[min(18rem,calc(100vw-2rem))] gap-0.5 p-1.5">
+                <PopoverContent side="top" align="start" sideOffset={10} className={cn(ui.layer, "w-[min(19rem,calc(100vw-2rem))] gap-0.5 rounded-2xl p-1.5")}>
                     {OPTIONS.map(({ type, label, hint, Icon, tone }) => (
                         <button
                             key={type}
                             type="button"
                             onClick={() => pick(type)}
-                            className="flex min-h-12 w-full items-center gap-3 rounded-lg p-2 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+                            className="flex min-h-14 w-full items-center gap-3 rounded-xl p-2 text-start outline-none transition-colors hover:bg-(--chat-surface-2) focus-visible:bg-(--chat-surface-2)"
                         >
                             <span className={cn("grid size-9 shrink-0 place-items-center rounded-full", tone)}>
                                 <Icon className="size-4.5" />
                             </span>
                             <span className="flex min-w-0 flex-col">
-                                <span className="text-[13px] font-medium leading-tight">{label}</span>
-                                <span className="truncate text-[11px] text-muted-foreground">{hint}</span>
+                                <span className="text-sm font-medium leading-tight text-(--chat-ink)">{label}</span>
+                                <span className="truncate text-xs text-(--chat-ink-3)">{hint}</span>
                             </span>
                         </button>
                     ))}

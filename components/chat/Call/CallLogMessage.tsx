@@ -7,9 +7,9 @@ import { describeCallLog, type CallLogDescription, type CallPeer } from "../lib/
 import type { MessageType } from "../types";
 
 const TONE_STYLES: Record<CallLogDescription["tone"], { row: string; icon: string }> = {
-    ok: { row: "border-border/40 bg-muted/40", icon: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
-    neutral: { row: "border-border/40 bg-muted/40", icon: "bg-muted text-muted-foreground" },
-    missed: { row: "border-destructive/25 bg-destructive/5", icon: "bg-destructive/10 text-destructive" },
+    ok: { row: "border-(--chat-line) bg-(--chat-surface)", icon: "bg-(--chat-accent-soft) text-(--chat-accent-text)" },
+    neutral: { row: "border-(--chat-line) bg-(--chat-surface)", icon: "bg-(--chat-surface-3) text-(--chat-ink-2)" },
+    missed: { row: "border-(--chat-danger)/25 bg-(--chat-danger-soft)", icon: "bg-(--chat-danger)/12 text-(--chat-danger)" },
 };
 
 interface CallLogMessageProps {
@@ -43,17 +43,15 @@ export function CallLogMessage({ message, peer }: CallLogMessageProps) {
     const CallBackIcon = isVideo ? VideoIcon : PhoneIcon;
 
     return (
-        <div className="flex justify-center py-1" role="status">
-            <div className={cn("flex max-w-full items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-xs backdrop-blur-md", styles.row)}>
+        <div className="my-3 flex justify-center px-1" role="status">
+            <div className={cn("flex max-w-full items-center gap-3 rounded-2xl border py-2 pe-2 ps-2.5 shadow-(--chat-shadow-sm)", styles.row)}>
                 <span className={cn("grid size-9 shrink-0 place-items-center rounded-full", styles.icon)}>
-                    <Icon className="size-4" aria-hidden />
+                    <Icon className="size-[18px]" aria-hidden />
                 </span>
 
-                <div className="min-w-0">
-                    <p className={cn("truncate font-semibold", tone === "missed" && "text-destructive")}>{title}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">
-                        {[detail, message.time].filter(Boolean).join(" · ")}
-                    </p>
+                <div className="min-w-0 pe-1">
+                    <p className={cn("truncate text-sm font-semibold", tone === "missed" ? "text-(--chat-danger)" : "text-(--chat-ink)")}>{title}</p>
+                    <p className="truncate text-xs text-(--chat-ink-3)">{[detail, message.time].filter(Boolean).join(" · ")}</p>
                 </div>
 
                 {canCallBack && peer && (
@@ -61,9 +59,9 @@ export function CallLogMessage({ message, peer }: CallLogMessageProps) {
                         type="button"
                         disabled={inCall}
                         onClick={() => startCall(peer, call.mode)}
-                        className="ml-1 flex shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-3 py-1.5 text-[11px] font-medium text-foreground transition-colors outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-(--chat-accent-soft) px-3.5 text-[13px] font-medium text-(--chat-accent-text) outline-none transition-colors hover:bg-(--chat-accent) hover:text-(--chat-accent-ink) focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring) disabled:pointer-events-none disabled:opacity-50"
                     >
-                        <CallBackIcon className="size-3.5" aria-hidden />
+                        <CallBackIcon className="size-4" aria-hidden />
                         Call back
                     </button>
                 )}

@@ -15,7 +15,7 @@ import { formatDuration } from "../../lib/attachments";
 import { WaveformBars, getPlaceholderWaveform } from "./Waveform";
 
 export type VoicePlayerTone =
-    /** In a bubble I sent (on the primary colour). */
+    /** In a bubble I sent (on the iris colour). */
     | "own"
     /** In a bubble I received. */
     | "other"
@@ -24,22 +24,22 @@ export type VoicePlayerTone =
 
 const TONES: Record<VoicePlayerTone, { button: string; wave: string; text: string; ring: string }> = {
     own: {
-        button: "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30",
-        wave: "text-primary-foreground",
-        text: "text-primary-foreground/80",
-        ring: "focus-visible:ring-primary-foreground/70",
+        button: "bg-white/20 text-white hover:bg-white/30",
+        wave: "text-white",
+        text: "text-white/80",
+        ring: "focus-visible:ring-white/70",
     },
     other: {
-        button: "bg-primary text-primary-foreground hover:bg-primary/90",
-        wave: "text-primary",
-        text: "text-muted-foreground",
-        ring: "focus-visible:ring-ring",
+        button: "bg-(--chat-accent) text-(--chat-accent-ink) hover:bg-(--chat-accent-hover)",
+        wave: "text-(--chat-accent)",
+        text: "text-(--chat-ink-3)",
+        ring: "focus-visible:ring-(--chat-accent-ring)",
     },
     composer: {
-        button: "bg-primary text-primary-foreground hover:bg-primary/90",
-        wave: "text-primary",
-        text: "text-muted-foreground",
-        ring: "focus-visible:ring-ring",
+        button: "bg-(--chat-accent) text-(--chat-accent-ink) hover:bg-(--chat-accent-hover)",
+        wave: "text-(--chat-accent)",
+        text: "text-(--chat-ink-3)",
+        ring: "focus-visible:ring-(--chat-accent-ring)",
     },
 };
 

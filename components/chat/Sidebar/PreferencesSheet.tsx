@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { NotificationSettingsPanel } from "@/components/notification/NotificationSettingsPanel";
 import { useOptionalNotificationControls } from "@/components/notification/NotificationProvider";
 import { useTheme, type Theme } from "@/lib/theme";
+import { CHAT_ROOT_CLASS } from "../lib/chatTheme";
 
 const THEMES: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
     { value: "light", label: "Light", Icon: SunIcon },
@@ -102,7 +103,7 @@ export function PreferencesSheet({ open, onOpenChange, finalFocus }: Preferences
             <SheetContent
                 side="left"
                 finalFocus={finalFocus}
-                className="gap-0 p-0 data-[side=left]:w-full data-[side=left]:sm:w-96"
+                className={`${CHAT_ROOT_CLASS} gap-0 bg-(--chat-surface) p-0 data-[side=left]:w-full data-[side=left]:sm:w-96`}
             >
                 <SheetHeader className="border-b border-border/40 px-4 py-3.5">
                     <SheetTitle>App preferences</SheetTitle>

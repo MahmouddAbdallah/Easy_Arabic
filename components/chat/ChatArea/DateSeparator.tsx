@@ -9,14 +9,18 @@ interface DateSeparatorProps {
     dateTime: string;
 }
 
-/** The small centered pill that opens each day of the conversation. */
+/**
+ * The chip that names a day. It stays at the top of the screen while that day scrolls by, then the next day's
+ * chip takes its place.
+ */
 export const DateSeparator = memo(function DateSeparator({ label, title, dateTime }: DateSeparatorProps) {
+    if (!label) return null;
     return (
-        <div className="flex items-center justify-center my-4">
+        <div className="pointer-events-none sticky top-2 z-10 flex justify-center py-1.5">
             <time
                 dateTime={dateTime}
                 title={title}
-                className="text-[10px] font-semibold tracking-wide text-muted-foreground/70 bg-muted/40 px-3.5 py-1 rounded-full border border-border/30 backdrop-blur-md shadow-xs"
+                className="pointer-events-auto rounded-full border border-(--chat-line) bg-(--chat-surface) px-3 py-1 text-xs font-medium text-(--chat-ink-2) shadow-(--chat-shadow-sm)"
             >
                 {label}
             </time>

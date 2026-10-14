@@ -11,6 +11,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ui } from "../../lib/chatTheme";
 
 interface DeleteMessageDialogProps {
     open: boolean;
@@ -28,7 +29,7 @@ export function DeleteMessageDialog({ open, deleting, onConfirm, onClose }: Dele
                 if (!next && !deleting) onClose();
             }}
         >
-            <AlertDialogContent size="sm">
+            <AlertDialogContent size="sm" className={`${ui.layer} rounded-3xl p-5`}>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Delete message?</AlertDialogTitle>
                     <AlertDialogDescription>
@@ -36,8 +37,8 @@ export function DeleteMessageDialog({ open, deleting, onConfirm, onClose }: Dele
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" disabled={deleting} onClick={onConfirm}>
+                    <AlertDialogCancel disabled={deleting} className="rounded-full">Cancel</AlertDialogCancel>
+                    <AlertDialogAction variant="destructive" disabled={deleting} onClick={onConfirm} className="rounded-full">
                         {deleting && <Loader2Icon className="animate-spin" />}
                         Delete
                     </AlertDialogAction>
