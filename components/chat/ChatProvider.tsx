@@ -90,11 +90,10 @@ export const ChatProvider: React.FC = () => {
                 {/* The chat's own palette, type and motion. Scoped to `.chat-theme`: nothing outside the chat is touched. */}
                 <style dangerouslySetInnerHTML={{ __html: CHAT_THEME_CSS }} />
                 <div
+                    style={{ height: viewHeight }}
                     className={`${CHAT_ROOT_CLASS} flex h-dvh min-h-dvh w-full items-center justify-center bg-(--chat-canvas-edge) sm:p-4 lg:p-6`}
                 >
                     <div
-                        style={{ height: viewHeight }}
-
                         className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-375">
                         <div className="flex h-full w-full">
                             {/* Conversations */}
