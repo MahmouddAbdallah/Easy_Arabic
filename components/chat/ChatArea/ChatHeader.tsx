@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ArrowLeftIcon, BanIcon, BroomSparkles, InfoIcon, Loader2Icon, MoreVerticalIcon, PhoneIcon, SearchIcon, Trash2Icon, User, UserCheckIcon, VideoIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, BroomSparkles, InfoIcon, Loader2Icon, MoreVerticalIcon, PhoneIcon, SearchIcon, Trash2Icon, UserCheckIcon, VideoIcon } from 'lucide-react'
 import { useChat } from '../ChatProvider'
 import { useCallActions, useCallSelector } from '../hooks/useCall';
 import UserStatusDisplay, { TypingDots } from '../UserStatusDisplay';
@@ -132,7 +132,7 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef, canCl
                             </AvatarFallback>
                         </Avatar>
                         {receiver?.id && (
-                            <span className="absolute -bottom-0.5 -end-0.5">
+                            <span className="absolute -bottom-0.5 -inset-e-0.5">
                                 <UserStatusDisplay userId={receiver.id} ping />
                             </span>
                         )}

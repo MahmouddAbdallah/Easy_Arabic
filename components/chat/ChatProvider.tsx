@@ -74,7 +74,6 @@ export const ChatProvider: React.FC = () => {
 
     const { viewHeight, messagesTopRef } = useViewportHeight();
 
-
     return (
         <ChatContext.Provider
             value={{

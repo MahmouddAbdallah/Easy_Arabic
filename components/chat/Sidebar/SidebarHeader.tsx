@@ -1,15 +1,10 @@
 "use client";
 
 import { memo, useCallback, useId, useRef, useState } from "react";
-import { MoreVerticalIcon, SlidersHorizontalIcon, UserRoundIcon } from "lucide-react";
+import { MoreVerticalIcon, SlidersHorizontalIcon, UserRoundIcon, UsersIcon } from "lucide-react";
 import { useAppContext } from "@/components/AppContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { useAccountDetails } from "../hooks/useAccountDetails";
 import { useSelfPresence } from "../hooks/useSelfPresence";
 import { getInitials } from "../lib/initials";
@@ -51,7 +46,7 @@ function SidebarHeaderComponent() {
     const displayName = user?.name?.trim() || user?.email || "Your account";
 
     return (
-        <header className="flex h-[68px] shrink-0 items-center gap-2 px-3">
+        <header className="flex h-17 shrink-0 items-center gap-2 px-3">
             {user ? (
                 <button
                     ref={profileButton}
@@ -101,7 +96,7 @@ function SidebarHeaderComponent() {
                 <DropdownMenuContent align="end" sideOffset={8} className={cn(ui.layer, "w-72 rounded-2xl p-1.5")}>
                     <DropdownMenuItem className={menuItem} onClick={() => openFrom(menuTrigger.current, "profile")}>
                         <span className={menuIconTile}>
-                            <UserRoundIcon className="size-[18px]" aria-hidden="true" />
+                            <UserRoundIcon className="size4.5" aria-hidden="true" />
                         </span>
                         <span className="flex min-w-0 flex-col leading-tight">
                             <span className="text-sm font-medium text-(--chat-ink)">Profile info</span>
@@ -110,11 +105,20 @@ function SidebarHeaderComponent() {
                     </DropdownMenuItem>
                     <DropdownMenuItem className={menuItem} onClick={() => openFrom(menuTrigger.current, "preferences")}>
                         <span className={menuIconTile}>
-                            <SlidersHorizontalIcon className="size-[18px]" aria-hidden="true" />
+                            <SlidersHorizontalIcon className="size4.5" aria-hidden="true" />
                         </span>
                         <span className="flex min-w-0 flex-col leading-tight">
                             <span className="text-sm font-medium text-(--chat-ink)">App preferences</span>
                             <span className="text-xs text-(--chat-ink-3)">Theme and notifications</span>
+                        </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className={menuItem} >
+                        <span className={menuIconTile}>
+                            <UsersIcon className="size4.5" aria-hidden="true" />
+                        </span>
+                        <span className="flex min-w-0 flex-col leading-tight">
+                            <span className="text-sm font-medium text-(--chat-ink)">Create Group</span>
+                            <span className="text-xs text-(--chat-ink-3)">Talk with your friends</span>
                         </span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>

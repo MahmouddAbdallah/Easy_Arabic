@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 
 export const useViewportHeight = () => {
-    const [viewHeight, setViewHeight] = useState('100dvh');
+    const [viewHeight, setViewHeight] = useState('');
     const messagesTopRef = useRef<any | null>(null);
 
     useEffect(() => {
         const handleResize = () => {
             if (window.visualViewport) {
-                setViewHeight(`${window.visualViewport.height}px`);
+                if (window.visualViewport.width <= 700) {
+                    setViewHeight(`${window.visualViewport.height}%`);
+                } else {
+                    setViewHeight(`${window.visualViewport.height}px`);
+                }
             }
         };
         window.visualViewport?.addEventListener('resize', handleResize);
