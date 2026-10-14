@@ -92,9 +92,7 @@ export const ChatProvider: React.FC = () => {
                 <div
                     className={`${CHAT_ROOT_CLASS} flex h-dvh min-h-dvh w-full items-center justify-center bg-(--chat-canvas-edge) sm:p-4 lg:p-6`}
                 >
-                    <div
-
-                        className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-375">
+                    <div className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-375">
                         <div
                             style={{ height: viewHeight }}
                             className="flex h-full w-full">

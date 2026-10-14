@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ArrowLeftIcon, BanIcon, BroomSparkles, InfoIcon, Loader2Icon, MoreVerticalIcon, PhoneIcon, SearchIcon, Trash2Icon, UserCheckIcon, VideoIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, BroomSparkles, InfoIcon, Loader2Icon, MoreVerticalIcon, PhoneIcon, SearchIcon, Trash2Icon, User, UserCheckIcon, VideoIcon } from 'lucide-react'
 import { useChat } from '../ChatProvider'
 import { useCallActions, useCallSelector } from '../hooks/useCall';
 import UserStatusDisplay, { TypingDots } from '../UserStatusDisplay';
@@ -100,7 +100,8 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef, canCl
     ) : null;
 
     return (
-        <header className="relative z-10 flex h-[68px] shrink-0 items-center justify-between gap-2 border-b border-(--chat-line) bg-(--chat-surface) px-2 sm:px-4">
+        <header className="relative z-10 flex h-17 shrink-0 items-center justify-between gap-2 border-b border-(--chat-line) bg-(--chat-surface) px-2 sm:px-4">
+            <title >{receiver.name}</title>
             <div className="flex min-w-0 flex-1 items-center gap-1">
                 {/* Phones show one pane at a time: this is the way back to the list. */}
                 <button
@@ -139,7 +140,7 @@ const ChatHeader = ({ searchOpen = false, onToggleSearch, searchButtonRef, canCl
 
                     <div className="flex min-w-0 flex-col leading-tight">
                         <span className="truncate text-base font-semibold text-(--chat-ink)">{receiver?.name}</span>
-                        <span className="mt-0.5 min-h-[18px]">{statusLine}</span>
+                        <span className="mt-0.5 min-h-4.5">{statusLine}</span>
                     </div>
                 </button>
             </div>
