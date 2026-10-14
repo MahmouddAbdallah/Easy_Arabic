@@ -27,6 +27,7 @@ interface NavItem {
 const getNavItems = (user: NavLinksProps['user']): NavItem[] => [
     { label: "Home", href: "/", icon: Home, visible: true },
     { label: "Contact", href: "/contact", icon: Mail, visible: !user },
+    { label: "Blog", href: "/blog", icon: Mail, visible: true },
     { label: "Lessons", href: "/lesson", icon: BookOpen, visible: !!user },
     { label: "Planner", href: "/planner", icon: CalendarDays, visible: user?.role === 'teacher' || user?.role === 'family' },
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, visible: user?.role === 'admin' },
