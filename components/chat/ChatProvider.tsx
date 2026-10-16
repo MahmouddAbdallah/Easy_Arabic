@@ -87,50 +87,55 @@ export const ChatProvider: React.FC = () => {
     const { viewHeight, messagesTopRef } = useViewportHeight();
 
     return (
-        <ChatContext.Provider
-            value={{
-                receiverId,
-                receiver,
-                groupId,
-                group,
-                chatId,
-                conversation,
-                conversationActions,
-                locallyDeleted
-            }}
+        <div
+            style={{ height: viewHeight }}
+
         >
-            <CallProvider>
-                {/* The chat's own palette, type and motion. Scoped to `.chat-theme`: nothing outside the chat is touched. */}
-                <style dangerouslySetInnerHTML={{ __html: CHAT_THEME_CSS }} />
-                <div
-                    className={`${CHAT_ROOT_CLASS} flex h-dvh min-h-dvh w-full items-center justify-center bg-(--chat-canvas-edge) sm:p-4 lg:p-6`}
-                >
-                    <div className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-375">
-                        <div
-                            style={{ height: viewHeight }}
-                            className="flex h-full w-full">
-                            {/* Conversations */}
-                            <aside
-                                className={`${hasConversation ? "hidden" : "flex"
-                                    } h-full w-full shrink-0 border-e border-(--chat-line) bg-(--chat-surface) md:flex md:w-85 lg:w-95`}
-                            >
-                                <ChatSidebar />
-                            </aside>
+            <div ref={messagesTopRef} />
 
-                            {/* The open conversation */}
-                            <main
-                                className={`${!hasConversation ? "hidden" : "flex"
-                                    } h-full min-w-0 flex-1 flex-col md:flex`}
-                            >
-                                <div ref={messagesTopRef} />
+            <ChatContext.Provider
+                value={{
+                    receiverId,
+                    receiver,
+                    groupId,
+                    group,
+                    chatId,
+                    conversation,
+                    conversationActions,
+                    locallyDeleted
+                }}
+            >
+                <CallProvider>
+                    {/* The chat's own palette, type and motion. Scoped to `.chat-theme`: nothing outside the chat is touched. */}
+                    <style dangerouslySetInnerHTML={{ __html: CHAT_THEME_CSS }} />
+                    <div
+                        className={`${CHAT_ROOT_CLASS} flex h-dvh min-h-dvh w-full items-center justify-center bg-(--chat-canvas-edge) sm:p-4 lg:p-6`}
+                    >
+                        <div className="h-full w-full overflow-hidden bg-(--chat-surface) sm:rounded-[28px] sm:border sm:border-(--chat-line) sm:shadow-(--chat-shadow-md) lg:h-[90vh] lg:w-[90vw] lg:max-w-375">
+                            <div
+                                className="flex h-full w-full">
+                                {/* Conversations */}
+                                <aside
+                                    className={`${hasConversation ? "hidden" : "flex"
+                                        } h-full w-full shrink-0 border-e border-(--chat-line) bg-(--chat-surface) md:flex md:w-85 lg:w-95`}
+                                >
+                                    <ChatSidebar />
+                                </aside>
 
-                                {hasConversation ? <ChatArea /> : <NoChatSelected />}
-                            </main>
+                                {/* The open conversation */}
+                                <main
+                                    className={`${!hasConversation ? "hidden" : "flex"
+                                        } h-full min-w-0 flex-1 flex-col md:flex`}
+                                >
+
+                                    {hasConversation ? <ChatArea /> : <NoChatSelected />}
+                                </main>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </CallProvider>
-        </ChatContext.Provider>
+                </CallProvider>
+            </ChatContext.Provider>
+        </div>
     );
 };
 

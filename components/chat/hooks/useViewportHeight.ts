@@ -1,27 +1,16 @@
+// hooks/use-viewport-height.ts
 import { useState, useEffect, useRef } from "react";
 
-const MOBILE_MAX_WIDTH = 700;
-
-// Builds the height string for the current visual viewport.
-// Returns '' when there is no window / visualViewport (e.g. during SSR).
-const getViewHeight = (): string => {
-    if (typeof window === 'undefined') return '';
-    const viewport = window.visualViewport as any;
-
-    return viewport?.width <= MOBILE_MAX_WIDTH
-        ? `100%`
-        : `${viewport?.height ? viewport?.height + 'px' : '100%'}`;
-};
-
 export const useViewportHeight = () => {
-    // Lazy initializer: runs once, so the first render already has the right value
-    const [viewHeight, setViewHeight] = useState<string>(getViewHeight);
+    const [viewHeight, setViewHeight] = useState('100dvh');
     const messagesTopRef = useRef<any | null>(null);
 
     useEffect(() => {
-        const handleResize = () => setViewHeight(getViewHeight());
-        handleResize(); // sync once on mount
-
+        const handleResize = () => {
+            if (window.visualViewport) {
+                setViewHeight(`${window.visualViewport.height}px`);
+            }
+        };
         window.visualViewport?.addEventListener('resize', handleResize);
         window.visualViewport?.addEventListener('scroll', handleResize);
         return () => {
@@ -29,7 +18,6 @@ export const useViewportHeight = () => {
             window.visualViewport?.removeEventListener('scroll', handleResize);
         };
     }, []);
-
     useEffect(() => {
         const handleScrollTop = () => {
             messagesTopRef.current?.scrollIntoView();
