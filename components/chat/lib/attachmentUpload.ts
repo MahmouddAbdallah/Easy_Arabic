@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { UploadedAsset, UploadTicket, UploadTicketResult } from "../types";
 import { compact } from "./attachments";
-import { ATTACHMENTS_API_URL } from "./constants";
+import { ATTACHMENTS_API_URL, GROUP_UPLOADS_API_URL } from "./constants";
 import type { SendAttachmentInput, SignUploadsRequest } from "./schemas";
 
 /**
@@ -53,19 +53,19 @@ function ticketRequestError(error: unknown): AttachmentUploadError {
     );
 }
 
-/** One signed upload ticket (or a per-file refusal) for each file, in the same order. */
-export async function requestUploadTickets(
-    receiverId: string,
-    files: SignUploadsRequest["files"],
+/** Where an upload is going: the other person of a direct chat, or a group. */
+export type UploadTarget = { receiverId: string } | { groupId: string };
+
+/** Asks `url` for tickets and checks that one answer came back per file. */
+async function postTicketRequest(
+    url: string,
+    body: unknown,
+    expected: number,
     signal?: AbortSignal
 ): Promise<UploadTicketResult[]> {
     try {
-        const { data } = await axios.post<{ results?: UploadTicketResult[] }>(
-            ATTACHMENTS_API_URL,
-            { receiverId, files },
-            { signal }
-        );
-        if (!Array.isArray(data.results) || data.results.length !== files.length) {
+        const { data } = await axios.post<{ results?: UploadTicketResult[] }>(url, body, { signal });
+        if (!Array.isArray(data.results) || data.results.length !== expected) {
             throw new AttachmentUploadError("Unexpected response from the server. Please try again.", true);
         }
         return data.results;
@@ -73,6 +73,32 @@ export async function requestUploadTickets(
         if (axios.isCancel(error)) throw new DOMException("Aborted", "AbortError");
         throw error instanceof AttachmentUploadError ? error : ticketRequestError(error);
     }
+}
+
+/** One signed upload ticket (or a per-file refusal) for each file, in the same order. */
+export function requestUploadTickets(
+    target: UploadTarget,
+    files: SignUploadsRequest["files"],
+    signal?: AbortSignal
+): Promise<UploadTicketResult[]> {
+    return "groupId" in target
+        ? postTicketRequest(GROUP_UPLOADS_API_URL, { purpose: "message", groupId: target.groupId, files }, files.length, signal)
+        : postTicketRequest(ATTACHMENTS_API_URL, { receiverId: target.receiverId, files }, files.length, signal);
+}
+
+/** The ticket (or the refusal) for the picture of the group `groupId`, which is about to be created. */
+export async function requestGroupPhotoTicket(
+    groupId: string,
+    file: Pick<File, "name" | "size" | "type">,
+    signal?: AbortSignal
+): Promise<UploadTicketResult> {
+    const [result] = await postTicketRequest(
+        GROUP_UPLOADS_API_URL,
+        { purpose: "photo", groupId, file: { name: file.name, size: file.size, mimeType: file.type } },
+        1,
+        signal
+    );
+    return result;
 }
 
 /* -------------------------------------------------------------------------------------------------

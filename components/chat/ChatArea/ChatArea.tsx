@@ -5,6 +5,8 @@ import InputMessage from "./InputMessage";
 import { useChat } from "../ChatProvider";
 import { useAppContext } from "@/components/AppContext";
 import ChatHeader from "./ChatHeader";
+import { GroupHeader } from "./GroupHeader";
+import { GroupUnavailable } from "../Groups/GroupUnavailable";
 import { MessageList } from "./MessageList";
 import { DeleteMessageDialog } from "./Message/DeleteMessageDialog";
 import { useMessageActions } from "../hooks/useMessageActions";
@@ -23,18 +25,22 @@ export function ChatArea() {
     const [searchOpen, setSearchOpen] = useState(false);
     // Phones: the results list covers the chat until a result is chosen (then the navigator bar takes over).
     const [listVisible, setListVisible] = useState(true);
-    const { receiver, receiverId, chatId, conversation } = useChat();
+    const { receiver, receiverId, groupId, group, chatId, conversation } = useChat();
     const { user } = useAppContext();
     const searchButtonRef = useRef<HTMLButtonElement>(null);
 
     const currentUserId = user?.id;
+    // A group is read only once its own document says this user is in it (until then the rules would refuse).
+    const isGroup = groupId !== null;
+    const groupOpen = isGroup && group.status === "ready";
+    const readable = conversation.ready && (!isGroup || groupOpen);
     // Who "Call back" rings. `receiver` lags behind `receiverId` while a different chat is loading.
     const peer = receiverId && receiver?.id === receiverId ? { id: receiverId, name: receiver.name ?? "User" } : null;
 
     // The conversation, kept live. Nothing is read before the chat document says where this user's history
     // starts ("Clear chat" moves it). Older history, newer history after a jump, and the jump itself are all here.
     const chat = useChatMessages(chatId, currentUserId, {
-        enabled: conversation.ready,
+        enabled: readable,
         clearedAt: conversation.clearedAt,
     });
     const { messages, latest } = chat;
@@ -46,7 +52,7 @@ export function ChatArea() {
     const { select: selectResult, step: stepResult } = search;
     const { editMessage, deleteMessage, reactToMessage, isPending } = useMessageActions(chatId);
     // Opening the chat (and keeping it open) clears the current user's own unread counter.
-    useMarkChatRead(chatId, currentUserId);
+    useMarkChatRead(isGroup && !groupOpen ? null : chatId, currentUserId);
 
     const scroll = useChatScroll({
         chatId,
@@ -124,16 +130,29 @@ export function ChatArea() {
         if (ok) setDeleteTarget(null);
     };
 
+    // The address names a group this user can't open (there is none, or they aren't in it).
+    if (isGroup && group.status === "unavailable") {
+        return (
+            <div className="relative flex h-full min-w-0 flex-1 overflow-hidden bg-(--chat-canvas)">
+                <GroupUnavailable />
+            </div>
+        );
+    }
+
     return (
         <div className="relative flex h-full min-w-0 flex-1 overflow-hidden bg-(--chat-canvas)">
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-                <ChatHeader
-                    searchOpen={searchOpen}
-                    onToggleSearch={searchOpen ? closeSearch : openSearch}
-                    searchButtonRef={searchButtonRef}
-                    canClear={messages.length > 0}
-                    newestMessageAt={newestMessageAt}
-                />
+                {isGroup ? (
+                    <GroupHeader key={groupId} group={group.group} />
+                ) : (
+                    <ChatHeader
+                        searchOpen={searchOpen}
+                        onToggleSearch={searchOpen ? closeSearch : openSearch}
+                        searchButtonRef={searchButtonRef}
+                        canClear={messages.length > 0}
+                        newestMessageAt={newestMessageAt}
+                    />
+                )}
 
                 <MessageList
                     messages={messages}
@@ -156,7 +175,8 @@ export function ChatArea() {
                     showLatest={scroll.showLatest}
                     onGoToLatest={scroll.goToLatest}
                     currentUserId={currentUserId ?? ""}
-                    otherUserName={receiver?.name}
+                    otherUserName={isGroup ? undefined : receiver?.name}
+                    group={isGroup ? group.group : null}
                     peer={peer}
                     blocked={conversation.blocked}
                     editingId={editingId}

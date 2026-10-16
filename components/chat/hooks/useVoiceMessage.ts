@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { COMPOSER_TOAST_POSITION, MESSAGES_API_URL } from "../lib/constants";
@@ -12,6 +12,7 @@ import {
     toUploadError,
     toVoicePayload,
     uploadToCloudinary,
+    type UploadTarget,
 } from "../lib/attachmentUpload";
 import { getErrorMessage } from "../lib/getErrorMessage";
 import { MAX_VOICE_SECONDS } from "../lib/attachments";
@@ -28,6 +29,8 @@ interface Options {
     /** A recording belongs to one chat (its upload lives in that chat's folder): leaving the chat drops it. */
     chatId: string | null;
     receiverId: string | null;
+    /** In a group conversation: the group (and `receiverId` is null). */
+    groupId?: string | null;
 }
 
 /**
@@ -38,7 +41,11 @@ interface Options {
  * checks and storage as a photo. If sending fails the recording stays: pressing send again retries,
  * and a file that already reached Cloudinary is not uploaded a second time.
  */
-export function useVoiceMessage({ chatId, receiverId }: Options) {
+export function useVoiceMessage({ chatId, receiverId, groupId = null }: Options) {
+    const target = useMemo<UploadTarget | null>(
+        () => (groupId ? { groupId } : receiverId ? { receiverId } : null),
+        [groupId, receiverId]
+    );
     const recorder = useVoiceRecorder({
         onError: (message) => toast.error(message, { id: "chat-voice-error", position: COMPOSER_TOAST_POSITION }),
         onLimitReached: () =>
@@ -66,7 +73,7 @@ export function useVoiceMessage({ chatId, receiverId }: Options) {
     }, []);
 
     const send = useCallback(async () => {
-        if (sendingRef.current || !receiverId || recorder.status === "requesting") return;
+        if (sendingRef.current || !target || recorder.status === "requesting") return;
         sendingRef.current = true;
         setSendError(null);
 
@@ -84,7 +91,7 @@ export function useVoiceMessage({ chatId, receiverId }: Options) {
             let asset = uploadedRef.current?.recordingId === recording.id ? uploadedRef.current.asset : null;
             if (!asset) {
                 const [ticket] = await requestUploadTickets(
-                    receiverId,
+                    target,
                     [{ name: recording.file.name, size: recording.file.size, mimeType: recording.mimeType, kind: "voice" }],
                     controller.signal
                 );
@@ -106,11 +113,13 @@ export function useVoiceMessage({ chatId, receiverId }: Options) {
             stage = "delivering";
             setSending({ stage, progress: 100 });
             deliveringRef.current = true;
-            await axios.patch(MESSAGES_API_URL, {
-                receiverId,
-                text: "",
-                attachments: [toVoicePayload(recording.file.name, asset, recording)],
-            });
+            const attachments = [toVoicePayload(recording.file.name, asset, recording)];
+            await axios.patch(
+                MESSAGES_API_URL,
+                "groupId" in target
+                    ? { action: "sendGroup", groupId: target.groupId, text: "", attachments }
+                    : { receiverId: target.receiverId, text: "", attachments }
+            );
 
             // The message owns the file now: forget it here without deleting it.
             uploadedRef.current = null;
@@ -127,7 +136,7 @@ export function useVoiceMessage({ chatId, receiverId }: Options) {
             abortRef.current = null;
             setSending(null);
         }
-    }, [cancelRecording, receiverId, recorder.status, stopRecording]);
+    }, [cancelRecording, target, recorder.status, stopRecording]);
 
     /** Throws the voice message away: stops recording / the upload, and deletes what already reached Cloudinary. */
     const cancel = useCallback(() => {

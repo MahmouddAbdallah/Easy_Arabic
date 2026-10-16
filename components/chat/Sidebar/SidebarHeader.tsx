@@ -5,8 +5,10 @@ import { MoreVerticalIcon, SlidersHorizontalIcon, UserRoundIcon, UsersIcon } fro
 import { useAppContext } from "@/components/AppContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
+import { CreateGroupSheet } from "../Groups/CreateGroupSheet";
 import { useAccountDetails } from "../hooks/useAccountDetails";
 import { useSelfPresence } from "../hooks/useSelfPresence";
+import { canCreateGroup } from "../lib/groups";
 import { getInitials } from "../lib/initials";
 import { PresenceDot, PresenceLabel } from "./PresenceDot";
 import { PreferencesSheet } from "./PreferencesSheet";
@@ -14,14 +16,14 @@ import { ProfileSheet } from "./ProfileSheet";
 import { ui } from "../lib/chatTheme";
 import { cn } from "cn";
 
-type Panel = "profile" | "preferences";
+type Panel = "profile" | "preferences" | "group";
 
 const menuItem = "cursor-pointer gap-3 rounded-xl px-2 py-2";
 const menuIconTile = "grid size-9 shrink-0 place-items-center rounded-full bg-(--chat-surface-3) text-(--chat-ink-2)";
 
 /**
- * The top of the chat list: who you are, whether you are online, and the way into your profile and the app's
- * preferences. It reads everything itself (no props), so the chat list re-rendering never re-renders it, and its
+ * The top of the chat list: who you are, whether you are online, and the way into your profile, the app's
+ * preferences and "Create Group". It reads everything itself (no props), so the chat list re-rendering never re-renders it, and its
  * own updates (presence, an open panel) never re-render the list.
  */
 function SidebarHeaderComponent() {
@@ -112,15 +114,18 @@ function SidebarHeaderComponent() {
                             <span className="text-xs text-(--chat-ink-3)">Theme and notifications</span>
                         </span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className={menuItem} >
-                        <span className={menuIconTile}>
-                            <UsersIcon className="size4.5" aria-hidden="true" />
-                        </span>
-                        <span className="flex min-w-0 flex-col leading-tight">
-                            <span className="text-sm font-medium text-(--chat-ink)">Create Group</span>
-                            <span className="text-xs text-(--chat-ink-3)">Talk with your friends</span>
-                        </span>
-                    </DropdownMenuItem>
+                    {/* Only the roles that can start a conversation can start a group (the server enforces it too). */}
+                    {canCreateGroup(user?.role) && (
+                        <DropdownMenuItem className={menuItem} onClick={() => openFrom(menuTrigger.current, "group")}>
+                            <span className={menuIconTile}>
+                                <UsersIcon className="size4.5" aria-hidden="true" />
+                            </span>
+                            <span className="flex min-w-0 flex-col leading-tight">
+                                <span className="text-sm font-medium text-(--chat-ink)">Create Group</span>
+                                <span className="text-xs text-(--chat-ink-3)">Talk with your friends</span>
+                            </span>
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
 
@@ -137,6 +142,7 @@ function SidebarHeaderComponent() {
                 onOpenChange={handlePanelChange("preferences")}
                 finalFocus={returnFocus}
             />
+            <CreateGroupSheet open={panel === "group"} onOpenChange={handlePanelChange("group")} finalFocus={returnFocus} />
         </header>
     );
 }

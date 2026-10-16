@@ -11,6 +11,8 @@ import { destroyUploadedAssets, resolveAttachments } from "@/components/chat/lib
 import { errorResponse, handleRouteError, parseBody, requireUser } from "@/components/chat/lib/http.server";
 import type { MessageAttachment } from "@/components/chat/types";
 import { notifyNewMessage } from "@/components/chat/lib/messageNotifications.server";
+import { assertGroupMember, sendGroupMessage } from "@/components/chat/lib/groupMessages.server";
+import { notifyGroupMessage } from "@/components/chat/lib/groupNotifications.server";
 import { newUnreadCounts, unreadIncrementUpdates, updateChat, } from "@/components/chat/lib/unread.server";
 import { readUnreadTotal, writeUnreadTotal } from "@/components/chat/lib/unreadTotal.server";
 
@@ -96,7 +98,7 @@ async function sendMessage(
 
 /**
  * Message mutations. Body is a discriminated union on `action`:
- *   send (default) | edit | delete | react | markRead
+ *   send (default) | sendGroup | edit | delete | react | markRead
  * The acting user is always taken from the authenticated session, never from the body.
  */
 export async function PATCH(req: NextRequest) {
@@ -134,6 +136,29 @@ export async function PATCH(req: NextRequest) {
                     request.receiverId,
                     request.text,
                 ));
+                break;
+            }
+            case "sendGroup": {
+                if (!request.text && !request.attachments?.length) {
+                    return errorResponse("EMPTY_MESSAGE", "Message must contain text or an attachment.", 400);
+                }
+                // Somebody who isn't in the group gets no Cloudinary lookups either: membership first.
+                if (request.attachments?.length) {
+                    assertGroupMember(await firebaseAdminDB.collection("chats").doc(request.groupId).get(), actorId);
+                }
+                // Checked against Cloudinary before anything is written: nothing is stored for a bad file.
+                const attachments = await resolveAttachments(actorId, request.groupId, request.attachments ?? []);
+                const sent = await sendGroupMessage({ actorId, groupId: request.groupId, text: request.text, attachments });
+                // Reached only once the message is stored. After the response, so the sender doesn't wait for it.
+                after(() =>
+                    notifyGroupMessage({
+                        groupId: request.groupId,
+                        groupName: sent.groupName,
+                        senderName: user.name,
+                        recipientIds: sent.recipientIds,
+                        message: request.text,
+                    })
+                );
                 break;
             }
             case "edit":

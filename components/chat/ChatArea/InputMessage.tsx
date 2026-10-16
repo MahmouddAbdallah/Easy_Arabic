@@ -27,8 +27,11 @@ interface MessageFormValues {
 
 const InputMessage = () => {
     const { user } = useAppContext();
-    const { receiverId, chatId, conversation } = useChat();
-    const { notifyTyping, stopTyping } = useTypingIndicator(chatId, user?.id);
+    const { receiverId, groupId, group, chatId, conversation } = useChat();
+    // In a group, the composer works once the group's own document has said that this user is in it.
+    const canCompose = groupId !== null ? group.status === "ready" : Boolean(receiverId);
+    // "Typing..." is a direct-chat signal for now: a group has several people to show it for, so nothing is written.
+    const { notifyTyping, stopTyping } = useTypingIndicator(groupId !== null ? null : chatId, user?.id);
     // Neither of the two can send, react or call: the composer gives way to a notice.
     const blocked = conversation.blocked;
 
@@ -36,11 +39,11 @@ const InputMessage = () => {
     // A ref as well as state: two quick submits (Enter twice) would both pass a state check.
     const sendingRef = useRef(false);
 
-    const attachments = useAttachmentUploads({ chatId, receiverId });
+    const attachments = useAttachmentUploads({ chatId, receiverId, groupId });
     const { addFiles } = attachments;
-    const voice = useVoiceMessage({ chatId, receiverId });
+    const voice = useVoiceMessage({ chatId, receiverId, groupId });
     // Files can't be dropped on a voice message that is being recorded or sent.
-    const isDraggingFiles = useFileDrop(addFiles, Boolean(receiverId) && !loading && !voice.isActive && !blocked);
+    const isDraggingFiles = useFileDrop(addFiles, canCompose && !loading && !voice.isActive && !blocked);
 
     const { register, handleSubmit, control, reset } = useForm<MessageFormValues>({
         defaultValues: {
@@ -78,7 +81,7 @@ const InputMessage = () => {
     }, [blocked, voiceActive, stopTyping, cancelVoice]);
 
     const onSubmit = async (data: MessageFormValues) => {
-        if (sendingRef.current || blocked) return;
+        if (sendingRef.current || blocked || !canCompose) return;
 
         const trimmedText = data.text?.trim() || "";
         const ready = attachments.getReady();
@@ -104,7 +107,8 @@ const InputMessage = () => {
         setLoading(true);
         try {
             const response = await axios.patch(MESSAGES_API_URL, {
-                receiverId,
+                // A group is addressed by its own action; a direct chat is exactly what it always was.
+                ...(groupId !== null ? { action: "sendGroup", groupId } : { receiverId }),
                 text: trimmedText,
                 ...(ready.length > 0 && { attachments: attachments.getPayload() }),
             });
@@ -150,7 +154,7 @@ const InputMessage = () => {
                             <VoiceComposer voice={voice} />
                         ) : (
                             <div className="flex items-end gap-1 rounded-[28px] border border-(--chat-line) bg-(--chat-surface) p-1.5 shadow-(--chat-shadow-md) transition-[border-color,box-shadow] focus-within:border-(--chat-accent-ring) focus-within:shadow-[0_0_0_3px_var(--chat-accent-soft),var(--chat-shadow-md)]">
-                                <AttachMenu disabled={loading || !receiverId} onFiles={addFiles} />
+                                <AttachMenu disabled={loading || !canCompose} onFiles={addFiles} />
 
                                 <textarea
                                     {...textField}
@@ -164,7 +168,7 @@ const InputMessage = () => {
                                     aria-label="Message"
                                     placeholder={attachments.items.length > 0 ? "Add a caption" : "Message"}
                                     // Read-only (not disabled) while sending, so the field keeps the focus.
-                                    readOnly={loading}
+                                    readOnly={loading || !canCompose}
                                     enterKeyHint="send"
                                     onKeyDown={(e) => {
                                         if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
@@ -210,7 +214,7 @@ const InputMessage = () => {
                                     <button
                                         type="button"
                                         onClick={voice.start}
-                                        disabled={!receiverId}
+                                        disabled={!canCompose}
                                         aria-label="Record voice message"
                                         title="Record voice message"
                                         className={cn(ui.iconButton, "size-11 [&_svg]:size-[22px]")}

@@ -19,6 +19,12 @@ interface MessageItemProps {
     message: MessageType;
     currentUserId: string;
     otherUserName?: string;
+    /** In a group: who wrote this message, shown above the first message of a run from somebody else. */
+    senderName?: string;
+    /** Which of the group's sender colours the name gets (0-7, see colorIndexOf). */
+    senderTone?: number;
+    /** In a group: how to name each person who reacted. */
+    nameOfUser?: (userId: string) => string | undefined;
     /** Drawn joined to the message above it (same person, sent moments apart). */
     joinsPrevious?: boolean;
     isEditing: boolean;
@@ -39,6 +45,9 @@ export const MessageItem = memo(function MessageItem({
     message,
     currentUserId,
     otherUserName,
+    senderName,
+    senderTone = 0,
+    nameOfUser,
     joinsPrevious = false,
     isEditing,
     isPending,
@@ -126,6 +135,15 @@ export const MessageItem = memo(function MessageItem({
                 isFlashing && "chat-flash-row"
             )}
         >
+            {senderName && !isMe && !joinsPrevious && (
+                <p
+                    dir="auto"
+                    className="mb-1 max-w-[84%] truncate px-3 text-[12.5px] font-semibold sm:max-w-[74%] lg:max-w-[66%]"
+                    style={{ color: `var(--chat-sender-${senderTone})` }}
+                >
+                    {senderName}
+                </p>
+            )}
             <div
                 ref={rootRef}
                 className={cn("group/message relative max-w-[84%] sm:max-w-[74%] lg:max-w-[66%]", isEditing && "w-[84%] sm:w-[74%] lg:w-[66%]")}
@@ -206,6 +224,7 @@ export const MessageItem = memo(function MessageItem({
                     reactions={message.reactions}
                     currentUserId={currentUserId}
                     otherUserName={otherUserName}
+                    nameOfUser={nameOfUser}
                     isMe={isMe}
                     disabled={isPending}
                     onToggle={handleReact}

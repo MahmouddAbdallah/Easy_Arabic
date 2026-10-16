@@ -46,6 +46,16 @@ export const CHAT_THEME_CSS = `
     --chat-danger: #e0383e;
     --chat-danger-soft: #fdecee;
 
+    /* Who wrote a message in a group: one colour per person (colorIndexOf), all readable on the incoming bubble. */
+    --chat-sender-0: #c2410c;
+    --chat-sender-1: #0f766e;
+    --chat-sender-2: #7e22ce;
+    --chat-sender-3: #b91c1c;
+    --chat-sender-4: #1d4ed8;
+    --chat-sender-5: #a16207;
+    --chat-sender-6: #be185d;
+    --chat-sender-7: #15803d;
+
     --chat-mark: #ffd84d;
     --chat-mark-ink: #2b2300;
     --chat-flash: rgba(255, 190, 0, 0.30);
@@ -110,6 +120,15 @@ export const CHAT_THEME_CSS = `
     --chat-online: #34d38a;
     --chat-danger: #ff6b70;
     --chat-danger-soft: rgba(255, 107, 112, 0.14);
+
+    --chat-sender-0: #fdba74;
+    --chat-sender-1: #5eead4;
+    --chat-sender-2: #d8b4fe;
+    --chat-sender-3: #fca5a5;
+    --chat-sender-4: #93c5fd;
+    --chat-sender-5: #fde047;
+    --chat-sender-6: #f9a8d4;
+    --chat-sender-7: #86efac;
 
     --chat-flash: rgba(255, 196, 0, 0.22);
 

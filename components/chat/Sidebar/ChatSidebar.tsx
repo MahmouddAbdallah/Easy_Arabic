@@ -8,6 +8,8 @@ import { useAppContext } from "@/components/AppContext";
 import { collection, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { firebaseClientDB } from "@/lib/config/firebase-client";
 import ReceiverInfo from "./ReceiverInfo";
+import GroupRow from "./GroupRow";
+import { getGroupPreview } from "../lib/groups";
 import { getUnreadCount, type UnreadCount } from "../lib/unread";
 import { isChatClearedFor, isChatHiddenFor } from "../lib/chatState";
 import { useToday } from "../hooks/useToday";
@@ -24,6 +26,13 @@ export interface ChatItemType {
     updatedAt?: Timestamp;
     participants: string[]
     category?: "direct" | "group";
+    /** Groups only (see lib/groups.ts for the document): the name, picture, who made it and who is in it. */
+    name?: string;
+    imageUrl?: string;
+    createdBy?: string;
+    /** Who wrote `lastMessage` (a group's preview says so). */
+    lastSenderId?: string;
+    members?: Record<string, { name?: string; role?: string; imageUrl?: string }>;
     /** ISO time of the newest message or call entry; what "clear" and "delete" are compared against. */
     time?: string;
     /** Per-user state of the conversation, { [userId]: ISO time } (see lib/chatState.ts). */
@@ -54,7 +63,7 @@ function ListSkeleton() {
 export function ChatSidebar() {
     const [chats, setChats] = useState<ChatItemType[] | null>(null);
 
-    const { receiverId, locallyDeleted } = useChat();
+    const { receiverId, groupId, locallyDeleted } = useChat();
     const { user } = useAppContext();
     const pathname = usePathname();
     // One clock for every row, so the times turn "Today" into "Yesterday" together after midnight.
@@ -105,6 +114,31 @@ export function ChatSidebar() {
                             {visible.map((chat) => {
                                 // Everything in it was cleared: nothing to preview (the other person's list is untouched).
                                 const cleared = isChatClearedFor(chat, user?.id);
+
+                                // A group: its own row and its own link (?groupId=). Everything in it is in the chat document.
+                                if (chat.category === "group") {
+                                    const isOpen = chat.id === groupId;
+                                    return (
+                                        <li key={chat.id}>
+                                            <Link
+                                                href={`${pathname}?groupId=${encodeURIComponent(chat.id)}`}
+                                                aria-current={isOpen ? "page" : undefined}
+                                                className="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-(--chat-accent-ring)"
+                                            >
+                                                <GroupRow
+                                                    name={chat.name?.trim() || "Group"}
+                                                    imageUrl={chat.imageUrl}
+                                                    preview={getGroupPreview(chat, user?.id)}
+                                                    lastSend={chat.updatedAt}
+                                                    isSelected={isOpen}
+                                                    unreadCount={getUnreadCount(chat.unreadCount, user?.id)}
+                                                    today={today}
+                                                />
+                                            </Link>
+                                        </li>
+                                    );
+                                }
+
                                 const receiveId = chat.participants.find(id => id != user?.id as string) ?? '';
                                 const isSelected = receiveId == receiverId;
                                 return (

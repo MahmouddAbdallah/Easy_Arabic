@@ -8,13 +8,15 @@ interface ReactionSummaryProps {
     currentUserId: string;
     /** Used only for the hover title ("You, Sara"). */
     otherUserName?: string;
+    /** In a group there are several others: how to name each one. Falls back to `otherUserName`. */
+    nameOfUser?: (userId: string) => string | undefined;
     isMe: boolean;
     disabled: boolean;
     onToggle: (reaction: ReactionKey) => void;
 }
 
 /** Reaction chips tucked under a bubble. Clicking a chip toggles the current user's reaction. */
-export function ReactionSummary({ reactions, currentUserId, otherUserName, isMe, disabled, onToggle }: ReactionSummaryProps) {
+export function ReactionSummary({ reactions, currentUserId, otherUserName, nameOfUser, isMe, disabled, onToggle }: ReactionSummaryProps) {
     const items = summarizeReactions(reactions, currentUserId);
     if (items.length === 0) return null;
 
@@ -25,7 +27,7 @@ export function ReactionSummary({ reactions, currentUserId, otherUserName, isMe,
             className={cn("relative z-10 -mt-2.5 flex flex-wrap gap-1 px-3", isMe ? "justify-end" : "justify-start")}
         >
             {items.map((item) => {
-                const names = item.userIds.map((id) => (id === currentUserId ? "You" : otherUserName || "Someone")).join(", ");
+                const names = item.userIds.map((id) => (id === currentUserId ? "You" : nameOfUser?.(id) || otherUserName || "Someone")).join(", ");
                 return (
                     <button
                         key={item.key}

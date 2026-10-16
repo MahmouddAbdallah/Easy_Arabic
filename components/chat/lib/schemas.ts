@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_WAVEFORM_BARS } from "./attachments";
 import { CHAT_SEARCH_MAX_QUERY_LENGTH } from "./chatSearch";
 import { MAX_MESSAGE_LENGTH } from "./constants";
+import { GROUP_ID_PATTERN } from "./groups";
 import { REACTION_KEYS } from "./reactions";
 
 /**
@@ -58,6 +59,20 @@ const SendMessageSchema = z.object({
         .optional(),
 });
 
+/**
+ * A message to a group. Its own action (rather than a `groupId` next to `receiverId`) so the direct-message
+ * request above stays exactly what it was. The sender is always the authenticated user; the group must list them.
+ */
+const SendGroupMessageSchema = z.object({
+    action: z.literal("sendGroup"),
+    groupId: z.string().regex(GROUP_ID_PATTERN, "Invalid group"),
+    text: z.string().trim().max(MAX_MESSAGE_LENGTH, `Message is too long (max ${MAX_MESSAGE_LENGTH} characters)`).default(""),
+    attachments: z
+        .array(SendAttachmentSchema)
+        .max(MAX_ATTACHMENTS_PER_MESSAGE, `You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files to a message`)
+        .optional(),
+});
+
 const EditMessageSchema = z.object({
     action: z.literal("edit"),
     chatId: firestoreId,
@@ -93,6 +108,7 @@ export const MessageRequestSchema = z.preprocess(
             : body,
     z.discriminatedUnion("action", [
         SendMessageSchema,
+        SendGroupMessageSchema,
         EditMessageSchema,
         DeleteMessageSchema,
         ReactMessageSchema,
@@ -104,18 +120,18 @@ export const MessageRequestSchema = z.preprocess(
  * POST /api/chat/attachments: "I want to upload these files to the chat with `receiverId`".
  * Only descriptions of the files are sent (never the files), so the server can validate before signing.
  */
+export const UploadFileSchema = z.object({
+    name: z.string().min(1).max(1024),
+    size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    mimeType: z.string().max(255).default(""),
+    /** "voice" when the file is a recording made in the chat: it gets the audio checks. */
+    kind: z.literal("voice").optional(),
+});
+
 export const SignUploadsRequestSchema = z.object({
     receiverId: z.string().min(1, "receiverId is required").max(200),
     files: z
-        .array(
-            z.object({
-                name: z.string().min(1).max(1024),
-                size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-                mimeType: z.string().max(255).default(""),
-                /** "voice" when the file is a recording made in the chat: it gets the audio checks. */
-                kind: z.literal("voice").optional(),
-            })
-        )
+        .array(UploadFileSchema)
         .min(1, "Choose at least one file")
         .max(MAX_ATTACHMENTS_PER_MESSAGE, `You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files at a time`),
 });
@@ -140,8 +156,10 @@ export const ChatSearchQuerySchema = z.object({
 export type MessageRequest = z.output<typeof MessageRequestSchema>;
 export type SendAttachmentInput = z.output<typeof SendAttachmentSchema>;
 export type SignUploadsRequest = z.output<typeof SignUploadsRequestSchema>;
+export type UploadFileInput = z.output<typeof UploadFileSchema>;
 export type DeleteUploadRequest = z.output<typeof DeleteUploadRequestSchema>;
 export type ChatSearchQuery = z.output<typeof ChatSearchQuerySchema>;
+export type SendGroupMessageRequest = z.output<typeof SendGroupMessageSchema>;
 export type EditMessageRequest = z.output<typeof EditMessageSchema>;
 export type DeleteMessageRequest = z.output<typeof DeleteMessageSchema>;
 export type ReactMessageRequest = z.output<typeof ReactMessageSchema>;

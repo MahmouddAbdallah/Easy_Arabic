@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, type RefObject } from "react";
+import { useCallback, useMemo, type RefObject } from "react";
 import { ArrowDownIcon, ChevronDownIcon, ChevronUpIcon, Loader2Icon, RefreshCwIcon } from "lucide-react";
 import { cn } from "cn";
 import { CallLogMessage } from "../Call/CallLogMessage";
 import { useToday } from "../hooks/useToday";
 import type { CallPeer } from "../lib/call";
 import { groupByDay } from "../lib/dateSeparators";
+import { colorIndexOf, firstNameOf, type GroupInfo } from "../lib/groups";
 import { ui } from "../lib/chatTheme";
 import type { ReactionKey } from "../lib/reactions";
 import type { MessageType } from "../types";
@@ -38,6 +39,8 @@ interface MessageListProps {
 
     currentUserId: string;
     otherUserName?: string;
+    /** The open group, when this is a group conversation: names go above other people's messages. */
+    group?: GroupInfo | null;
     peer: CallPeer | null;
     blocked: boolean;
     editingId: string | null;
@@ -80,7 +83,15 @@ function LoadingSkeleton() {
     );
 }
 
-function EmptyConversation({ blocked, name }: { blocked: boolean; name?: string }) {
+/** "You created this group" / "Sara created this group", with the day when it is known. */
+function describeCreation(group: GroupInfo, currentUserId: string): string {
+    const creator = group.members.find((member) => member.id === group.createdBy);
+    const who = group.createdBy === currentUserId ? "You" : creator ? firstNameOf(creator.name) || creator.name : "Someone";
+    const when = group.createdAt?.toLocaleDateString(undefined, { dateStyle: "medium" });
+    return when ? `${who} created this group · ${when}` : `${who} created this group`;
+}
+
+function EmptyConversation({ blocked, name, group, currentUserId }: { blocked: boolean; name?: string; group?: GroupInfo | null; currentUserId: string }) {
     return (
         <div className="my-auto flex flex-col items-center px-6 py-16 text-center">
             <svg viewBox="0 0 120 96" className="mb-5 h-24 w-[7.5rem]" aria-hidden>
@@ -97,10 +108,13 @@ function EmptyConversation({ blocked, name }: { blocked: boolean; name?: string 
             <p className="mt-1 max-w-64 text-sm text-(--chat-ink-2)">
                 {blocked
                     ? "Messages and calls are unavailable in this conversation."
-                    : name
-                      ? `Say hello to ${name} to start the conversation.`
-                      : "Send a message to start the conversation."}
+                    : group
+                      ? `Say hello to everyone in ${group.name} to get the conversation going.`
+                      : name
+                        ? `Say hello to ${name} to start the conversation.`
+                        : "Send a message to start the conversation."}
             </p>
+            {group && <p className="mt-4 rounded-full bg-(--chat-surface-3) px-3 py-1 text-xs text-(--chat-ink-2)">{describeCreation(group, currentUserId)}</p>}
         </div>
     );
 }
@@ -156,6 +170,7 @@ export function MessageList({
     onGoToLatest,
     currentUserId,
     otherUserName,
+    group = null,
     peer,
     blocked,
     editingId,
@@ -171,6 +186,10 @@ export function MessageList({
     const today = useToday();
     const sections = useMemo(() => groupByDay(messages, today), [messages, today]);
     const empty = !loading && !failed && messages.length === 0;
+
+    // In a group, whoever wrote a message is named from the group's own member list.
+    const members = useMemo(() => (group ? new Map(group.members.map((member) => [member.id, member.name])) : null), [group]);
+    const nameOfUser = useCallback((userId: string) => members?.get(userId), [members]);
 
     return (
         <div className="relative flex min-h-0 flex-1 flex-col">
@@ -190,13 +209,15 @@ export function MessageList({
                             </button>
                         </div>
                     ) : empty ? (
-                        <EmptyConversation blocked={blocked} name={otherUserName} />
+                        <EmptyConversation blocked={blocked} name={otherUserName} group={group} currentUserId={currentUserId} />
                     ) : (
                         <>
                             {hasOlder ? (
                                 <LoadRow direction="older" loading={loadingOlder} onClick={onLoadOlder} />
                             ) : (
-                                <p className="py-4 text-center text-xs text-(--chat-ink-3)">Beginning of the conversation</p>
+                                <p className="py-4 text-center text-xs text-(--chat-ink-3)">
+                                    {group ? describeCreation(group, currentUserId) : "Beginning of the conversation"}
+                                </p>
                             )}
 
                             {sections.map((section) => (
@@ -211,6 +232,9 @@ export function MessageList({
                                                 message={message}
                                                 currentUserId={currentUserId}
                                                 otherUserName={otherUserName}
+                                                senderName={members ? (members.get(message.senderId) ?? "Former member") : undefined}
+                                                senderTone={members ? colorIndexOf(message.senderId, 8) : undefined}
+                                                nameOfUser={members ? nameOfUser : undefined}
                                                 joinsPrevious={joinsPrevious}
                                                 isEditing={editingId === message.id && !message.deleted}
                                                 isPending={isPending(message.id)}

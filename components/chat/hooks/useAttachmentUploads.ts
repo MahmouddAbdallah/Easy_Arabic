@@ -10,6 +10,7 @@ import {
     requestUploadTickets,
     toAttachmentPayload,
     toUploadError,
+    type UploadTarget,
     uploadToCloudinary,
 } from "../lib/attachmentUpload";
 import type { SendAttachmentInput } from "../lib/schemas";
@@ -48,6 +49,8 @@ interface Options {
     /** Uploads belong to one chat: switching chats drops them (and deletes what was already uploaded). */
     chatId: string | null;
     receiverId: string | null;
+    /** In a group conversation: the group (and `receiverId` is null). */
+    groupId?: string | null;
 }
 
 /**
@@ -56,8 +59,12 @@ interface Options {
  * progress. A file can be removed (cancels it / deletes it from Cloudinary) or retried at any time.
  * Sending only needs `getPayload()`; nothing here ever holds a Cloudinary secret.
  */
-export function useAttachmentUploads({ chatId, receiverId }: Options) {
+export function useAttachmentUploads({ chatId, receiverId, groupId = null }: Options) {
     const [items, setItems] = useState<PendingAttachment[]>([]);
+    const target = useMemo<UploadTarget | null>(
+        () => (groupId ? { groupId } : receiverId ? { receiverId } : null),
+        [groupId, receiverId]
+    );
 
     // The ref is the source of truth for code that runs outside render (uploads finishing, event
     // handlers); the state mirrors it for rendering. Every change goes through `commit`.
@@ -132,11 +139,11 @@ export function useAttachmentUploads({ chatId, receiverId }: Options) {
     /** Gets tickets for `batch` in one request, then queues an upload for each file the server accepted. */
     const startBatch = useCallback(
         async (batch: PendingAttachment[]) => {
-            if (!receiverId) return;
+            if (!target) return;
             const startedIn = session.current;
             try {
                 const results = await requestUploadTickets(
-                    receiverId,
+                    target,
                     batch.map(({ fileName, file }) => ({ name: fileName, size: file.size, mimeType: file.type }))
                 );
                 if (startedIn !== session.current) return;
@@ -155,12 +162,12 @@ export function useAttachmentUploads({ chatId, receiverId }: Options) {
                 }
             }
         },
-        [enqueueUpload, patch, receiverId]
+        [enqueueUpload, patch, target]
     );
 
     const addFiles = useCallback(
         (files: File[]) => {
-            if (!receiverId || files.length === 0) return;
+            if (!target || files.length === 0) return;
 
             const room = MAX_ATTACHMENTS_PER_MESSAGE - itemsRef.current.length;
             if (room <= 0) {
@@ -208,7 +215,7 @@ export function useAttachmentUploads({ chatId, receiverId }: Options) {
             commit((current) => [...current, ...accepted]);
             void startBatch(accepted);
         },
-        [commit, receiverId, startBatch]
+        [commit, target, startBatch]
     );
 
     const remove = useCallback(

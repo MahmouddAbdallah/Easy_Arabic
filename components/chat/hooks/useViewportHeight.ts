@@ -6,12 +6,11 @@ const MOBILE_MAX_WIDTH = 700;
 // Returns '' when there is no window / visualViewport (e.g. during SSR).
 const getViewHeight = (): string => {
     if (typeof window === 'undefined') return '';
-    const viewport = window.visualViewport;
-    if (!viewport) return '';
+    const viewport = window.visualViewport as any;
 
-    return viewport.width <= MOBILE_MAX_WIDTH
-        ? `${viewport.height}%`
-        : `${viewport.height}px`;
+    return viewport?.width <= MOBILE_MAX_WIDTH
+        ? `100%`
+        : `${viewport?.height ? viewport?.height + 'px' : '100%'}`;
 };
 
 export const useViewportHeight = () => {

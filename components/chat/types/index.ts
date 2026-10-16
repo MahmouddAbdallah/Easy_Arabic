@@ -111,7 +111,8 @@ export interface MessageType {
 export interface StoredMessage {
     id: string;
     senderId: string;
-    receiverId: string;
+    /** The other person of a direct chat. Messages of a group have no single receiver, so they don't carry it. */
+    receiverId?: string;
     text: string;
     /** ISO string, set once on send. Messages are ordered by this field. */
     time: string;

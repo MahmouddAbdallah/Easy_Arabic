@@ -21,6 +21,15 @@ export const CONVERSATIONS_API_URL = "/api/chat/conversations";
 /** Upload tickets (POST) and clean-up of unsent uploads (DELETE). */
 export const ATTACHMENTS_API_URL = "/api/chat/attachments";
 
+/** Create a group (POST). */
+export const GROUPS_API_URL = "/api/chat/groups";
+
+/** The people the signed-in user can add to a group (GET ?keyword=). */
+export const GROUP_CANDIDATES_API_URL = "/api/chat/groups/candidates";
+
+/** Upload tickets for a group's photo and for the files sent to a group (POST). */
+export const GROUP_UPLOADS_API_URL = "/api/chat/groups/uploads";
+
 /** Upper bound for edited text. (Sending is intentionally left as it was.) */
 export const MAX_MESSAGE_LENGTH = 4096;
 

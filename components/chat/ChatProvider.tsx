@@ -10,17 +10,24 @@ import { ChatArea } from './ChatArea/ChatArea';
 import { CallProvider } from './CallProvider';
 import NoChatSelected from './ChatArea/NoChatSelected';
 import { getChatId } from './lib/chatId';
+import { isGroupId } from './lib/groups';
 import { CHAT_ROOT_CLASS, CHAT_THEME_CSS } from './lib/chatTheme';
 import { laterOf } from './lib/chatState';
 import { useConversationState, type ConversationStateHandle } from './hooks/useConversationState';
 import { useConversationActions, type ConversationActions } from './hooks/useConversationActions';
+import { useGroupChat, type GroupChatState } from './hooks/useGroupChat';
 import { useViewportHeight } from './hooks/useViewportHeight';
 
 
 interface ChatContextType {
+    /** The other person of the open direct chat (?receiverId=). Null when a group, or nothing, is open. */
     receiverId: string | null;
     receiver: Partial<userType>
-    /** chats/{chatId} between the current user and the receiver; null until both are known. */
+    /** The open group (?groupId=). Null when a direct chat, or nothing, is open. */
+    groupId: string | null;
+    /** The open group's document, live: loading, ready, or unavailable (no such group, or you are not in it). */
+    group: GroupChatState;
+    /** chats/{chatId}: between the current user and the receiver for a direct chat, the group's own document for a group; null until known. */
     chatId: string | null;
     /** The current user's side of the open chat: who blocked whom, and where their history starts. */
     conversation: ConversationStateHandle;
@@ -35,9 +42,14 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC = () => {
     const searchParams = useSearchParams();
-    const receiverId = searchParams.get('receiverId');
+    // A group is opened by its own parameter; anything that isn't a group id is ignored, never trusted.
+    const groupParam = searchParams.get('groupId');
+    const groupId = isGroupId(groupParam) ? groupParam : null;
+    const receiverId = groupId ? null : searchParams.get('receiverId');
+    const hasConversation = Boolean(receiverId) || groupId !== null;
     const { user } = useAppContext();
-    const chatId = user?.id && receiverId ? getChatId(user.id, receiverId) : null;
+    const chatId = groupId ?? (user?.id && receiverId ? getChatId(user.id, receiverId) : null);
+    const group = useGroupChat(groupId, user?.id);
     const [receiver, setReceiver] = useState<Partial<userType>>({})
     const router = useRouter();
     const pathname = usePathname();
@@ -79,6 +91,8 @@ export const ChatProvider: React.FC = () => {
             value={{
                 receiverId,
                 receiver,
+                groupId,
+                group,
                 chatId,
                 conversation,
                 conversationActions,
@@ -97,7 +111,7 @@ export const ChatProvider: React.FC = () => {
                             className="flex h-full w-full">
                             {/* Conversations */}
                             <aside
-                                className={`${receiverId ? "hidden" : "flex"
+                                className={`${hasConversation ? "hidden" : "flex"
                                     } h-full w-full shrink-0 border-e border-(--chat-line) bg-(--chat-surface) md:flex md:w-85 lg:w-95`}
                             >
                                 <ChatSidebar />
@@ -105,12 +119,12 @@ export const ChatProvider: React.FC = () => {
 
                             {/* The open conversation */}
                             <main
-                                className={`${!receiverId ? "hidden" : "flex"
+                                className={`${!hasConversation ? "hidden" : "flex"
                                     } h-full min-w-0 flex-1 flex-col md:flex`}
                             >
                                 <div ref={messagesTopRef} />
 
-                                {receiverId ? <ChatArea /> : <NoChatSelected />}
+                                {hasConversation ? <ChatArea /> : <NoChatSelected />}
                             </main>
                         </div>
                     </div>
